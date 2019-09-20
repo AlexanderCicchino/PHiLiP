@@ -140,8 +140,6 @@ DGBase<dim,real>::create_collection_tuple(const unsigned int max_degree, const i
         const dealii::FESystem<dim,dim> fe_system(fe_dg, nstate);
         fe_coll.push_back (fe_system);
 
-        //
-
         dealii::Quadrature<1>     oned_quad(degree+1);
         dealii::Quadrature<dim>   volume_quad(degree+1);
         dealii::Quadrature<dim-1> face_quad(degree+1); //removed const
@@ -176,7 +174,6 @@ DGBase<dim,real>::create_collection_tuple(const unsigned int max_degree, const i
                 face_quad = face_quad_Gauss_Legendre;
             }
         //
-
 
         volume_quad_coll.push_back (volume_quad);
         face_quad_coll.push_back (face_quad);
@@ -265,12 +262,13 @@ void DGBase<dim,real>::assemble_residual (const bool compute_dRdW)
         const dealii::FEValues<dim,dim> &fe_values_volume = fe_values_collection_volume.get_present_fe_values();
 
         if (!(all_parameters->use_weak_form)) {
-            fe_values_collection_volume_lagrange.reinit (current_cell, fe_index_curr_cell, fe_index_curr_cell, fe_index_curr_cell);
+            //fe_values_collection_volume_lagrange.reinit (current_cell, fe_index_curr_cell, fe_index_curr_cell, fe_index_curr_cell);
         }
         if ( compute_dRdW ) {
             assemble_volume_terms_implicit (fe_values_volume, current_dofs_indices, current_cell_rhs);
         } else {
-            assemble_volume_terms_explicit (fe_values_volume, current_dofs_indices, current_cell_rhs);
+            //assemble_volume_terms_explicit (fe_values_volume, current_dofs_indices, current_cell_rhs);
+            current_cell_rhs = 1.0;
         }
 
         for (unsigned int iface=0; iface < dealii::GeometryInfo<dim>::faces_per_cell; ++iface) {

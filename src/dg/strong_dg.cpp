@@ -19,6 +19,53 @@
 
 namespace PHiLiP {
 
+template <int dim, typename real>
+dealii::FullMatrix<double> get_projection_operator(
+        const dealii::FiniteElement<dim> &fe,
+        const dealii::Quadrature<dim> &quad)
+{
+    const std::vector<dealii::Point<dim>> &quad_pts = quad.get_points();
+    const std::vector<double> &quad_weights = quad.get_weights();
+    const unsigned int n_quad_pts = quad.size();
+    const unsigned int n_dofs = fe.n_dofs_per_cell();
+
+    dealii::FullMatrix<real> local_mass_matrix(n_dofs);
+    dealii::FullMatrix<real> local_vandermonde_transpose_weights_matrix(n_dofs, n_quad_pts);
+    for (unsigned int itest=0; itest<n_dofs; ++itest) {
+        const unsigned int istate_test = fe.system_to_component_index(itest).first;
+        for (unsigned int itrial=itest; itrial<n_dofs; ++itrial) {
+            const unsigned int istate_trial = fe.system_to_component_index(itrial).first;
+
+            real value = 0.0;
+            if (istate_test==istate_trial) { 
+                for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+                    value +=
+                        fe.shape_value_component(itest,quad_pts[iquad],istate_test)
+                        * fe.shape_value_component(itrial,quad_pts[iquad],istate_trial)
+                        * quad_weights[iquad];
+                }
+                //std::cout << "non zero " << value << std::endl;
+            }
+            //std::cout << value << std::endl;
+            local_mass_matrix[itrial][itest] = value;
+            local_mass_matrix[itest][itrial] = value;
+        }
+
+        for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+            local_vandermonde_transpose_weights_matrix[itest][iquad] = fe.shape_value_component(itest,quad_pts[iquad],istate_test) * quad_weights[iquad];
+        }
+    }
+    
+    dealii::FullMatrix<real> local_inverse_mass_matrix(n_dofs);
+    local_inverse_mass_matrix.invert(local_mass_matrix);
+
+    dealii::FullMatrix<real> projection_operator(n_dofs, n_quad_pts);
+    local_inverse_mass_matrix.mmult(projection_operator, local_vandermonde_transpose_weights_matrix);
+
+    return projection_operator;
+}
+
+
 
 template <int dim, int nstate, typename real>
 DGStrong<dim,nstate,real>::DGStrong(
@@ -68,7 +115,6 @@ void DGStrong<dim,nstate,real>::assemble_volume_terms_implicit(
     std::vector< ADArray > soln_at_q(n_quad_pts);
     std::vector< ADArrayTensor1 > soln_grad_at_q(n_quad_pts); // Tensor initialize with zeros
 
-    std::vector< ADArrayTensor1 > conv_phys_flux_at_q(n_quad_pts);
     std::vector< ADArrayTensor1 > diss_phys_flux_at_q(n_quad_pts);
     std::vector< ADArray > source_at_q(n_quad_pts);
 
@@ -86,7 +132,7 @@ void DGStrong<dim,nstate,real>::assemble_volume_terms_implicit(
             soln_grad_at_q[iquad][istate] = 0;
         }
     }
-    // Interpolate solution to face
+    // Interpolate solution to volume quadrature nodes
     for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
         for (unsigned int idof=0; idof<n_dofs_cell; ++idof) {
               const unsigned int istate = fe_values_vol.get_fe().system_to_component_index(idof).first;
@@ -97,7 +143,6 @@ void DGStrong<dim,nstate,real>::assemble_volume_terms_implicit(
         //if(nstate>1) std::cout << "Momentum " << soln_at_q[iquad][1] << std::endl;
         //std::cout << "Energy " << soln_at_q[iquad][nstate-1] << std::endl;
         // Evaluate physical convective flux and source term
-        conv_phys_flux_at_q[iquad] = pde_physics->convective_flux (soln_at_q[iquad]);
         diss_phys_flux_at_q[iquad] = pde_physics->dissipative_flux (soln_at_q[iquad], soln_grad_at_q[iquad]);
 
         if(this->all_parameters->manufactured_convergence_study_param.use_manufactured_source_term) {
@@ -105,22 +150,58 @@ void DGStrong<dim,nstate,real>::assemble_volume_terms_implicit(
         }
     }
 
+    // Define some quadrature points for overintegration of the flux projection onto the polynomial space.
+    const int overintegrate = n_quad_pts+10;
+    const unsigned int n_quad_more_pts = n_quad_pts+overintegrate;
+    const dealii::FiniteElement<dim> &current_fe = fe_values_vol.get_fe(); // Is an FESystem
+    const dealii::QGauss<dim> quadrature_more_pts(n_quad_more_pts);
+    const std::vector<dealii::Point<dim>> &more_pts = quadrature_more_pts.get_points();
 
-    // Evaluate flux divergence by interpolating the flux
-    // Since we have nodal values of the flux, we use the Lagrange polynomials to obtain the gradients at the quadrature points.
-    const dealii::FEValues<dim,dim> &fe_values_lagrange = this->fe_values_collection_volume_lagrange.get_present_fe_values();
+    // Interpolate solution and flux to over-integrated quadrature points for the projection
+    std::vector< ADArrayTensor1 > conv_phys_flux_at_overintegrated(n_quad_more_pts);
+    for (unsigned int iquad=0; iquad<n_quad_more_pts; ++iquad) {
+        ADArray soln;
+        for (int s=0;s<nstate;++s) {
+            soln[s] = 0.0;
+        }
+        for (unsigned int idof=0; idof<n_dofs_cell; ++idof) {
+              const unsigned int istate = current_fe.system_to_component_index(idof).first;
+              soln[istate]  += soln_coeff[idof] * current_fe.shape_value_component(idof, more_pts[iquad], istate);
+        }
+        conv_phys_flux_at_overintegrated[iquad] = pde_physics->convective_flux (soln);
+    }
+
+    // Project the flux onto the polynomial space
+    const dealii::FullMatrix<real> projection_operator = get_projection_operator<dim,real>(current_fe, quadrature_more_pts);
+
+    std::vector< ADArrayTensor1 > conv_phys_flux_projected(n_quad_pts);
+    for (unsigned int idof=0; idof<n_dofs_cell; ++idof) {
+        const unsigned int istate = current_fe.system_to_component_index(idof).first;
+        conv_phys_flux_projected[idof][istate] = 0.0;
+        for (unsigned int iquad=0; iquad<n_quad_more_pts; ++iquad) {
+            conv_phys_flux_projected[idof][istate] += projection_operator[idof][iquad] * conv_phys_flux_at_overintegrated[iquad][istate];
+        }
+    }
+
+    //// Now need to interpolate this projected flux back to the currently used quadrature points
+    //std::vector< ADArrayTensor1 > conv_phys_flux_at_q(n_quad_pts);
+    //for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+    //    conv_phys_flux_at_q[iquad][istate] = 0.0;
+    //    for (unsigned int idof=0; idof<n_dofs_cell; ++idof) {
+    //        const unsigned int istate = current_fe.system_to_component_index(idof).first;
+    //        conv_phys_flux_at_q[iquad][istate] = conv_phys_flux_projected[idof][istate] * fe_values_vol.shape_value_component(idof,iquad,istate);
+    //    }
+    //}
+
+    // Evaluate flux divergence since the flux is now in polynomial form of order p.
     std::vector<ADArray> flux_divergence(n_quad_pts);
-
-    std::array<std::array<std::vector<ADtype>,nstate>,dim> f;
-    std::array<std::array<std::vector<ADtype>,nstate>,dim> g;
-
-    for (int istate = 0; istate<nstate; ++istate) {
-        for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+    for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+        for (unsigned int istate=0; istate<nstate; ++istate) {
             flux_divergence[iquad][istate] = 0.0;
-            for ( unsigned int flux_basis = 0; flux_basis < n_quad_pts; ++flux_basis ) {
-                flux_divergence[iquad][istate] += conv_phys_flux_at_q[flux_basis][istate] * fe_values_lagrange.shape_grad(flux_basis,iquad);
-            }
-
+        }
+        for ( unsigned int idof = 0; idof < n_dofs_cell; ++idof ) {
+            const unsigned int istate = current_fe.system_to_component_index(idof).first;
+            flux_divergence[iquad][istate] += conv_phys_flux_projected[idof][istate] * fe_values_vol.shape_grad_component(idof,iquad,istate);
         }
     }
 
@@ -143,8 +224,7 @@ void DGStrong<dim,nstate,real>::assemble_volume_terms_implicit(
 
             // Convective
             // Now minus such 2 integrations by parts
-            assert(JxW[iquad] - fe_values_lagrange.JxW(iquad) < 1e-14);
-
+            //assert(JxW[iquad] - fe_values_lagrange.JxW(iquad) < 1e-14);
             rhs = rhs - fe_values_vol.shape_value_component(itest,iquad,istate) * flux_divergence[iquad][istate] * JxW[iquad];
 
             //// Diffusive
