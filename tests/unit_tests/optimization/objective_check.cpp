@@ -12,9 +12,10 @@
 #include "ROL_LineSearchStep.hpp"
 //#include "ROL_StatusTest.hpp"
 
+#include "physics/initial_conditions/initial_condition.h"
 #include "physics/euler.h"
 #include "dg/dg_factory.hpp"
-#include "ode_solver/ode_solver.h"
+#include "ode_solver/ode_solver_factory.h"
 
 #include "functional/target_boundary_functional.h"
 
@@ -31,11 +32,12 @@ const double TOL = 1e-7;
 const int dim = 2;
 const int nstate = 4;
 const int POLY_DEGREE = 2;
+const int MESH_DEGREE = POLY_DEGREE+1;
 const double BUMP_HEIGHT = 0.0625;
 const double CHANNEL_LENGTH = 3.0;
 const double CHANNEL_HEIGHT = 0.8;
 const unsigned int NY_CELL = 3;
-const unsigned int NX_CELL = 4*NY_CELL;
+const unsigned int NX_CELL = 5*NY_CELL;
 
 double check_max_rel_error(std::vector<std::vector<double>> rol_check_results) {
     double max_rel_err = 999999;
@@ -64,22 +66,33 @@ int test(const unsigned int nx_ffd)
     parameter_handler.set("pde_type", "euler");
     parameter_handler.set("conv_num_flux", "roe");
     parameter_handler.set("dimension", (long int)dim);
+
     parameter_handler.enter_subsection("euler");
     parameter_handler.set("mach_infinity", 0.3);
     parameter_handler.leave_subsection();
     parameter_handler.enter_subsection("ODE solver");
+
     parameter_handler.set("nonlinear_max_iterations", (long int) 500);
-    parameter_handler.set("nonlinear_steady_residual_tolerance", 1e-12);
-    parameter_handler.set("initial_time_step", 0.05);
+    parameter_handler.set("nonlinear_steady_residual_tolerance", 1e-14);
+    //parameter_handler.set("output_solution_every_x_steps", (long int) 1);
+
+    parameter_handler.set("ode_solver_type", "implicit");
+    parameter_handler.set("initial_time_step", 10.);
     parameter_handler.set("time_step_factor_residual", 25.0);
     parameter_handler.set("time_step_factor_residual_exp", 4.0);
+
     parameter_handler.leave_subsection();
+    parameter_handler.enter_subsection("linear solver");
+    parameter_handler.enter_subsection("gmres options");
+    parameter_handler.set("linear_residual_tolerance", 1e-8);
+    parameter_handler.leave_subsection();
+    parameter_handler.leave_subsection();
+
 
     Parameters::AllParameters param;
     param.parse_parameters (parameter_handler);
 
     param.euler_param.parse_parameters (parameter_handler);
-    param.euler_param.mach_inf = 0.3;
 
     Physics::Euler<dim,nstate,double> euler_physics_double
         = Physics::Euler<dim, nstate, double>(
@@ -110,13 +123,13 @@ int test(const unsigned int nx_ffd)
         grid->clear();
         Grids::gaussian_bump(*grid, n_subdivisions, CHANNEL_LENGTH, CHANNEL_HEIGHT, 0.5*BUMP_HEIGHT);
         // Create DG object
-        std::shared_ptr < DGBase<dim, double> > dg = DGFactory<dim,double>::create_discontinuous_galerkin(&param, POLY_DEGREE, grid);
+        std::shared_ptr < DGBase<dim, double> > dg = DGFactory<dim,double>::create_discontinuous_galerkin(&param, POLY_DEGREE, POLY_DEGREE, MESH_DEGREE, grid);
 
         // Initialize coarse grid solution with free-stream
         dg->allocate_system ();
         dealii::VectorTools::interpolate(dg->dof_handler, initial_conditions, dg->solution);
         // Create ODE solver and ramp up the solution from p0
-        std::shared_ptr<ODE::ODESolver<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
+        std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
         ode_solver->initialize_steady_polynomial_ramping (POLY_DEGREE);
         // Solve the steady state problem
         ode_solver->steady_state();
@@ -146,6 +159,7 @@ int test(const unsigned int nx_ffd)
 
             if (   ijk[0] == 0 // Constrain first column of FFD points.
                 || ijk[0] == ffd_ndim_control_pts[0] - 1  // Constrain last column of FFD points.
+                || ijk[1] == 0 // Constrain first row of FFD points.
                 || d_ffd == 0 // Constrain x-direction of FFD points.
                ) {
                 continue;
@@ -172,7 +186,7 @@ int test(const unsigned int nx_ffd)
     dg->allocate_system ();
     dealii::VectorTools::interpolate(dg->dof_handler, initial_conditions, dg->solution);
     // Create ODE solver and ramp up the solution from p0
-    std::shared_ptr<ODE::ODESolver<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
+    std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
     ode_solver->initialize_steady_polynomial_ramping (POLY_DEGREE);
     // Solve the steady state problem
     ode_solver->steady_state();
@@ -262,6 +276,7 @@ int test(const unsigned int nx_ffd)
     {
         const auto direction_ctl = des_var_ctl_rol_p->clone();
         *outStream << "robj->checkGradient..." << std::endl;
+        dealii::VectorTools::interpolate(dg->dof_handler, initial_conditions, dg->solution);
         std::vector<std::vector<double>> results
             = robj->checkGradient( *des_var_ctl_rol_p, *direction_ctl, steps, true, *outStream, order);
 

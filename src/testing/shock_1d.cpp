@@ -27,7 +27,7 @@
 #include "physics/manufactured_solution.h"
 #include "dg/dg_factory.hpp"
 #include "dg/weak_dg.hpp"
-#include "ode_solver/ode_solver.h"
+#include "ode_solver/ode_solver_factory.h"
 
 
 namespace PHiLiP {
@@ -119,7 +119,7 @@ double Shock1D<dim,nstate>
     int overintegrate = 10;
     dealii::QGauss<dim> quad_extra(dg.max_degree+1+overintegrate);
     //dealii::MappingQ<dim,dim> mappingq_temp(dg.max_degree+1);
-    dealii::FEValues<dim,dim> fe_values_extra(*(dg.high_order_grid.mapping_fe_field), dg.fe_collection[dg.max_degree], quad_extra, 
+    dealii::FEValues<dim,dim> fe_values_extra(*(dg.high_order_grid->mapping_fe_field), dg.fe_collection[dg.max_degree], quad_extra, 
             dealii::update_values | dealii::update_JxW_values | dealii::update_quadrature_points);
     const unsigned int n_quad_pts = fe_values_extra.n_quadrature_points;
     std::array<double,nstate> soln_at_q;
@@ -220,10 +220,12 @@ int Shock1D<dim,nstate>
     // Set the physics' manufactured solution to be the Shocked1D1State manufactured solution
     std::shared_ptr <Physics::PhysicsBase<dim,nstate,double>> physics_double = Physics::PhysicsFactory<dim, nstate, double>::create_Physics(&param);
     std::shared_ptr <Physics::PhysicsBase<dim,nstate,FadType>> physics_fad = Physics::PhysicsFactory<dim, nstate, FadType>::create_Physics(&param);
+    std::shared_ptr <Physics::PhysicsBase<dim,nstate,RadType>> physics_rad = Physics::PhysicsFactory<dim, nstate, RadType>::create_Physics(&param);
     std::shared_ptr <Physics::PhysicsBase<dim,nstate,FadFadType>> physics_fad_fad = Physics::PhysicsFactory<dim, nstate, FadFadType>::create_Physics(&param);
     std::shared_ptr <Physics::PhysicsBase<dim,nstate,RadFadType>> physics_rad_fad = Physics::PhysicsFactory<dim, nstate, RadFadType>::create_Physics(&param);
     std::shared_ptr shocked_1d1state_double = std::make_shared < Shocked1D1State<dim,double> > (nstate);
     std::shared_ptr shocked_1d1state_fad = std::make_shared < Shocked1D1State<dim,FadType> > (nstate);
+    std::shared_ptr shocked_1d1state_rad = std::make_shared < Shocked1D1State<dim,RadType> > (nstate);
     std::shared_ptr shocked_1d1state_fad_fad = std::make_shared < Shocked1D1State<dim,FadFadType> > (nstate);
     std::shared_ptr shocked_1d1state_rad_fad = std::make_shared < Shocked1D1State<dim,RadFadType> > (nstate);
     physics_double->manufactured_solution_function = shocked_1d1state_double;
@@ -246,7 +248,7 @@ int Shock1D<dim,nstate>
                 dealii::Triangulation<dim>::smoothing_on_coarsening));
         dealii::GridGenerator::subdivided_hyper_cube(*grid_super_fine, n_1d_cells[n_grids_input-1]);
         std::shared_ptr dg_super_fine = std::make_shared< DGWeak<dim,1,double> > (&param, p_end, p_end, p_end+1, grid_super_fine);
-        dg_super_fine->set_physics(physics_double, physics_fad, physics_fad_fad, physics_rad_fad);
+        dg_super_fine->set_physics(physics_double, physics_fad, physics_rad, physics_fad_fad, physics_rad_fad);
         dg_super_fine->allocate_system ();
 
         initialize_perturbed_solution(*dg_super_fine, *physics_double);
@@ -291,26 +293,18 @@ int Shock1D<dim,nstate>
                     if (cell->face(face)->at_boundary()) cell->face(face)->set_boundary_id (1000);
                 }
             }
-            // Warp grid if requested in input file
-            if (manu_grid_conv_param.grid_type == GridEnum::sinehypercube) dealii::GridTools::transform (&warp, *grid);
-
-            // Distort grid by random amount if requested
-            const double random_factor = manu_grid_conv_param.random_distortion;
-            const bool keep_boundary = true;
-            if (random_factor > 0.0) dealii::GridTools::distort_random (random_factor, *grid, keep_boundary);
-
-            // Show mesh if in 2D
-            //std::string gridname = "grid-"+std::to_string(igrid)+".eps";
-            //if (dim == 2) print_mesh_info (grid, gridname);
+            std::vector<dealii::GridTools::PeriodicFacePair<typename Triangulation::cell_iterator> > matched_pairs;
+            dealii::GridTools::collect_periodic_faces(*grid,0,1,0,matched_pairs);
+            grid->add_periodicity(matched_pairs);
 
             // Create DG object using the factory
             //std::shared_ptr < DGBase<dim, double> > dg = DGFactory<dim,double>::create_discontinuous_galerkin(&param, poly_degree, grid);
             std::shared_ptr dg = std::make_shared< DGWeak<dim,1,double> > (&param, poly_degree, poly_degree, poly_degree+1, grid);
-            dg->set_physics(physics_double, physics_fad, physics_fad_fad, physics_rad_fad);
+            dg->set_physics(physics_double, physics_fad, physics_rad, physics_fad_fad, physics_rad_fad);
             dg->allocate_system ();
 
             // Create ODE solver using the factory and providing the DG object
-            std::shared_ptr<ODE::ODESolver<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
+            std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
 
             const unsigned int n_global_active_cells = grid->n_global_active_cells();
             const unsigned int n_dofs = dg->dof_handler.n_dofs();
@@ -332,7 +326,7 @@ int Shock1D<dim,nstate>
             int overintegrate = 10;
             dealii::QGauss<dim> quad_extra(dg->max_degree+overintegrate);
             //dealii::MappingQ<dim,dim> mappingq(dg->max_degree+1);
-            dealii::FEValues<dim,dim> fe_values_extra(*(dg->high_order_grid.mapping_fe_field), dg->fe_collection[poly_degree], quad_extra, 
+            dealii::FEValues<dim,dim> fe_values_extra(*(dg->high_order_grid->mapping_fe_field), dg->fe_collection[poly_degree], quad_extra, 
                     dealii::update_values | dealii::update_JxW_values | dealii::update_quadrature_points);
             const unsigned int n_quad_pts = fe_values_extra.n_quadrature_points;
             std::array<double,nstate> soln_at_q;

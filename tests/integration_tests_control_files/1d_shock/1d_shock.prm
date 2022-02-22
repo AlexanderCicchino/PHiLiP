@@ -8,13 +8,21 @@ set dimension = 1
 
 set pde_type  = burgers_inviscid
 
-set add_artificial_dissipation = true
+# Note: this was added to turn off check_same_coords() -- was previously false but test still passes
+# TO DO: Investigate the purpose of this parameter for dim==1; shows up in dg somewhere
+set use_periodic_bc = true
 
 set conv_num_flux = lax_friedrichs
 
+subsection artificial dissipation
+	set add_artificial_dissipation = true
+end
+
 subsection ODE solver
+  set ode_output = quiet
+
   # Maximum nonlinear solver iterations
-  set nonlinear_max_iterations            = 500
+  set nonlinear_max_iterations            = 1000
 
   # Nonlinear solver residual tolerance
   set nonlinear_steady_residual_tolerance = 1e-13
@@ -28,7 +36,7 @@ subsection ODE solver
   set output_solution_every_x_steps = 1
 
   # Explicit or implicit solverChoices are <explicit|implicit>.
-  set ode_solver_type    = implicit
+  set ode_solver_type    = explicit
 end
 
 subsection manufactured solution convergence study

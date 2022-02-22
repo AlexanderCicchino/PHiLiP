@@ -14,9 +14,10 @@
 #include "ROL_LineSearchStep.hpp"
 //#include "ROL_StatusTest.hpp"
 
+#include "physics/initial_conditions/initial_condition.h"
 #include "physics/euler.h"
 #include "dg/dg_factory.hpp"
-#include "ode_solver/ode_solver.h"
+#include "ode_solver/ode_solver_factory.h"
 
 #include "functional/target_boundary_functional.h"
 
@@ -32,12 +33,12 @@ const double CONSISTENCY_ABS_TOL = 1e-10;
 
 const int dim = 2;
 const int nstate = 4;
-const int POLY_DEGREE = 1;
+const int POLY_DEGREE = 2;
 const double BUMP_HEIGHT = 0.0625;
 const double CHANNEL_LENGTH = 3.0;
 const double CHANNEL_HEIGHT = 0.8;
-const unsigned int NY_CELL = 5;
-const unsigned int NX_CELL = 9*NY_CELL;
+const unsigned int NY_CELL = 3;
+const unsigned int NX_CELL = 5*NY_CELL;
 
 double check_max_rel_error(std::vector<std::vector<double>> rol_check_results) {
     double max_rel_err = 999999;
@@ -72,7 +73,7 @@ int test(const unsigned int nx_ffd)
     parameter_handler.enter_subsection("ODE solver");
     parameter_handler.set("nonlinear_max_iterations", (long int) 500);
     parameter_handler.set("nonlinear_steady_residual_tolerance", 1e-12);
-    parameter_handler.set("initial_time_step", 0.05);
+    parameter_handler.set("initial_time_step", 10.);
     parameter_handler.set("time_step_factor_residual", 25.0);
     parameter_handler.set("time_step_factor_residual_exp", 4.0);
     parameter_handler.leave_subsection();
@@ -148,7 +149,7 @@ int test(const unsigned int nx_ffd)
     // Initialize coarse grid solution with free-stream
     dealii::VectorTools::interpolate(dg->dof_handler, initial_conditions, dg->solution);
     // Create ODE solver and ramp up the solution from p0
-    std::shared_ptr<ODE::ODESolver<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
+    std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
     ode_solver->initialize_steady_polynomial_ramping (POLY_DEGREE);
     // Solve the steady state problem
     ode_solver->steady_state();
