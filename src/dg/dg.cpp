@@ -83,6 +83,7 @@ DGBase<dim,real,MeshType>::DGBase(
     , nstate(nstate_input)
     , initial_degree(degree)
     , max_degree(max_degree_input)
+    , store_global_mass_matrix((parameters_input->ode_solver_param.ode_solver_type == Parameters::ODESolverParam::ODESolverEnum::explicit_solver) ? false : true)
     , triangulation(triangulation_input)
     , dof_handler(*triangulation, true)
     , high_order_grid(std::make_shared<HighOrderGrid<dim,real,MeshType>>(grid_degree_input, triangulation))
@@ -2439,6 +2440,92 @@ void DGBase<dim,real,MeshType>::evaluate_local_metric_dependent_mass_matrix_and_
 
     }//end of weight-adjusted mass matrix condition
 
+}
+
+template<int dim, typename real, typename MeshType>
+void DGBase<dim,real,MeshType>::apply_inverse_global_mass_matrix(
+        dealii::LinearAlgebra::distributed::Vector<double> &input_vector,
+        dealii::LinearAlgebra::distributed::Vector<double> &output_vector)
+{
+        const unsigned int grid_degree = this->high_order_grid->fe_system.tensor_degree();
+        const dealii::FESystem<dim> &fe_metric = high_order_grid->fe_system;
+        const unsigned int n_metric_dofs = high_order_grid->fe_system.dofs_per_cell;
+        auto metric_cell = high_order_grid->dof_handler_grid.begin_active();
+        for (auto soln_cell = dof_handler.begin_active(); soln_cell != dof_handler.end(); ++soln_cell, ++metric_cell) {
+            if (!soln_cell->is_locally_owned()) continue;
+
+            const int poly_degree = soln_cell->active_fe_index();
+            const unsigned int n_dofs_cell = operators->fe_collection_basis[poly_degree].n_dofs_per_cell();
+            std::vector<dealii::types::global_dof_index> current_dofs_indices;
+            current_dofs_indices.resize(n_dofs_cell);
+            soln_cell->get_dof_indices (current_dofs_indices);
+            dealii::Vector<real> local_input_vector_dofs(n_dofs_cell);
+            dealii::Vector<real> local_output_vector_dofs(n_dofs_cell);
+            for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+                local_input_vector_dofs[idof] = input_vector[current_dofs_indices[idof]];
+            }
+
+            //get mapping support points and determinant of Jacobian
+            //setup metric cell
+            std::vector<dealii::types::global_dof_index> metric_dof_indices(n_metric_dofs);
+            metric_cell->get_dof_indices (metric_dof_indices);
+            // get mapping_support points
+            std::array<std::vector<real>,dim> mapping_support_points;
+            for(int idim=0; idim<dim; idim++){
+                mapping_support_points[idim].resize(n_metric_dofs/dim);
+            }
+            dealii::QGaussLobatto<dim> vol_GLL(grid_degree +1);
+            for (unsigned int igrid_node = 0; igrid_node< n_metric_dofs/dim; ++igrid_node) {
+                for (unsigned int idof = 0; idof< n_metric_dofs; ++idof) {
+                    const real val = (high_order_grid->volume_nodes[metric_dof_indices[idof]]);
+                    const unsigned int istate = fe_metric.system_to_component_index(idof).first; 
+                    mapping_support_points[istate][igrid_node] += val * fe_metric.shape_value_component(idof,vol_GLL.point(igrid_node),istate); 
+                }
+            }
+            //get determinant of Jacobian
+            const unsigned int n_quad_pts = operators->volume_quadrature_collection[poly_degree].size();
+            std::vector<real> determinant_Jacobian(n_quad_pts);
+            operators->build_local_vol_determinant_Jac(grid_degree, poly_degree, n_quad_pts, n_metric_dofs/dim, mapping_support_points, determinant_Jacobian);
+
+            //Apply inverse of metric dependent mass matrix
+            if(grid_degree == 1){
+                apply_linear_metric_mass_matrix(determinant_Jacobian[0],poly_degree,local_input_vector_dofs, local_output_vector_dofs);
+            }
+            else{
+                apply_curvilinear_metric_mass_matrix(determinant_Jacobian,poly_degree,local_input_vector_dofs, local_output_vector_dofs);
+            }
+
+            for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+                output_vector[current_dofs_indices[idof]] = local_output_vector_dofs[idof];
+            }
+        }//end of cell loop
+}
+template<int dim, typename real, typename MeshType>
+void DGBase<dim,real,MeshType>::apply_linear_metric_mass_matrix(
+        const real determinant_Jacobian,
+        const unsigned int poly_degree,
+        const dealii::Vector<real> &input_vector,
+        dealii::Vector<real> &output_vector)
+{
+    operators->FR_mass_inv[poly_degree].vmult(output_vector, input_vector);
+    output_vector /= determinant_Jacobian;
+}
+template<int dim, typename real, typename MeshType>
+void DGBase<dim,real,MeshType>::apply_curvilinear_metric_mass_matrix(
+        const std::vector<real> &/*determinant_Jacobian*/,
+        const unsigned int /*poly_degree*/,
+        const dealii::Vector<real> &/*input_vector*/,
+        dealii::Vector<real> &/*output_vector*/)
+{
+
+//    //quadrature weights
+//    const std::vector<real> &quad_weights = operators->volume_quadrature_collection[fe_index_curr_cell].get_weights();
+//    //if compute regular inverse
+//    if(!this->all_parameters->use_weight_adjusted_mass){
+//    }
+//    //If do weighted mass inverse
+//    else{
+//    }
 }
 
 template<int dim, typename real, typename MeshType>

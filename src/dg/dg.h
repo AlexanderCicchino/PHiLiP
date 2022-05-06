@@ -90,6 +90,13 @@ public:
      *  DGBase cannot use nstate as a compile-time known.  */
     const unsigned int max_degree;
 
+    ///Flag on whether to store and evaluate the global mass matrix.
+    /* For explicit solves, if the mesh is linear we apply the inverse of the determinant of the
+    * metric Jacobian on-the-fly multiplied by the local FR_mass_inv, whereas for curvilinear,
+    * we assemble and invert the local metric dependent mass matrix on-the-fly.
+    */
+    const bool store_global_mass_matrix;
+
     /// Principal constructor that will call delegated constructor.
     /** Will initialize mapping, fe_dg, all_parameters, volume_quadrature, and face_quadrature
      *  from DGBase. The it will new some FEValues that will be used to retrieve the
@@ -179,6 +186,31 @@ public:
         const std::vector<real> &determinant_Jacobian, 
         const std::vector<real> &quad_weights, 
         dealii::FullMatrix<real> &local_mass_matrix);
+
+    ///Applies the inverse of the local metric dependent mass matrices when the global is not stored.
+    void apply_inverse_global_mass_matrix(
+        dealii::LinearAlgebra::distributed::Vector<double> &input_vector,
+        dealii::LinearAlgebra::distributed::Vector<double> &output_vector);
+
+    ///For a linear element, applies inverse mass matrix
+    /* Since the mesh is linear, the determiannt of the metric Jacobian is constant
+    * and is factored out of the mass matrix inverse to speed up computation.
+    */
+    void apply_linear_metric_mass_matrix(
+        const real determinant_Jacobian,
+        const unsigned int poly_degree,
+        const dealii::Vector<real> &input_vector,
+        dealii::Vector<real> &output_vector);
+
+    ///For a curvilinear element, applies inverse mass matrix
+    /* Since the mesh is nonlinear, the determiannt of the metric Jacobian is a nonlinear
+    * polynomial and the inverse of the mass matrix must be assembled on-the-fly.
+    */
+    void apply_curvilinear_metric_mass_matrix(
+        const std::vector<real> &determinant_Jacobian,
+        const unsigned int poly_degree,
+        const dealii::Vector<real> &input_vector,
+        dealii::Vector<real> &output_vector);
 
     /// Evaluates the maximum stable time step
     /** If exact_time_stepping = true, use the same time step for the entire solution
