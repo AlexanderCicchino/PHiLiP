@@ -2527,6 +2527,7 @@ void DGWeak<dim,nstate,real,MeshType>::assemble_face_term(
             }
 
             rhs_int[itest_int] += rhs;
+           // pcout<<" rhs second "<<rhs_int[itest_int]<<" itest "<<itest_int<<"iquad"<<iquad<<std::endl;
             dual_dot_residual += dual_int[itest_int]*rhs;
         }
 
@@ -2548,7 +2549,6 @@ void DGWeak<dim,nstate,real,MeshType>::assemble_face_term(
             dual_dot_residual += dual_ext[itest_ext]*rhs;
         }
     } // Quadrature point loop
-
 }
 
 #ifdef FADFAD
