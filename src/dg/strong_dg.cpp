@@ -67,7 +67,8 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual ()
         pcout<<"DG Strong not yet verified for Burgers' viscous."<<std::endl;
         exit(1);
     }
-    if ( (this->all_parameters->pde_type == PDE_enum::convection_diffusion || this->all_parameters->pde_type == PDE_enum::diffusion)
+    if ( (this->all_parameters->pde_type == PDE_enum::convection_diffusion || this->all_parameters->pde_type == PDE_enum::diffusion
+        ||this->all_parameters->pde_type == PDE_enum::navier_stokes)
         && this->all_parameters->ode_solver_param.ode_solver_type == ODE_enum::explicit_solver )//auxiliary only works explicit for now
     {
         //set auxiliary rhs to 0
@@ -110,8 +111,10 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual ()
             //update ghost values
             this->auxiliary_RHS[idim].update_ghost_values();
 
+pcout<<"got here for aux"<<std::endl;
             //solve for auxiliary solution for each dimension
-            this->global_inverse_mass_matrix_auxiliary.vmult(this->auxiliary_solution[idim], this->auxiliary_RHS[idim]);
+        //    this->global_inverse_mass_matrix_auxiliary.vmult(this->auxiliary_solution[idim], this->auxiliary_RHS[idim]);
+            this->apply_inverse_global_mass_matrix(this->auxiliary_RHS[idim], this->auxiliary_solution[idim]); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
 
             //update ghost values of auxiliary solution
             this->auxiliary_solution[idim].update_ghost_values();
@@ -1135,6 +1138,12 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
 
         //Diffusion
         diffusive_phys_flux_at_q[iquad] = this->pde_physics_double->dissipative_flux(soln_at_q[iquad], aux_soln_at_q[iquad]);
+//        for(unsigned int istate=0; istate<nstate; istate++){
+//            for(int idim=0;idim<dim; idim++){
+//                pcout<<"diff phys flux "<<diffusive_phys_flux_at_q[iquad][istate][idim]<<" for istate "<<istate<<std::endl;
+//                pcout<<"Aux sol "<<aux_soln_at_q[iquad][istate][idim]<<std::endl;
+//            }
+//        }
 
         //Source
         if(this->all_parameters->manufactured_convergence_study_param.manufactured_solution_param.use_manufactured_source_term) {

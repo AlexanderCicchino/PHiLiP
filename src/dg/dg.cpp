@@ -2146,7 +2146,8 @@ void DGBase<dim,real,MeshType>::evaluate_mass_matrices (bool do_inverse_mass_mat
 {
 
     using PDE_enum = Parameters::AllParameters::PartialDifferentialEquation;
-    const bool use_auxiliary_eq = (all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion) ? true : false;//bool to simplify aux check
+   // const bool use_auxiliary_eq = (all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion) ? true : false;//bool to simplify aux check
+    const bool use_auxiliary_eq = (all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion || all_parameters->pde_type == PDE_enum::navier_stokes) ? true : false;//bool to simplify aux check
 
     // Mass matrix sparsity pattern
     //dealii::SparsityPattern dsp(dof_handler.n_dofs(), dof_handler.n_dofs(), dof_handler.get_fe_collection().max_dofs_per_cell());
@@ -2286,7 +2287,8 @@ void DGBase<dim,real,MeshType>::evaluate_local_metric_dependent_mass_matrix_and_
     using FR_Aux_enum = Parameters::AllParameters::Flux_Reconstruction_Aux;
     const FR_enum FR_Type = this->all_parameters->flux_reconstruction_type;
     const FR_Aux_enum FR_Aux_Type = this->all_parameters->flux_reconstruction_aux_type;
-    const bool use_auxiliary_eq = (this->all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion) ? true : false;//bool to simplify aux check
+   // const bool use_auxiliary_eq = (this->all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion) ? true : false;//bool to simplify aux check
+    const bool use_auxiliary_eq = (this->all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion || all_parameters->pde_type == PDE_enum::navier_stokes) ? true : false;//bool to simplify aux check
     const dealii::FESystem<dim,dim> &current_fe_ref = operators->fe_collection_basis[poly_degree];
     //set auxiliary mass matrices as primary mass matrix
     std::vector<dealii::FullMatrix<real>> local_mass_matrix_aux(dim);
@@ -2490,8 +2492,12 @@ void DGBase<dim,real,MeshType>::apply_inverse_global_mass_matrix(
             //Apply inverse of metric dependent mass matrix
             if(grid_degree == 1){
                 apply_linear_metric_mass_matrix(determinant_Jacobian[0],poly_degree,local_input_vector_dofs, local_output_vector_dofs);
+                for(unsigned int idof=0;idof<n_dofs_cell;idof++){
+            pcout<<"input vect aux RHS "<<local_input_vector_dofs[idof]<<" output vect aux sol "<<local_output_vector_dofs[idof]<<std::endl;
+                }
             }
             else{
+                pcout<<"Shouldn't be here"<<std::endl;
                 apply_curvilinear_metric_mass_matrix(determinant_Jacobian,poly_degree,local_input_vector_dofs, local_output_vector_dofs);
             }
 
