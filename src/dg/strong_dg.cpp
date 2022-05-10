@@ -62,7 +62,6 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual ()
 {
     using PDE_enum = Parameters::AllParameters::PartialDifferentialEquation;
     using ODE_enum = Parameters::ODESolverParam::ODESolverEnum;
-   // if( this->all_parameters->pde_type == PDE_enum::navier_stokes || this->all_parameters->pde_type == PDE_enum::burgers_viscous){
     if(this->all_parameters->pde_type == PDE_enum::burgers_viscous){
         pcout<<"DG Strong not yet verified for Burgers' viscous."<<std::endl;
         exit(1);
@@ -111,9 +110,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual ()
             //update ghost values
             this->auxiliary_RHS[idim].update_ghost_values();
 
-pcout<<"got here for aux"<<std::endl;
             //solve for auxiliary solution for each dimension
-        //    this->global_inverse_mass_matrix_auxiliary.vmult(this->auxiliary_solution[idim], this->auxiliary_RHS[idim]);
             this->apply_inverse_global_mass_matrix(this->auxiliary_RHS[idim], this->auxiliary_solution[idim]); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
 
             //update ghost values of auxiliary solution

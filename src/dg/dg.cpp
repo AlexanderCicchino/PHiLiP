@@ -2146,7 +2146,6 @@ void DGBase<dim,real,MeshType>::evaluate_mass_matrices (bool do_inverse_mass_mat
 {
 
     using PDE_enum = Parameters::AllParameters::PartialDifferentialEquation;
-   // const bool use_auxiliary_eq = (all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion) ? true : false;//bool to simplify aux check
     const bool use_auxiliary_eq = (all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion || all_parameters->pde_type == PDE_enum::navier_stokes) ? true : false;//bool to simplify aux check
 
     // Mass matrix sparsity pattern
@@ -2287,7 +2286,6 @@ void DGBase<dim,real,MeshType>::evaluate_local_metric_dependent_mass_matrix_and_
     using FR_Aux_enum = Parameters::AllParameters::Flux_Reconstruction_Aux;
     const FR_enum FR_Type = this->all_parameters->flux_reconstruction_type;
     const FR_Aux_enum FR_Aux_Type = this->all_parameters->flux_reconstruction_aux_type;
-   // const bool use_auxiliary_eq = (this->all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion) ? true : false;//bool to simplify aux check
     const bool use_auxiliary_eq = (this->all_parameters->pde_type == PDE_enum::convection_diffusion || all_parameters->pde_type == PDE_enum::diffusion || all_parameters->pde_type == PDE_enum::navier_stokes) ? true : false;//bool to simplify aux check
     const dealii::FESystem<dim,dim> &current_fe_ref = operators->fe_collection_basis[poly_degree];
     //set auxiliary mass matrices as primary mass matrix
@@ -2429,14 +2427,12 @@ void DGBase<dim,real,MeshType>::evaluate_local_metric_dependent_mass_matrix_and_
                 global_mass_matrix.set (dofs_indices, inverse_of_weighted_mass_inverse);
             }
         } else {
-            dealii::FullMatrix<real> inv_weighted_mass_inv(n_dofs_cell);
-            inv_weighted_mass_inv.invert(local_mass_matrix);
-            dealii::FullMatrix<real> FR_mass_matrix(n_dofs_cell);
-            FR_mass_matrix.add(1.0, operators->local_mass[curr_cell_degree], 1.0, operators->local_Flux_Reconstruction_operator[curr_cell_degree]);
             dealii::FullMatrix<real> temp(n_dofs_cell);
-            FR_mass_matrix.mmult(temp, inv_weighted_mass_inv);
+            operators->FR_mass_inv[curr_cell_degree].mmult(temp, local_mass_matrix);
+            dealii::FullMatrix<real> local_inverse_mass_matrix(n_dofs_cell);
+            temp.mmult(local_inverse_mass_matrix, operators->FR_mass_inv[curr_cell_degree]); 
             dealii::FullMatrix<real> inverse_of_weighted_mass_inverse(n_dofs_cell);
-            temp.mmult(inverse_of_weighted_mass_inverse, inv_weighted_mass_inv);
+            inverse_of_weighted_mass_inverse.invert(local_inverse_mass_matrix);
             global_mass_matrix.set (dofs_indices, inverse_of_weighted_mass_inverse);
         }
 
@@ -2492,12 +2488,8 @@ void DGBase<dim,real,MeshType>::apply_inverse_global_mass_matrix(
             //Apply inverse of metric dependent mass matrix
             if(grid_degree == 1){
                 apply_linear_metric_mass_matrix(determinant_Jacobian[0],poly_degree,local_input_vector_dofs, local_output_vector_dofs);
-                for(unsigned int idof=0;idof<n_dofs_cell;idof++){
-            pcout<<"input vect aux RHS "<<local_input_vector_dofs[idof]<<" output vect aux sol "<<local_output_vector_dofs[idof]<<std::endl;
-                }
             }
             else{
-                pcout<<"Shouldn't be here"<<std::endl;
                 apply_curvilinear_metric_mass_matrix(determinant_Jacobian,poly_degree,local_input_vector_dofs, local_output_vector_dofs);
             }
 
@@ -2518,20 +2510,67 @@ void DGBase<dim,real,MeshType>::apply_linear_metric_mass_matrix(
 }
 template<int dim, typename real, typename MeshType>
 void DGBase<dim,real,MeshType>::apply_curvilinear_metric_mass_matrix(
-        const std::vector<real> &/*determinant_Jacobian*/,
-        const unsigned int /*poly_degree*/,
-        const dealii::Vector<real> &/*input_vector*/,
-        dealii::Vector<real> &/*output_vector*/)
+        const std::vector<real> &determinant_Jacobian,
+        const unsigned int poly_degree,
+        const dealii::Vector<real> &input_vector,
+        dealii::Vector<real> &output_vector)
 {
 
-//    //quadrature weights
-//    const std::vector<real> &quad_weights = operators->volume_quadrature_collection[fe_index_curr_cell].get_weights();
-//    //if compute regular inverse
-//    if(!this->all_parameters->use_weight_adjusted_mass){
-//    }
-//    //If do weighted mass inverse
-//    else{
-//    }
+    using FR_enum = Parameters::AllParameters::Flux_Reconstruction;
+    const FR_enum FR_Type = this->all_parameters->flux_reconstruction_type;
+    //quadrature weights
+    const std::vector<real> &quad_weights = operators->volume_quadrature_collection[poly_degree].get_weights();
+    const unsigned int n_dofs_cell = operators->fe_collection_basis[poly_degree].n_dofs_per_cell();
+    const unsigned int n_quad_pts = operators->volume_quadrature_collection[poly_degree].size();
+    //if compute regular inverse
+    if(!this->all_parameters->use_weight_adjusted_mass){
+        dealii::FullMatrix<real> local_mass_matrix(n_dofs_cell);
+        std::vector<real> JxW(n_quad_pts);
+        for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+            JxW[iquad] = quad_weights[iquad] * determinant_Jacobian[iquad];
+        }
+        operators->build_local_Mass_Matrix(JxW, n_dofs_cell, n_quad_pts, poly_degree, local_mass_matrix);
+        //Only compute FR correction if not the DG case as to not waste time adding 0.
+        if(FR_Type != FR_enum::cDG){
+            //For flux reconstruction
+            dealii::FullMatrix<real> FR_correction_operator(n_dofs_cell);
+            //build metric dependent FR correction operator
+            operators->build_local_Flux_Reconstruction_operator(local_mass_matrix, n_dofs_cell, poly_degree, FR_correction_operator);
+            for (unsigned int itest=0; itest<n_dofs_cell; ++itest) {
+                for (unsigned int itrial=0; itrial<n_dofs_cell; ++itrial) {
+                    local_mass_matrix[itest][itrial] = local_mass_matrix[itest][itrial] + FR_correction_operator[itest][itrial];
+                }
+            }
+        }
+        dealii::FullMatrix<real> local_mass_matrix_inverse(n_dofs_cell);
+        local_mass_matrix_inverse.invert(local_mass_matrix);
+        local_mass_matrix_inverse.vmult(output_vector, input_vector);
+    }
+    //If do weighted mass inverse
+    else{
+        dealii::FullMatrix<real> local_mass_matrix(n_dofs_cell);
+        std::vector<real> W_J_inv(n_quad_pts);
+        for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+            W_J_inv[iquad] = quad_weights[iquad] / determinant_Jacobian[iquad]; 
+        }
+        operators->build_local_Mass_Matrix(W_J_inv, n_dofs_cell, n_quad_pts, poly_degree, local_mass_matrix);
+        //If FR case other than DG.
+        if(FR_Type != FR_enum::cDG){
+            //For flux reconstruction
+            dealii::FullMatrix<real> FR_correction_operator(n_dofs_cell);
+            operators->build_local_Flux_Reconstruction_operator(local_mass_matrix, n_dofs_cell, poly_degree, FR_correction_operator);
+            for (unsigned int itest=0; itest<n_dofs_cell; ++itest) {
+                for (unsigned int itrial=0; itrial<n_dofs_cell; ++itrial) {
+                    local_mass_matrix[itest][itrial] = local_mass_matrix[itest][itrial] + FR_correction_operator[itest][itrial];
+                }
+            }
+        }
+        dealii::FullMatrix<real> temp(n_dofs_cell);
+        operators->FR_mass_inv[poly_degree].mmult(temp, local_mass_matrix);
+        dealii::FullMatrix<real> local_inverse_mass_matrix(n_dofs_cell);
+        temp.mmult(local_inverse_mass_matrix, operators->FR_mass_inv[poly_degree]); 
+        local_inverse_mass_matrix.vmult(output_vector, input_vector);
+    }
 }
 
 template<int dim, typename real, typename MeshType>
