@@ -84,12 +84,12 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
     double left = 0.0;
     double right = 2.0;
-    const unsigned int n_grids = (all_parameters_new.use_energy) ? 4 : 5;
+    const unsigned int n_grids = (all_parameters_new.use_energy) ? 6 : 5;
     std::vector<double> grid_size(n_grids);
     std::vector<double> soln_error(n_grids);
     unsigned int poly_degree = 4;
     dealii::ConvergenceTable convergence_table;
-    const unsigned int igrid_start = 3;
+    const unsigned int igrid_start = 5;
     const unsigned int grid_degree = 1;
 
     for(unsigned int igrid = igrid_start; igrid<n_grids; igrid++){
@@ -147,6 +147,7 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
 
         if (all_parameters_new.use_energy == true){//for split form get energy
 
+finalTime=1.0;
 	    double dt = all_parameters_new.ode_solver_param.initial_time_step;
 
 	    //need to call ode_solver before calculating energy because mass matrix isn't allocated yet.

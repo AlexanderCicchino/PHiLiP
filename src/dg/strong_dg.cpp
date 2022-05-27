@@ -1189,6 +1189,39 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
         }
     }
 
+    //Compute additional term for Chebyshev entropy stability
+    double avg_soln_coeff = 0.0;
+    for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+        avg_soln_coeff += soln_coeff[idof];
+    }
+    avg_soln_coeff /= n_dofs_cell;
+    std::vector<real> soln_vector_residual_distribution(n_dofs_cell);
+    for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+        soln_vector_residual_distribution[idof] = soln_coeff[idof] - avg_soln_coeff;
+    }
+    double normalized_soln_vector_RD = 0.0;
+    for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+        normalized_soln_vector_RD += soln_vector_residual_distribution[idof] * soln_vector_residual_distribution[idof];
+    }
+
+    double chebyshev_entropy_residual_distribution = 0.0;
+    for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+        const dealii::Point<dim> qpoint  = this->operators_state->volume_quadrature_collection[poly_degree].point(iquad);
+        chebyshev_entropy_residual_distribution += //this->pde_physics_double->linear_advection_velocity[0]
+                                                  1.1 * 0.5 * soln_at_q[iquad][0] * soln_at_q[iquad][0]
+                                                  //1.0/6.0 * soln_at_q[iquad][0] * soln_at_q[iquad][0] * soln_at_q[iquad][0]
+                                                 *       this->operators_state->volume_quadrature_collection[poly_degree].weight(iquad)
+                                                 /       (1.0/std::sqrt(qpoint[0]*(1.0-qpoint[0])))
+                                                 *       ((2.0*qpoint[0]-1.0)/(pow(qpoint[0]*(1.0-qpoint[0]), 3.0/2.0)*2.0));
+    }
+
+//    pcout<<"epsilon "<<chebyshev_entropy_residual_distribution<<" normalized part "<<normalized_soln_vector_RD<<std::endl;  
+//    double check =0.0;
+//    for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+//        check += soln_coeff[idof] * soln_vector_residual_distribution[idof]; 
+//    }
+//    check /= (normalized_soln_vector_RD+1e-20);
+//    pcout<<"check "<<check<<std::endl;
 
 
     // Strong form
@@ -1210,6 +1243,16 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
             // Convective
             rhs = rhs - this->operators_state->vol_integral_basis[poly_degree][iquad][itest]  * flux_divergence[iquad][istate];
 
+            //Aditional Chebyshev term
+            const dealii::Point<dim> qpoint  = this->operators_state->volume_quadrature_collection[poly_degree].point(iquad);
+            for(int idim=0; idim<dim; idim++){
+                rhs = rhs - conv_phys_flux_at_q[iquad][istate][idim] 
+                    *       this->operators_state->basis_at_vol_cubature[poly_degree][iquad][itest] 
+                    *       this->operators_state->volume_quadrature_collection[poly_degree].weight(iquad)
+                    /       (1.0/std::sqrt(qpoint[idim]*(1.0-qpoint[idim])))
+                    *       ((2.0*qpoint[idim]-1.0)/(pow(qpoint[idim]*(1.0-qpoint[idim]), 3.0/2.0)*2.0));
+            }
+
             //// Diffusive
             //// Note that for diffusion, the negative is defined in the physics. Since we used the auxiliary
             //// variable, put a negative here.
@@ -1220,6 +1263,14 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
                 rhs = rhs + this->operators_state->vol_integral_basis[poly_degree][iquad][itest] * source_at_q[iquad][istate] * determinant_Jacobian[iquad];
             }
         }
+
+        //Chebyshev Residual Distribution Entropy Correction Term
+       // if(normalized_soln_vector_RD>1e-12){
+        rhs = rhs 
+            + chebyshev_entropy_residual_distribution
+            * soln_vector_residual_distribution[itest]
+            / (normalized_soln_vector_RD+1e-20); 
+       // }
 
         local_rhs_int_cell(itest) += rhs;
     }
@@ -1653,6 +1704,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_explicit(
             normal_int, penalty);
     }
 
+    const double pi = atan(1)*4.0;
     // From test functions associated with interior cell point of view
     for (unsigned int itest_int=0; itest_int<n_dofs_int; ++itest_int) {
         ADtype rhs = 0.0;
@@ -1662,7 +1714,9 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_explicit(
 
             // Convection
             const ADtype flux_diff = face_jac[iquad]*conv_num_flux_dot_n[iquad][istate] - conv_ref_flux_int_on_face[iquad][istate]*unit_normal_int;
-            rhs = rhs - this->operators_state->face_integral_basis[poly_degree][iface][iquad][itest_int] * flux_diff;
+           // rhs = rhs - this->operators_state->face_integral_basis[poly_degree][iface][iquad][itest_int] * flux_diff;
+            rhs = rhs - this->operators_state->face_integral_basis[poly_degree][iface][iquad][itest_int] * flux_diff
+                * pi * (poly_degree + 1.0);
 
 
             // Diffusive
@@ -1682,7 +1736,9 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_explicit(
 
             // Convection
             const ADtype flux_diff = face_jac[iquad]*(-conv_num_flux_dot_n[iquad][istate]) - conv_ref_flux_ext_on_face[iquad][istate]*(-unit_normal_int);
-            rhs = rhs - this->operators_state->face_integral_basis[poly_degree][neighbor_iface][iquad][itest_ext] * flux_diff;
+           // rhs = rhs - this->operators_state->face_integral_basis[poly_degree][neighbor_iface][iquad][itest_ext] * flux_diff;
+            rhs = rhs - this->operators_state->face_integral_basis[poly_degree][neighbor_iface][iquad][itest_ext] * flux_diff
+                * pi * (poly_degree + 1.0);
 
             // Diffusive
             const ADtype diffusive_diff = face_jac[iquad]*(-diss_auxi_num_flux_dot_n[iquad][istate]) - diffusive_ref_flux_interp_to_face_ext[iquad][istate]*(-unit_normal_int);

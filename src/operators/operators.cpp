@@ -139,23 +139,23 @@ OperatorsBase<dim,real,n_faces>::create_collection_tuple(const unsigned int max_
                 face_quad = face_quad_Gauss_Lobatto;
             }
         } else {
-            dealii::QGauss<1> oned_quad_Gauss_Legendre (degree+1);
-            dealii::QGauss<dim> vol_quad_Gauss_Legendre (degree+1);
-            dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1);
+//            dealii::QGauss<1> oned_quad_Gauss_Legendre (degree+1);
+//            dealii::QGauss<dim> vol_quad_Gauss_Legendre (degree+1);
+//            dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1);
 //Commented out, to be able to handle mixed integration weights in future.
-//            dealii::QGaussChebyshev<1> oned_quad_Gauss_Legendre (degree+1);
-//            dealii::QGaussChebyshev<dim> vol_quad_Gauss_Legendre (degree+1);
-//            if(dim == 1) {
-//                dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1);
-//            face_quad = face_quad_Gauss_Legendre;
-//            } else {
-//                dealii::QGaussChebyshev<dim-1> face_quad_Gauss_Legendre (degree+1);
-//            face_quad = face_quad_Gauss_Legendre;
-//            }
+            dealii::QGaussChebyshev<1> oned_quad_Gauss_Legendre (degree+1);
+            dealii::QGaussChebyshev<dim> vol_quad_Gauss_Legendre (degree+1);
+            if(dim == 1) {
+                dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1);
+            face_quad = face_quad_Gauss_Legendre;
+            } else {
+                dealii::QGaussChebyshev<dim-1> face_quad_Gauss_Legendre (degree+1);
+            face_quad = face_quad_Gauss_Legendre;
+            }
 
             oned_quad = oned_quad_Gauss_Legendre;
             volume_quad = vol_quad_Gauss_Legendre;
-            face_quad = face_quad_Gauss_Legendre;
+//            face_quad = face_quad_Gauss_Legendre;
         }
 
         volume_quad_coll.push_back (volume_quad);
@@ -170,7 +170,12 @@ OperatorsBase<dim,real,n_faces>::create_collection_tuple(const unsigned int max_
     for (unsigned int degree=minimum_degree; degree<=max_degree; ++degree) {
 
         // Solution FECollection
-        const dealii::FE_DGQ<dim> fe_dg(degree);
+//        const dealii::FE_DGQ<dim> fe_dg(degree);
+
+        //nodal chebyshev
+        dealii::QGaussChebyshev<1> oned_cheby(degree+1);
+        dealii::FE_DGQArbitraryNodes<dim,dim> fe_dg(oned_cheby);
+
         const dealii::FESystem<dim,dim> fe_system(fe_dg, nstate);
         fe_coll.push_back (fe_system);
 
@@ -196,21 +201,21 @@ OperatorsBase<dim,real,n_faces>::create_collection_tuple(const unsigned int max_
             }
         } else {
             const unsigned int overintegration = parameters_input->overintegration;
-            dealii::QGauss<1> oned_quad_Gauss_Legendre (degree+1+overintegration);
-            dealii::QGauss<dim> vol_quad_Gauss_Legendre (degree+1+overintegration);
-            dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
-//            dealii::QGaussChebyshev<1> oned_quad_Gauss_Legendre (degree+1+overintegration);
-//            dealii::QGaussChebyshev<dim> vol_quad_Gauss_Legendre (degree+1+overintegration);
-//            if(dim == 1) {
-//                dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
-//            face_quad = face_quad_Gauss_Legendre;
-//            } else {
-//                dealii::QGaussChebyshev<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
-//            face_quad = face_quad_Gauss_Legendre;
-//            }
+//            dealii::QGauss<1> oned_quad_Gauss_Legendre (degree+1+overintegration);
+//            dealii::QGauss<dim> vol_quad_Gauss_Legendre (degree+1+overintegration);
+//            dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
+            dealii::QGaussChebyshev<1> oned_quad_Gauss_Legendre (degree+1+overintegration);
+            dealii::QGaussChebyshev<dim> vol_quad_Gauss_Legendre (degree+1+overintegration);
+            if(dim == 1) {
+                dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
+            face_quad = face_quad_Gauss_Legendre;
+            } else {
+                dealii::QGaussChebyshev<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
+            face_quad = face_quad_Gauss_Legendre;
+            }
             oned_quad = oned_quad_Gauss_Legendre;
             volume_quad = vol_quad_Gauss_Legendre;
-            face_quad = face_quad_Gauss_Legendre;
+//            face_quad = face_quad_Gauss_Legendre;
         }
 
         volume_quad_coll.push_back (volume_quad);

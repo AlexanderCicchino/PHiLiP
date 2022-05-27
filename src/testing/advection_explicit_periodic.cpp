@@ -129,7 +129,10 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
 #endif
 
     //set the warped grid
-    PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid);
+//    PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid);
+    //straight grid setup
+    dealii::GridGenerator::hyper_cube(*grid, left, right, true);
+    grid->refine_global(igrid);
 
     //CFL number
     const unsigned int n_global_active_cells2 = grid->n_global_active_cells();
@@ -171,6 +174,7 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
          
         ode_solver->current_iteration = 0;
          
+//        finalTime = dt;
         //loop over time steps because needs to evaluate energy and conservation at each time step.
         for (int i = 0; i < std::ceil(finalTime/dt); ++ i){
             
@@ -181,16 +185,16 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
             std::cout << std::setprecision(16) << std::fixed;
             pcout << "Energy at time " << i * dt << " is " << current_energy<< std::endl;
             myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_energy << std::endl;
-            if (current_energy*initial_energy - initial_energy >= 1.00)//since normalized by initial
-            {
-                pcout << " Energy was not monotonically decreasing" << std::endl;
-            	return 1;
-            }
-            if ( (current_energy*initial_energy - initial_energy >= 1.0e-12) && (all_parameters_new.conv_num_flux_type == Parameters::AllParameters::ConvectiveNumericalFlux::central_flux))
-            {
-                pcout << " Energy was not conserved" << std::endl;
-            	return 1;
-            }
+//            if (current_energy*initial_energy - initial_energy >= 1.00)//since normalized by initial
+//            {
+//                pcout << " Energy was not monotonically decreasing" << std::endl;
+//            	return 1;
+//            }
+//            if ( (current_energy*initial_energy - initial_energy >= 1.0e-12) && (all_parameters_new.conv_num_flux_type == Parameters::AllParameters::ConvectiveNumericalFlux::central_flux))
+//            {
+//                pcout << " Energy was not conserved" << std::endl;
+//            	return 1;
+//            }
             //Conservation
          
             double current_conservation = compute_conservation(dg, poly_degree);
@@ -209,6 +213,40 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
          
         //Close the file
         myfile.close();
+
+        //write out solution for 1D
+	    std::ofstream myfile2 ("solution_to_plot.gpl" , std::ios::trunc);
+             
+           // dealii::QGaussLobatto<dim> quad_extra(dg->max_degree+1);
+            dealii::FEValues<dim,dim> fe_values_extra(*(dg->high_order_grid->mapping_fe_field), dg->operators->fe_collection_basis[poly_degree], 
+                        dg->operators->volume_quadrature_collection[poly_degree], 
+                    dealii::update_values | dealii::update_JxW_values | dealii::update_quadrature_points);
+            const unsigned int n_quad_pts = fe_values_extra.n_quadrature_points;
+            std::array<double,nstate> soln_at_q;
+            std::vector<dealii::types::global_dof_index> dofs_indices (fe_values_extra.dofs_per_cell);
+            for (auto cell = dg->dof_handler.begin_active(); cell!=dg->dof_handler.end(); ++cell) {
+            
+                if (!cell->is_locally_owned()) continue;
+            
+                fe_values_extra.reinit (cell);
+                cell->get_dof_indices (dofs_indices);
+            
+                for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+            
+                    std::fill(soln_at_q.begin(), soln_at_q.end(), 0.0);
+                    for (unsigned int idof=0; idof<fe_values_extra.dofs_per_cell; ++idof) {
+                        const unsigned int istate = fe_values_extra.get_fe().system_to_component_index(idof).first;
+                        soln_at_q[istate] += dg->solution[dofs_indices[idof]] * fe_values_extra.shape_value_component(idof, iquad, istate);
+                    }
+                    const dealii::Point<dim> qpoint = (fe_values_extra.quadrature_point(iquad));
+                std::cout << std::setprecision(16) << std::fixed;
+	        myfile2<< std::fixed << std::setprecision(16) << qpoint[0] << std::fixed << std::setprecision(16) <<" " << soln_at_q[0]<< std::endl;
+                }
+            
+            }
+             
+	    myfile2.close();
+
     }
     else{//do OOA
         if(left==-1){
