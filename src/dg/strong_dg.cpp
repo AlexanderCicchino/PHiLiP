@@ -1191,13 +1191,29 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
 
     //Compute additional term for Chebyshev entropy stability
     double avg_soln_coeff = 0.0;
+//    double normalize = 0.0;
     for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+//        const dealii::Point<dim> qpoint  = this->operators_state->volume_quadrature_collection[poly_degree].point(idof);
+//        const unsigned int iquad=idof;
+//        double deriv_w = ((2.0*qpoint[0]-1.0)/(pow(qpoint[0]*(1.0-qpoint[0]), 3.0/2.0)*2.0))
+//                       * this->operators_state->volume_quadrature_collection[poly_degree].weight(iquad)
+//                       / (1.0/std::sqrt(qpoint[0]*(1.0-qpoint[0])));
+//        deriv_w*=deriv_w;
+//        avg_soln_coeff += 1.0/std::abs(deriv_w)*soln_coeff[idof];
+//        normalize += 1.0/std::abs(deriv_w);
         avg_soln_coeff += soln_coeff[idof];
     }
     avg_soln_coeff /= n_dofs_cell;
+//    avg_soln_coeff /= normalize;
     std::vector<real> soln_vector_residual_distribution(n_dofs_cell);
     for(unsigned int idof=0; idof<n_dofs_cell; idof++){
         soln_vector_residual_distribution[idof] = soln_coeff[idof] - avg_soln_coeff;
+//        const dealii::Point<dim> qpoint  = this->operators_state->volume_quadrature_collection[poly_degree].point(idof);
+//        const unsigned int iquad=idof;
+//        double deriv_w = ((2.0*qpoint[0]-1.0)/(pow(qpoint[0]*(1.0-qpoint[0]), 3.0/2.0)*2.0))
+//                       * this->operators_state->volume_quadrature_collection[poly_degree].weight(iquad)
+//                       / (1.0/std::sqrt(qpoint[0]*(1.0-qpoint[0])));
+//        soln_vector_residual_distribution[idof] = 1.0/abs(deriv_w)*(soln_coeff[idof] - avg_soln_coeff);
     }
     double normalized_soln_vector_RD = 0.0;
     for(unsigned int idof=0; idof<n_dofs_cell; idof++){
@@ -1207,12 +1223,16 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
     double chebyshev_entropy_residual_distribution = 0.0;
     for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
         const dealii::Point<dim> qpoint  = this->operators_state->volume_quadrature_collection[poly_degree].point(iquad);
-        chebyshev_entropy_residual_distribution += //this->pde_physics_double->linear_advection_velocity[0]
-                                                  1.1 * 0.5 * soln_at_q[iquad][0] * soln_at_q[iquad][0]
-                                                  //1.0/6.0 * soln_at_q[iquad][0] * soln_at_q[iquad][0] * soln_at_q[iquad][0]
-                                                 *       this->operators_state->volume_quadrature_collection[poly_degree].weight(iquad)
-                                                 /       (1.0/std::sqrt(qpoint[0]*(1.0-qpoint[0])))
-                                                 *       ((2.0*qpoint[0]-1.0)/(pow(qpoint[0]*(1.0-qpoint[0]), 3.0/2.0)*2.0));
+        double entropy_potential = 0.0;
+        if(this->all_parameters->pde_type == Parameters::AllParameters::PartialDifferentialEquation::advection) 
+            entropy_potential = 0.5 * soln_at_q[iquad][0] * conv_phys_flux_at_q[iquad][0][0];
+        else
+            entropy_potential = 1.0/6.0 * soln_at_q[iquad][0] * soln_at_q[iquad][0] * soln_at_q[iquad][0];
+
+        chebyshev_entropy_residual_distribution += entropy_potential
+                                                 * this->operators_state->volume_quadrature_collection[poly_degree].weight(iquad)
+                                                 / (1.0/std::sqrt(qpoint[0]*(1.0-qpoint[0])))
+                                                 * ((2.0*qpoint[0]-1.0)/(pow(qpoint[0]*(1.0-qpoint[0]), 3.0/2.0)*2.0));
     }
 
 //    pcout<<"epsilon "<<chebyshev_entropy_residual_distribution<<" normalized part "<<normalized_soln_vector_RD<<std::endl;  
@@ -1271,6 +1291,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
             * soln_vector_residual_distribution[itest]
             / (normalized_soln_vector_RD+1e-20); 
        // }
+
 
         local_rhs_int_cell(itest) += rhs;
     }

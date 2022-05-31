@@ -95,7 +95,7 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
     printf("starting test\n");
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
 
-    const unsigned int n_grids = (all_parameters_new.use_energy) ? 4 : 5;
+    const unsigned int n_grids = (all_parameters_new.use_energy) ? 6 : 5;
     std::vector<double> grid_size(n_grids);
     std::vector<double> soln_error(n_grids);
     std::vector<double> soln_error_inf(n_grids);
@@ -110,7 +110,7 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
     unsigned int grid_degree = poly_degree;
     
     dealii::ConvergenceTable convergence_table;
-    const unsigned int igrid_start = 3;
+    const unsigned int igrid_start = 5;
 
     for(unsigned int igrid=igrid_start; igrid<n_refinements; ++igrid){
 #if PHILIP_DIM==1 // dealii::parallel::distributed::Triangulation<dim> does not work for 1D
@@ -132,6 +132,17 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
 //    PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid);
     //straight grid setup
     dealii::GridGenerator::hyper_cube(*grid, left, right, true);
+    //found the periodicity in dealii doesn't work as expected in 1D so I hard coded the 1D periodic condition in DG
+#if PHILIP_DIM==1
+#else
+    std::vector<dealii::GridTools::PeriodicFacePair<typename dealii::parallel::distributed::Triangulation<PHILIP_DIM>::cell_iterator> > matched_pairs;
+		dealii::GridTools::collect_periodic_faces(*grid,0,1,0,matched_pairs);
+                if(dim >= 2)
+		dealii::GridTools::collect_periodic_faces(*grid,2,3,1,matched_pairs);
+                if(dim>=3)
+		dealii::GridTools::collect_periodic_faces(*grid,4,5,2,matched_pairs);
+		grid->add_periodicity(matched_pairs);
+#endif
     grid->refine_global(igrid);
 
     //CFL number
@@ -158,7 +169,14 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
 
     if (all_parameters_new.use_energy == true){//for split form get energy
         double dt = all_parameters_new.ode_solver_param.initial_time_step;
-         
+       // dt = 0.0001;
+       // dt = 1e-6;  
+       //  finalTime = 5.0*dt;
+         finalTime = 1.0;
+         finalTime = 10.0*dt;
+         dt /=100.0;
+         finalTime = 1000.0*dt;
+
         ode_solver->current_iteration = 0;
          
         //advance by small amount, basically 0

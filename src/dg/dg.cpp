@@ -2240,7 +2240,7 @@ void DGBase<dim,real,MeshType>::evaluate_mass_matrices (bool do_inverse_mass_mat
         //Compute local matrices and set them in the global system.
         evaluate_local_metric_dependent_mass_matrix_and_set_in_global_mass_matrix(
             do_inverse_mass_matrix, fe_index_curr_cell, n_quad_pts, n_dofs_cell, dofs_indices, determinant_Jacobian, quad_weights, local_mass_matrix);
- 
+
     }//end of cell loop
 
     //Compress global matrices.

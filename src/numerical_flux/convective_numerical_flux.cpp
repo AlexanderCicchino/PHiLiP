@@ -67,6 +67,8 @@ std::array<real, nstate> LaxFriedrichs<dim,nstate,real>
             flux_dot_n += flux_avg[s][d]*normal_int[d];
         }
         numerical_flux_dot_n[s] = flux_dot_n - 0.5 * conv_max_eig * (soln_ext[s]-soln_int[s]);
+        //Chebyshev
+        numerical_flux_dot_n[s] = flux_dot_n - 0.5 * conv_max_eig * (soln_ext[s]-soln_int[s])/((3.0+1.0)*atan(1.0)*4.0);
     }
 
     return numerical_flux_dot_n;

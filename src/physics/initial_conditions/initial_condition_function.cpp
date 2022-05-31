@@ -238,7 +238,7 @@ inline real InitialConditionFunction_AdvectionEnergy<dim,nstate,real>
     else
         value = 1.5;
 
-   // value = sin(dealii::numbers::PI*point[0]);
+    value = sin(dealii::numbers::PI*point[0])+0.01;
 
     return value;
 }
