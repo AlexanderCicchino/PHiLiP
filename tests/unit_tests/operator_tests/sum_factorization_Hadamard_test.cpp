@@ -67,7 +67,7 @@ int main (int argc, char * argv[])
 
     bool different = false;
     bool different_mass = false;
-    const unsigned int poly_max = 4;
+    const unsigned int poly_max = 16;
     const unsigned int poly_min = 2;
     std::array<clock_t,poly_max> time_diff;
     std::array<clock_t,poly_max> time_diff_sum;

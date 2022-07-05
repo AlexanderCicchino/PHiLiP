@@ -1714,6 +1714,52 @@ void face_integral_basis<dim,n_faces>::build_1D_surface_operator(
 }
 
 template <int dim, int n_faces>  
+surface_integral_SBP<dim,n_faces>::surface_integral_SBP<dim(
+    const int nstate_input,
+    const unsigned int max_degree_input,
+    const unsigned int grid_degree_input)
+    : SumFactorizedOperators<dim,n_faces>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
+{
+    //Initialize to the max degrees
+    current_degree      = max_degree_input;
+}
+template <int dim, int n_faces>  
+surface_integral_SBP<dim,n_faces>::~surface_integral_SBP()
+{
+}
+template <int dim, int n_faces>  
+void surface_integral_SBP<dim,n_faces>::build_local_surface_integral_operator(
+    const unsigned int n_dofs, 
+    const dealii::FullMatrix<double> &norm_matrix, 
+    const dealii::FullMatrix<double> &face_integral, 
+    dealii::FullMatrix<double> &lifting)
+{
+    dealii::FullMatrix<double> norm_inv(n_dofs);
+    norm_inv.invert(norm_matrix);
+    norm_inv.mTmult(lifting, face_integral);
+}
+template <int dim, int n_faces>  
+void surface_integral_SBP<dim,n_faces>::build_1D_surface_operator(
+    const dealii::FESystem<1,1> &finite_element,
+    const dealii::Quadrature<0> &face_quadrature)
+{
+    const unsigned int n_face_quad_pts = face_quadrature.size();
+    const unsigned int n_dofs          = finite_element.dofs_per_cell;
+    const unsigned int n_faces_1D      = n_faces / dim;
+    //create surface integral of basis functions
+    face_integral_basis<dim,n_faces> basis_int_facet(this->nstate, this->max_degree, this->max_grid_degree);
+    basis_int_facet.build_1D_surface_operator(finite_element, face_quadrature);
+    basis_functions<dim,n_faces> basis(this->nstate, this->max_degree, this->max_grid_degree);
+    basis.build_1D_surface_operator(finite_element, face_quadrature);
+    //loop and store
+    for(unsigned int iface=0; iface<n_faces_1D; iface++){
+        //allocate the facet operator
+        this->oneD_surf_operator[iface].reinit(n_dofs, n_dofs);
+        basis.oneD_surf_operator[iface].Tmmult(this->oneD_surf_operator[iface], basis_int_facet.oneD_surf_operator[iface]);
+    }
+}
+
+template <int dim, int n_faces>  
 lifting_operator<dim,n_faces>::lifting_operator(
     const int nstate_input,
     const unsigned int max_degree_input,
@@ -2693,6 +2739,7 @@ template class vol_integral_gradient_basis <PHILIP_DIM, 2*PHILIP_DIM>;
 
 //template class basis_at_facet_cubature <PHILIP_DIM, 2*PHILIP_DIM>;
 template class face_integral_basis <PHILIP_DIM, 2*PHILIP_DIM>;
+template class surface_integral_SBP <PHILIP_DIM, 2*PHILIP_DIM>;
 template class lifting_operator <PHILIP_DIM, 2*PHILIP_DIM>;
 template class lifting_operator_FR <PHILIP_DIM, 2*PHILIP_DIM>;
 
