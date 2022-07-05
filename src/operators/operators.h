@@ -944,13 +944,6 @@ public:
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
 
-    ///Builds the local surface inner product operator. 
-    void build_local_surface_integral_operator (
-            const unsigned int n_dofs, 
-            const dealii::FullMatrix<double> &norm_matrix, 
-            const dealii::FullMatrix<double> &face_integral,
-            dealii::FullMatrix<double> &lifting);
-
     ///Assembles the one dimensional operator.
     void build_1D_surface_operator(
             const dealii::FESystem<1,1> &finite_element,
