@@ -241,6 +241,27 @@ public:
             const dealii::FullMatrix<double> &basis,//the only direction that isn't identity
             const int direction);//direction for the derivative that corresponds to basis
 
+    ///Computes the surface lifting 2pt flux Hadamard product, then sums the rows.
+    /** Note that we have the factor of 2.0 definied in this function.
+    * We also make use of the structure of the flux basis to get the matrix vector product after the Hadamard product
+    * to be \f$ \mathcal{O}(n^{d+1})\f$.
+    */
+    void surface_lifting_two_pt_flux_Hadamard_product(
+            const unsigned int face_number,
+            const dealii::Tensor<1,dim,dealii::FullMatrix<double>> &input_mat,
+            std::vector<double> &output_vect,
+            const std::vector<double> &quad_weights,//volume quad weighs for tensor product
+            const std::array<dealii::FullMatrix<double>,2> &basis_surf);//the only direction that isn't identity
+
+    ///Computes the surface lifting 2pt flux Hadamard product, then sums the rows for the single face.
+    void compute_surface_Hadamard_and_sum_rows(
+            const dealii::FullMatrix<double> &input_mat,
+            std::vector<double> &output_vect,
+            const std::vector<double> &quad_weights,//1D volume quad weighs for tensor product
+            const dealii::FullMatrix<double> &basis,
+            const unsigned int direction,
+            const double factor = 1.0);
+
     /// Apply the matrix vector operation using the 1D operator in each direction
     /** This is for the case where the operator of size dim is the dyadic product of
     * the same 1D operator in each direction

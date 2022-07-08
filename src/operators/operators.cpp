@@ -719,6 +719,158 @@ void SumFactorizedOperators<dim,n_faces>::Hadamard_product(
 
 }
 
+template <int dim, int n_faces>  
+void SumFactorizedOperators<dim,n_faces>::surface_lifting_two_pt_flux_Hadamard_product(
+    const unsigned int face_number,
+    const dealii::Tensor<1,dim,dealii::FullMatrix<double>> &input_mat,
+    std::vector<double> &output_vect,
+    const std::vector<double> &quad_weights,//volume quad weighs for tensor product
+    const std::array<dealii::FullMatrix<double>,2> &basis_surf)
+{
+    assert(input_mat[0].m() == output_vect.size());
+    assert(quad_weights.size() == basis_surf[0].m());
+    assert(quad_weights.size() == basis_surf[0].n());
+
+    if(face_number == 0){
+        compute_surface_Hadamard_and_sum_rows(input_mat[0],
+                                              output_vect,
+                                              quad_weights,
+                                              basis_surf[0],
+                                              0,//xi direction
+                                              -1.0);//reference normal -1
+    }
+    if(face_number == 1){
+        compute_surface_Hadamard_and_sum_rows(input_mat[0],
+                                              output_vect,
+                                              quad_weights,
+                                              basis_surf[1],
+                                              0,//xi direction
+                                              1.0);//reference normal 1
+    }
+    if(face_number == 2){
+        compute_surface_Hadamard_and_sum_rows(input_mat[1],
+                                              output_vect,
+                                              quad_weights,
+                                              basis_surf[0],
+                                              1,//eta direction
+                                              -1.0);//reference normal -1
+    }
+    if(face_number == 3){
+        compute_surface_Hadamard_and_sum_rows(input_mat[1],
+                                              output_vect,
+                                              quad_weights,
+                                              basis_surf[1],
+                                              1,//eta direction
+                                              1.0);//reference normal 1
+    }
+    if(face_number == 4){
+        compute_surface_Hadamard_and_sum_rows(input_mat[2],
+                                              output_vect,
+                                              quad_weights,
+                                              basis_surf[0],
+                                              2,//zeta direction
+                                              -1.0);//reference normal -1
+    }
+    if(face_number == 5){
+        compute_surface_Hadamard_and_sum_rows(input_mat[2],
+                                              output_vect,
+                                              quad_weights,
+                                              basis_surf[1],
+                                              2,//zeta direction
+                                              1.0);//reference normal 1
+    }
+
+}
+
+template <int dim, int n_faces>  
+void SumFactorizedOperators<dim,n_faces>::compute_surface_Hadamard_and_sum_rows(
+    const dealii::FullMatrix<double> &input_mat,
+    std::vector<double> &output_vect,
+    const std::vector<double> &quad_weights,//volume quad weighs for tensor product
+    const dealii::FullMatrix<double> &basis,
+    const unsigned int direction,
+    const double factor)
+{
+    assert(quad_weights.size() == basis.m());
+    assert(quad_weights.size() == basis.n());
+    if constexpr(dim==1){
+        for(unsigned int row=0; row<basis.m(); row++){//n^d rows
+            for(unsigned int col=0; col<basis.m(); col++){//only need to sum n columns
+                const unsigned int col_index = col; 
+               // output_vect[row] += 2.0 
+                output_vect[row] += 1.0 
+                                  * factor
+                                  * basis[row][col] 
+                                  * input_mat[row][col_index];//scaled by 2.0 for 2pt flux
+            }
+        }
+    }
+    if constexpr(dim==2){
+        const unsigned int size_1D = basis.m();
+        for(unsigned int irow=0; irow<size_1D; irow++){
+            for(unsigned int jrow=0; jrow<size_1D; jrow++){
+                const unsigned int row_index = irow * size_1D + jrow;
+                for(unsigned int col=0; col<size_1D; col++){
+                    if(direction==0){
+                        const unsigned int col_index = col + irow * size_1D;
+                        output_vect[row_index] += 2.0 
+                                                * factor
+                                                * basis[jrow][col]
+                                                * quad_weights[irow]
+                                                * input_mat[row_index][col_index];//scaled by 2.0 for 2pt flux
+                    }
+                    if(direction==1){
+                        const unsigned int col_index = col * size_1D + jrow;
+                        output_vect[row_index] += 2.0 
+                                                * factor
+                                                * basis[irow][col]
+                                                * quad_weights[jrow]
+                                                * input_mat[row_index][col_index];//scaled by 2.0 for 2pt flux
+                    }
+                }
+            }
+        }
+    }
+    if constexpr(dim==3){
+        const unsigned int size_1D = basis.m();
+        for(unsigned int irow=0; irow<size_1D; irow++){
+            for(unsigned int jrow=0; jrow<size_1D; jrow++){
+                for(unsigned int krow=0; krow<size_1D; krow++){
+                    const unsigned int row_index = irow * size_1D * size_1D + jrow * size_1D + krow;
+                    for(unsigned int col=0; col<size_1D; col++){
+                        if(direction==0){
+                            const unsigned int col_index = col + irow * size_1D * size_1D + jrow * size_1D;
+                            output_vect[row_index] += 2.0 
+                                                    * factor
+                                                    * basis[krow][col]
+                                                    * quad_weights[jrow]
+                                                    * quad_weights[irow]
+                                                    * input_mat[row_index][col_index];//scaled by 2.0 for 2pt flux
+                        }
+                        if(direction==1){
+                            const unsigned int col_index = col * size_1D + krow + irow * size_1D * size_1D;
+                            output_vect[row_index] += 2.0 
+                                                    * factor
+                                                    * basis[jrow][col]
+                                                    * quad_weights[krow]
+                                                    * quad_weights[irow]
+                                                    * input_mat[row_index][col_index];//scaled by 2.0 for 2pt flux
+                        }
+                        if(direction==2){
+                            const unsigned int col_index = col * size_1D * size_1D + krow + jrow * size_1D;
+                            output_vect[row_index] += 2.0 
+                                                    * factor
+                                                    * basis[irow][col]
+                                                    * quad_weights[krow]
+                                                    * quad_weights[jrow]
+                                                    * input_mat[row_index][col_index];//scaled by 2.0 for 2pt flux
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 /*******************************************
  *
  *      VOLUME OPERATORS FUNCTIONS

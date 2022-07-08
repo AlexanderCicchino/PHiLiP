@@ -4357,6 +4357,7 @@ void DGWeak<dim,nstate,real,MeshType>::assemble_face_term_strong(
     OPERATOR::basis_functions<dim,2*dim>  &/*flux_basis_ext*/,
     OPERATOR::metric_operators<real,dim,2*dim>         &/*metric_oper_int*/,
     OPERATOR::metric_operators<real,dim,2*dim>         &/*metric_oper_ext*/,
+    OPERATOR::surface_integral_SBP<dim,2*dim>          &/*surf_integral_flux_basis_SBP*/,
     dealii::Vector<real>                               &/*local_rhs_int_cell*/,
     dealii::Vector<real>                               &/*local_rhs_ext_cell*/)
 {

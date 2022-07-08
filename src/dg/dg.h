@@ -203,6 +203,7 @@ public:
         OPERATOR::basis_functions<dim,2*dim> &soln_basis_ext,
         OPERATOR::basis_functions<dim,2*dim> &flux_basis_int,
         OPERATOR::basis_functions<dim,2*dim> &flux_basis_ext,
+        OPERATOR::surface_integral_SBP<dim,2*dim> &surf_integral_flux_basis_SBP,
         OPERATOR::mapping_shape_functions<dim,2*dim> &mapping_basis);
 
     ///Builds needed operators to compute mass matrices/inverses efficiently.
@@ -551,6 +552,7 @@ public:
         OPERATOR::basis_functions<dim,2*dim> &soln_basis_ext,
         OPERATOR::basis_functions<dim,2*dim> &flux_basis_int,
         OPERATOR::basis_functions<dim,2*dim> &flux_basis_ext,
+        OPERATOR::surface_integral_SBP<dim,2*dim> &surf_integral_flux_basis_SBP,
         OPERATOR::mapping_shape_functions<dim,2*dim> &mapping_basis,
         const bool compute_Auxiliary_RHS,//flag on whether computing the Auxiliary variable's equations' residuals
         dealii::LinearAlgebra::distributed::Vector<double> &rhs,
@@ -712,6 +714,7 @@ protected:
         OPERATOR::basis_functions<dim,2*dim>        &flux_basis_ext,
         OPERATOR::metric_operators<real,dim,2*dim>         &metric_oper_int,
         OPERATOR::metric_operators<real,dim,2*dim>         &metric_oper_ext,
+        OPERATOR::surface_integral_SBP<dim,2*dim>          &surf_integral_flux_basis_SBP,
         dealii::Vector<real>                               &local_rhs_int_cell,
         dealii::Vector<real>                               &local_rhs_ext_cell) = 0;
 

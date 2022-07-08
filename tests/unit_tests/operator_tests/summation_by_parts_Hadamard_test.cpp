@@ -66,7 +66,7 @@ int main (int argc, char * argv[])
     dealii::ConditionalOStream pcout(std::cout, dealii::Utilities::MPI::this_mpi_process(MPI_COMM_WORLD)==0);
 
     bool different = false;
-    const unsigned int poly_max = 4;
+    const unsigned int poly_max = 8;
     const unsigned int poly_min = 2;
     for(unsigned int poly_degree=poly_min; poly_degree<poly_max; poly_degree++){
 
@@ -163,54 +163,17 @@ int main (int argc, char * argv[])
                 hadamard_stiff_trans.vmult(stiff_trans_2pt, ones_Vect, true);
             }
 
-            dealii::Vector<real> surf_2pt(n_dofs);
-            surf_2pt *= 0.0;
-            for(int idim=0; idim<dim; idim++){
-                dealii::FullMatrix<real> surf_dim(n_dofs);
-                if(idim==0){
-                    surf_dim = surf_SBP.tensor_product(surf_SBP.oneD_surf_operator[1],
-                                                       mass.oneD_vol_operator,
-                                                       mass.oneD_vol_operator);
-                    dealii::FullMatrix<real> temp(n_dofs);
-                    temp = surf_SBP.tensor_product(surf_SBP.oneD_surf_operator[0],
-                                                       mass.oneD_vol_operator,
-                                                       mass.oneD_vol_operator);
-                    surf_dim.add(-1.0, temp);
-                }
-                if(idim==1){
-                    surf_dim = surf_SBP.tensor_product(mass.oneD_vol_operator,
-                                                       surf_SBP.oneD_surf_operator[1],
-                                                       mass.oneD_vol_operator);
-                    dealii::FullMatrix<real> temp(n_dofs);
-                    temp = surf_SBP.tensor_product(mass.oneD_vol_operator,
-                                                       surf_SBP.oneD_surf_operator[0],
-                                                       mass.oneD_vol_operator);
-                    surf_dim.add(-1.0, temp);
-                }
-                if(idim==2){
-                    surf_dim = surf_SBP.tensor_product(mass.oneD_vol_operator,
-                                                       mass.oneD_vol_operator,
-                                                       surf_SBP.oneD_surf_operator[1]);
-                    dealii::FullMatrix<real> temp(n_dofs);
-                    temp = surf_SBP.tensor_product(mass.oneD_vol_operator,
-                                                       mass.oneD_vol_operator,
-                                                       surf_SBP.oneD_surf_operator[0]);
-                    surf_dim.add(-1.0, temp);
-                }
-
-                dealii::FullMatrix<real> hadamard_surf(n_dofs);
-                for(unsigned int i=0; i<n_dofs; i++){
-                    for(unsigned int j=0; j<n_dofs; j++){
-                        hadamard_surf[i][j] = 2.0 * surf_dim[i][j] * sol_hat_mat[i][j]; 
-                    }
-                }
-                dealii::Vector<real> ones_Vect(n_dofs);
-                for(unsigned int i=0;i<n_dofs;i++){
-                    ones_Vect[i] = 1.0;
-                }
-                hadamard_surf.vmult(surf_2pt, ones_Vect, true);
-
+            std::vector<real> surf_2pt(n_dofs);
+            const std::vector<double> &quad_weights = quad1D.get_weights();
+            for(unsigned int iface=0; iface<2*dim; iface++){
+                surf_SBP.surface_lifting_two_pt_flux_Hadamard_product(
+                            iface,
+                            dim_sol_hat_mat,
+                            surf_2pt,
+                            quad_weights,
+                            surf_SBP.oneD_surf_operator);
             }
+
 
             for(unsigned int i=0; i<n_dofs; i++){
                 if(std::abs(surf_2pt[i] - (stiff_trans_2pt[i] + integrated_div_vol_2pt[i])) >1e-13)

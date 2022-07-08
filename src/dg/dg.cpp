@@ -676,6 +676,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
     OPERATOR::basis_functions<dim,2*dim> &soln_basis_ext,
     OPERATOR::basis_functions<dim,2*dim> &flux_basis_int,
     OPERATOR::basis_functions<dim,2*dim> &flux_basis_ext,
+    OPERATOR::surface_integral_SBP<dim,2*dim> &surf_integral_flux_basis_SBP,
     OPERATOR::mapping_shape_functions<dim,2*dim> &mapping_basis,
     const bool compute_Auxiliary_RHS,
     dealii::LinearAlgebra::distributed::Vector<double> &rhs,
@@ -715,7 +716,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
             soln_basis_ext.current_degree = poly_degree; 
             flux_basis_ext.current_degree = poly_degree; 
             mapping_basis.current_degree  = poly_degree; 
-            reinit_operators_for_cell_residual_loop(poly_degree, poly_degree, grid_degree, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, mapping_basis);
+            reinit_operators_for_cell_residual_loop(poly_degree, poly_degree, grid_degree, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, surf_integral_flux_basis_SBP, mapping_basis);
         }
 
     }
@@ -913,7 +914,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                         soln_basis_ext.current_degree    = poly_degree_ext; 
                         flux_basis_ext.current_degree    = poly_degree_ext; 
                         mapping_basis.current_degree     = poly_degree_ext; 
-                        reinit_operators_for_cell_residual_loop(poly_degree, poly_degree_ext, grid_degree_ext, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, mapping_basis);
+                        reinit_operators_for_cell_residual_loop(poly_degree, poly_degree_ext, grid_degree_ext, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, surf_integral_flux_basis_SBP, mapping_basis);
                     }
                     if(!compute_Auxiliary_RHS){//only for primary equations
                         //get neighbor metric operator
@@ -970,6 +971,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                             soln_basis_int, soln_basis_ext,
                             flux_basis_int, flux_basis_ext,
                             metric_oper_int, metric_oper_ext,
+                            surf_integral_flux_basis_SBP,
                             current_cell_rhs, neighbor_cell_rhs);
                     }
                     else {
@@ -1072,7 +1074,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                         soln_basis_ext.current_degree    = poly_degree_ext; 
                         flux_basis_ext.current_degree    = poly_degree_ext; 
                         mapping_basis.current_degree     = poly_degree_ext; 
-                        reinit_operators_for_cell_residual_loop(poly_degree, poly_degree_ext, grid_degree_ext, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, mapping_basis);
+                        reinit_operators_for_cell_residual_loop(poly_degree, poly_degree_ext, grid_degree_ext, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, surf_integral_flux_basis_SBP, mapping_basis);
                     }
 
                     if(!compute_Auxiliary_RHS){//only for primary equations
@@ -1130,6 +1132,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                             soln_basis_int, soln_basis_ext,
                             flux_basis_int, flux_basis_ext,
                             metric_oper_int, metric_oper_ext,
+                            surf_integral_flux_basis_SBP,
                             current_cell_rhs, neighbor_cell_rhs);
                     }
                     else {
@@ -1239,7 +1242,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                     soln_basis_ext.current_degree    = poly_degree_ext; 
                     flux_basis_ext.current_degree    = poly_degree_ext; 
                     mapping_basis.current_degree     = poly_degree_ext; 
-                    reinit_operators_for_cell_residual_loop(poly_degree, poly_degree_ext, grid_degree_ext, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, mapping_basis);
+                    reinit_operators_for_cell_residual_loop(poly_degree, poly_degree_ext, grid_degree_ext, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, surf_integral_flux_basis_SBP, mapping_basis);
                 }
                 if(!compute_Auxiliary_RHS){//only for primary equations
                     //get neighbor metric operator
@@ -1295,6 +1298,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                         soln_basis_int, soln_basis_ext,
                         flux_basis_int, flux_basis_ext,
                         metric_oper_int, metric_oper_ext,
+                        surf_integral_flux_basis_SBP,
                         current_cell_rhs, neighbor_cell_rhs);
                 }
                 else {
@@ -1387,7 +1391,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                     soln_basis_ext.current_degree    = poly_degree_ext; 
                     flux_basis_ext.current_degree    = poly_degree_ext; 
                     mapping_basis.current_degree     = poly_degree_ext; 
-                    reinit_operators_for_cell_residual_loop(poly_degree, poly_degree_ext, grid_degree_ext, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, mapping_basis);
+                    reinit_operators_for_cell_residual_loop(poly_degree, poly_degree_ext, grid_degree_ext, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, surf_integral_flux_basis_SBP, mapping_basis);
                 }
                 if(!compute_Auxiliary_RHS){//only for primary equations
                     //get neighbor metric operator
@@ -1444,6 +1448,7 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                         soln_basis_int, soln_basis_ext,
                         flux_basis_int, flux_basis_ext,
                         metric_oper_int, metric_oper_ext,
+                        surf_integral_flux_basis_SBP,
                         current_cell_rhs, neighbor_cell_rhs);
                 }
                 else {
@@ -1713,6 +1718,7 @@ void DGBase<dim,real,MeshType>::reinit_operators_for_cell_residual_loop(
     OPERATOR::basis_functions<dim,2*dim> &soln_basis_ext,
     OPERATOR::basis_functions<dim,2*dim> &flux_basis_int,
     OPERATOR::basis_functions<dim,2*dim> &flux_basis_ext,
+    OPERATOR::surface_integral_SBP<dim,2*dim> &surf_integral_flux_basis_SBP,
     OPERATOR::mapping_shape_functions<dim,2*dim> &mapping_basis)
 {
     soln_basis_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
@@ -1730,6 +1736,8 @@ void DGBase<dim,real,MeshType>::reinit_operators_for_cell_residual_loop(
     flux_basis_ext.build_1D_gradient_operator(oneD_fe_collection_flux[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
     flux_basis_ext.build_1D_surface_operator(oneD_fe_collection_flux[poly_degree_ext], oneD_face_quadrature);
     flux_basis_ext.build_1D_surface_operator(oneD_fe_collection_flux[poly_degree_ext], oneD_face_quadrature);
+
+    surf_integral_flux_basis_SBP.build_1D_surface_operator(oneD_fe_collection_flux[poly_degree_int], oneD_face_quadrature);
 
     //We only need to compute the most recent mapping basis since we compute interior before looping faces
     mapping_basis.build_1D_shape_functions_at_grid_nodes(high_order_grid->oneD_fe_system, high_order_grid->oneD_grid_nodes);
@@ -1866,14 +1874,15 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
 
 
     const unsigned int init_grid_degree = high_order_grid->fe_system.tensor_degree();
-    OPERATOR::basis_functions<dim,2*dim> soln_basis_int(nstate, max_degree, init_grid_degree); 
-    OPERATOR::basis_functions<dim,2*dim> soln_basis_ext(nstate, max_degree, init_grid_degree); 
-    OPERATOR::basis_functions<dim,2*dim> flux_basis_int(nstate, max_degree, init_grid_degree); 
-    OPERATOR::basis_functions<dim,2*dim> flux_basis_ext(nstate, max_degree, init_grid_degree); 
-    OPERATOR::mapping_shape_functions<dim,2*dim> mapping_basis(nstate, max_degree, init_grid_degree);
+    OPERATOR::basis_functions<dim,2*dim> soln_basis_int(1, max_degree, init_grid_degree); 
+    OPERATOR::basis_functions<dim,2*dim> soln_basis_ext(1, max_degree, init_grid_degree); 
+    OPERATOR::basis_functions<dim,2*dim> flux_basis_int(1, max_degree, init_grid_degree); 
+    OPERATOR::basis_functions<dim,2*dim> flux_basis_ext(1, max_degree, init_grid_degree); 
+    OPERATOR::surface_integral_SBP<dim,2*dim> surf_integral_flux_basis_SBP(1,max_degree,this->max_grid_degree);
+    OPERATOR::mapping_shape_functions<dim,2*dim> mapping_basis(1, max_degree, init_grid_degree);
 
     reinit_operators_for_cell_residual_loop(
-        max_degree, max_degree, init_grid_degree, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, mapping_basis);
+        max_degree, max_degree, init_grid_degree, soln_basis_int, soln_basis_ext, flux_basis_int, flux_basis_ext, surf_integral_flux_basis_SBP, mapping_basis);
 
     solution.update_ghost_values();
 
@@ -1919,6 +1928,7 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
                 soln_basis_ext,
                 flux_basis_int,
                 flux_basis_ext,
+                surf_integral_flux_basis_SBP,
                 mapping_basis,
                 false,
                 right_hand_side,
