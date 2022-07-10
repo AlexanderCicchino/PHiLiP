@@ -73,6 +73,20 @@ std::array<real, nstate> LaxFriedrichs<dim,nstate,real>
 }
 
 template <int dim, int nstate, typename real>
+std::array<real, nstate> LaxFriedrichs<dim,nstate,real>::evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &/*vol_phys_flux_interp_face_int*/,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &/*vol_phys_flux_interp_face_ext*/,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &/*ref_entropy_var_int*/,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &/*ref_entropy_var_ext*/,
+    const std::array<real, nstate>                       &entropy_var_int,
+    const std::array<real, nstate>                       &/*entropy_var_ext*/,
+    const dealii::Tensor<1,dim,real>                     &/*ref_normal_int*/) const
+{
+    //do nothing
+    return entropy_var_int;
+}
+
+template <int dim, int nstate, typename real>
 void RoePike<dim,nstate,real>
 ::evaluate_entropy_fix (
     const std::array<real, 3> &eig_L,
@@ -342,10 +356,23 @@ std::array<real, nstate> RoeBase<dim,nstate,real>
 
     return numerical_flux_dot_n;
 }
+template <int dim, int nstate, typename real>
+std::array<real, nstate> RoeBase<dim,nstate,real>::evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &/*vol_phys_flux_interp_face_int*/,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &/*vol_phys_flux_interp_face_ext*/,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &/*ref_entropy_var_int*/,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &/*ref_entropy_var_ext*/,
+    const std::array<real, nstate>                       &entropy_var_int,
+    const std::array<real, nstate>                       &/*entropy_var_ext*/,
+    const dealii::Tensor<1,dim,real>                     &/*ref_normal_int*/) const
+{
+    //do nothing
+    return entropy_var_int;
+}
 
 template <int dim, int nstate, typename real>
 std::array<real, nstate> EntropyConsNumFlux<dim,nstate,real>::evaluate_flux(
- const std::array<real, nstate> &soln_int,
+    const std::array<real, nstate> &soln_int,
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal_int) const
 {
@@ -363,6 +390,40 @@ std::array<real, nstate> EntropyConsNumFlux<dim,nstate,real>::evaluate_flux(
         }
         numerical_flux_dot_n[s] = flux_dot_n;
     }
+    return numerical_flux_dot_n;
+}
+
+template <int dim, int nstate, typename real>
+std::array<real, nstate> EntropyConsNumFlux<dim,nstate,real>::evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_int,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_ext,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_int,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_ext,
+    const std::array<real, nstate> &entropy_var_int,
+    const std::array<real, nstate> &entropy_var_ext,
+    const dealii::Tensor<1,dim,real> &ref_normal_int) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> conv_flux;
+    for(int istate=0; istate<nstate; istate++){
+        for(int idim=0; idim<dim; idim++){
+            conv_flux[istate][idim] = 0.0;
+            for(int jdim=0; jdim<dim; jdim++){
+                conv_flux[istate][idim] += 1.0/3.0
+                                         * (vol_phys_flux_interp_face_int[istate][jdim] * ref_entropy_var_int[istate][jdim][idim] 
+                                         -  vol_phys_flux_interp_face_ext[istate][jdim] * ref_entropy_var_ext[istate][jdim][idim]) 
+                                         / (entropy_var_int[istate] - entropy_var_ext[istate] + 1e-12);
+            }
+        }
+    }
+    std::array<real, nstate> numerical_flux_dot_n;
+    for (int s=0; s<nstate; s++) {
+        real flux_dot_n = 0.0;
+        for (int d=0; d<dim; ++d) {
+            flux_dot_n += conv_flux[s][d] * ref_normal_int[d];
+        }
+        numerical_flux_dot_n[s] = flux_dot_n;
+    }
+
     return numerical_flux_dot_n;
 }
 
@@ -401,6 +462,19 @@ std::array<real, nstate> CentralNumFlux<dim,nstate,real>::evaluate_flux(
 }
 
 template <int dim, int nstate, typename real>
+std::array<real, nstate> CentralNumFlux<dim,nstate,real>::evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &/*vol_phys_flux_interp_face_int*/,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &/*vol_phys_flux_interp_face_ext*/,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &/*ref_entropy_var_int*/,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &/*ref_entropy_var_ext*/,
+    const std::array<real, nstate>                       &entropy_var_int,
+    const std::array<real, nstate>                       &/*entropy_var_ext*/,
+    const dealii::Tensor<1,dim,real>                     &/*ref_normal_int*/) const
+{
+    //do nothing
+    return entropy_var_int;
+}
+template <int dim, int nstate, typename real>
 std::array<real, nstate> SplitFormNumFlux<dim,nstate,real>::evaluate_flux(
  const std::array<real, nstate> &soln_int,
     const std::array<real, nstate> &soln_ext,
@@ -437,6 +511,19 @@ std::array<real, nstate> SplitFormNumFlux<dim,nstate,real>::evaluate_flux(
     // std::cout << "about to return split num flux" <<std::endl;
     return numerical_flux_dot_n;
  }
+template <int dim, int nstate, typename real>
+std::array<real, nstate> SplitFormNumFlux<dim,nstate,real>::evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &/*vol_phys_flux_interp_face_int*/,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &/*vol_phys_flux_interp_face_ext*/,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &/*ref_entropy_var_int*/,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &/*ref_entropy_var_ext*/,
+    const std::array<real, nstate>                       &entropy_var_int,
+    const std::array<real, nstate>                       &/*entropy_var_ext*/,
+    const dealii::Tensor<1,dim,real>                     &/*ref_normal_int*/) const
+{
+    //do nothing
+    return entropy_var_int;
+}
 
 // Instantiation
 template class NumericalFluxConvective<PHILIP_DIM, 1, double>;

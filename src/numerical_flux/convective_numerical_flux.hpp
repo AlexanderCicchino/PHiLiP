@@ -23,6 +23,16 @@ virtual std::array<real, nstate> evaluate_flux (
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal1) const = 0;
 
+/// Returns the Tadmor shuffle for surface numerical flux.
+virtual std::array<real, nstate> evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_int,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_ext,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_int,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_ext,
+    const std::array<real, nstate> &entropy_var_int,
+    const std::array<real, nstate> &entropy_var_ext,
+    const dealii::Tensor<1,dim,real> &ref_normal_int) const = 0;
+
 };
 
 
@@ -45,6 +55,16 @@ std::array<real, nstate> evaluate_flux (
     const std::array<real, nstate> &soln_int,
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal1) const;
+
+/// Returns the Tadmor shuffle for surface numerical flux.
+std::array<real, nstate> evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_int,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_ext,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_int,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_ext,
+    const std::array<real, nstate> &entropy_var_int,
+    const std::array<real, nstate> &entropy_var_ext,
+    const dealii::Tensor<1,dim,real> &ref_normal_int) const;
 
 protected:
 /// Numerical flux requires physics to evaluate convective eigenvalues.
@@ -96,6 +116,17 @@ public:
 	    const std::array<real, nstate> &soln_int,
 	    const std::array<real, nstate> &soln_ext,
 	    const dealii::Tensor<1,dim,real> &normal1) const;
+
+/// Returns the Tadmor shuffle for surface numerical flux.
+std::array<real, nstate> evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_int,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_ext,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_int,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_ext,
+    const std::array<real, nstate> &entropy_var_int,
+    const std::array<real, nstate> &entropy_var_ext,
+    const dealii::Tensor<1,dim,real> &ref_normal_int) const;
+
 };
 
 /// RoePike flux with entropy fix. Derived from RoeBase.
@@ -124,6 +155,7 @@ public:
 	    const std::array<real, 3> &eig_R,
 	    real &dV_normal, 
 	    dealii::Tensor<1,dim,real> &dV_tangent) const;
+
 };
 
 /// L2Roe flux with entropy fix. Derived from RoeBase.
@@ -164,6 +196,7 @@ protected:
 	    const std::array<real, 3> &eig_R,
 	    int &ssw_LEFT,
 	    int &ssw_RIGHT) const;
+
 };
 
 /// Entropy Conserving Numerica Flux currently only for Burgers' split-form 1D.
@@ -185,6 +218,16 @@ std::array<real, nstate> evaluate_flux (
     const std::array<real, nstate> &soln_int,
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal1) const;
+
+/// Returns the Tadmor shuffle for surface numerical flux.
+std::array<real, nstate> evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_int,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_ext,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_int,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_ext,
+    const std::array<real, nstate> &entropy_var_int,
+    const std::array<real, nstate> &entropy_var_ext,
+    const dealii::Tensor<1,dim,real> &ref_normal_int) const;
 
 protected:
 /// Numerical flux requires physics to evaluate convective eigenvalues.
@@ -212,6 +255,17 @@ std::array<real, nstate> evaluate_flux (
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal1) const;
 
+/// Returns the Tadmor shuffle for surface numerical flux.
+std::array<real, nstate> evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_int,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_ext,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_int,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_ext,
+    const std::array<real, nstate> &entropy_var_int,
+    const std::array<real, nstate> &entropy_var_ext,
+    const dealii::Tensor<1,dim,real> &ref_normal_int) const;
+
+
 protected:
 /// Numerical flux requires physics to evaluate convective eigenvalues.
 const std::shared_ptr < Physics::PhysicsBase<dim, nstate, real> > pde_physics;
@@ -237,6 +291,17 @@ std::array<real, nstate> evaluate_flux (
     const std::array<real, nstate> &soln_int,
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal1) const;
+
+/// Returns the Tadmor shuffle for surface numerical flux.
+std::array<real, nstate> evaluate_Tadmor_shuffle_modified(
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_int,
+    const std::array<dealii::Tensor<1,dim,real>, nstate> &vol_phys_flux_interp_face_ext,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_int,
+    const std::array<dealii::Tensor<2,dim,real>, nstate> &ref_entropy_var_ext,
+    const std::array<real, nstate> &entropy_var_int,
+    const std::array<real, nstate> &entropy_var_ext,
+    const dealii::Tensor<1,dim,real> &ref_normal_int) const;
+
 
 protected:
 /// Numerical flux requires physics to evaluate convective eigenvalues.

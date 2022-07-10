@@ -156,6 +156,7 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         if (all_parameters_new.use_energy == true){//for split form get energy
 
             double dt = all_parameters_new.ode_solver_param.initial_time_step;
+            finalTime = dt;
 
             //need to call ode_solver before calculating energy because mass matrix isn't allocated yet.
             ode_solver->current_iteration = 0;

@@ -1069,6 +1069,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> diffusive_ref_flux_at_vol_q_int;
     //The matrix of two-pt fluxes for Hadamard products
     std::array<dealii::Tensor<1,dim,dealii::FullMatrix<real>>,nstate> conv_ref_2pt_flux_at_q_int;
+//    std::array<dealii::Tensor<2,dim,std::vector<real>>,nstate> soln_ref_transformed_int;
 
     for (unsigned int iquad=0; iquad<n_quad_pts_vol_int; ++iquad) {
 
@@ -1166,6 +1167,10 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                     conv_ref_flux_at_vol_q_int[istate][idim].resize(n_quad_pts_vol_int);
                     conv_ref_2pt_flux_at_q_int[istate][idim].reinit(n_quad_pts_vol_int, n_quad_pts_vol_int);
                     diffusive_ref_flux_at_vol_q_int[istate][idim].resize(n_quad_pts_vol_int);
+
+//                    for(int jdim=0; jdim<dim; jdim++){
+//                        soln_ref_transformed_int[istate][idim][jdim].resize(n_quad_pts_vol_int);
+//                    }
                 }
                 //write data
                 if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
@@ -1174,9 +1179,13 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                         conv_ref_2pt_flux_at_q_int[istate][idim][iquad][flux_basis] = conv_ref_flux_2pt[flux_basis][istate][idim];
                         conv_ref_2pt_flux_at_q_int[istate][idim][flux_basis][iquad] = conv_ref_flux_2pt[flux_basis][istate][idim];
                     }
+//                    for(int jdim=0; jdim<dim; jdim++){
+//                        soln_ref_transformed_int[istate][idim][jdim][iquad] = metric_cofactor_vol_int[idim][jdim] * soln_state[istate];
+//                    }
                 }
                 else{
                     conv_ref_flux_at_vol_q_int[istate][idim][iquad] = conv_ref_flux[idim];
+//                    conv_ref_flux_at_vol_q_int[istate][idim][iquad] = conv_phys_flux[istate][idim];
                 }
 
                 diffusive_ref_flux_at_vol_q_int[istate][idim][iquad] = diffusive_ref_flux[idim];
@@ -1191,6 +1200,8 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
 
     //The matrix of two-pt fluxes for Hadamard products
     std::array<dealii::Tensor<1,dim,dealii::FullMatrix<real>>,nstate> conv_ref_2pt_flux_at_q_ext;
+
+//    std::array<dealii::Tensor<2,dim,std::vector<real>>,nstate> soln_ref_transformed_ext;
 
     for (unsigned int iquad=0; iquad<n_quad_pts_vol_ext; ++iquad) {
 
@@ -1286,6 +1297,10 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                     conv_ref_flux_at_vol_q_ext[istate][idim].resize(n_quad_pts_vol_ext);
                     conv_ref_2pt_flux_at_q_ext[istate][idim].reinit(n_quad_pts_vol_ext, n_quad_pts_vol_ext);
                     diffusive_ref_flux_at_vol_q_ext[istate][idim].resize(n_quad_pts_vol_ext);
+
+//                    for(int jdim=0; jdim<dim; jdim++){
+//                        soln_ref_transformed_ext[istate][idim][jdim].resize(n_quad_pts_vol_ext);
+//                    }
                 }
                 //write data
                 if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
@@ -1294,9 +1309,13 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                         conv_ref_2pt_flux_at_q_ext[istate][idim][iquad][flux_basis] = conv_ref_flux_2pt[flux_basis][istate][idim];
                         conv_ref_2pt_flux_at_q_ext[istate][idim][flux_basis][iquad] = conv_ref_flux_2pt[flux_basis][istate][idim];
                     }
+//                    for(int jdim=0; jdim<dim; jdim++){
+//                        soln_ref_transformed_ext[istate][idim][jdim][iquad] = metric_cofactor_vol_ext[idim][jdim] * soln_state[istate];
+//                    }
                 }
                 else{
                     conv_ref_flux_at_vol_q_ext[istate][idim][iquad] = conv_ref_flux[idim];
+//                    conv_ref_flux_at_vol_q_ext[istate][idim][iquad] = conv_phys_flux[istate][idim];
                 }
 
                 diffusive_ref_flux_at_vol_q_ext[istate][idim][iquad] = diffusive_ref_flux[idim];
@@ -1339,12 +1358,19 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
         diag_vol_quad_weights_ext_1D[iquad][iquad] = vol_quad_weights_ext_1D[iquad];
     }
 
+
+//    std::array<dealii::Tensor<2,dim,std::vector<real>>,nstate> ref_transformed_soln_int_interp_face;
+//    std::array<dealii::Tensor<2,dim,std::vector<real>>,nstate> ref_transformed_soln_ext_interp_face;
+//    std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> phys_flux_int_interp_face;
+//    std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> phys_flux_ext_interp_face;
+
     for(int istate=0; istate<nstate; istate++){
         //allocate
         conv_int_vol_ref_flux_integrated_face[istate].resize(n_quad_pts_vol_int);
         conv_ext_vol_ref_flux_integrated_face[istate].resize(n_quad_pts_vol_ext);
         diffusive_int_vol_ref_flux_interp_to_face_dot_ref_normal[istate].resize(n_face_quad_pts);
         diffusive_ext_vol_ref_flux_interp_to_face_dot_ref_normal[istate].resize(n_face_quad_pts);
+
 
         //solve
         //Note, since the normal is zero in all other reference directions, we only have to interpolate one given reference direction to the facet
@@ -1396,6 +1422,41 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                                                      flux_basis_ext.oneD_surf_operator,
                                                      flux_basis_ext.oneD_vol_operator,
                                                      false, -unit_ref_normal_int[dim_not_zero]);
+
+
+//        for(int idim=0; idim<dim; idim++){
+//            for(int jdim=0; jdim<dim; jdim++){
+//                ref_transformed_soln_int_interp_face[istate][idim][jdim].resize(n_face_quad_pts);
+//                ref_transformed_soln_ext_interp_face[istate][idim][jdim].resize(n_face_quad_pts);
+//                flux_basis_int.matrix_vector_mult_surface_1D(iface, 
+//                                                             soln_ref_transformed_int[istate][idim][jdim],
+//                                                             ref_transformed_soln_int_interp_face[istate][idim][jdim],
+//                                                             flux_basis_int.oneD_surf_operator,
+//                                                             flux_basis_int.oneD_vol_operator,
+//                                                             false, 1.0);
+//                flux_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface, 
+//                                                             soln_ref_transformed_ext[istate][idim][jdim],
+//                                                             ref_transformed_soln_ext_interp_face[istate][idim][jdim],
+//                                                             flux_basis_ext.oneD_surf_operator,
+//                                                             flux_basis_ext.oneD_vol_operator,
+//                                                             false, 1.0);
+//
+//            }
+//            phys_flux_int_interp_face[istate][idim].resize(n_face_quad_pts);
+//            phys_flux_ext_interp_face[istate][idim].resize(n_face_quad_pts);
+//            flux_basis_int.matrix_vector_mult_surface_1D(iface, 
+//                                                         conv_ref_flux_at_vol_q_int[istate][idim],
+//                                                         phys_flux_int_interp_face[istate][idim],
+//                                                         flux_basis_int.oneD_surf_operator,
+//                                                         flux_basis_int.oneD_vol_operator,
+//                                                         false, 1.0);
+//            flux_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface, 
+//                                                         conv_ref_flux_at_vol_q_ext[istate][idim],
+//                                                         phys_flux_ext_interp_face[istate][idim],
+//                                                         flux_basis_ext.oneD_surf_operator,
+//                                                         flux_basis_ext.oneD_vol_operator,
+//                                                         false, 1.0);
+//        }
     }
 //    pcout<<"the hadamard lift int"<<std::endl;
 //    for(unsigned int iquad=0;iquad<n_quad_pts_vol_int; iquad++){
@@ -1440,12 +1501,24 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
         std::array<real,nstate> soln_state_ext;
         std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state_int;
         std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state_ext;
+
+//        std::array<dealii::Tensor<2,dim,real>,nstate> ref_interp_soln_state_int;
+//        std::array<dealii::Tensor<2,dim,real>,nstate> ref_interp_soln_state_ext;
+//        std::array<dealii::Tensor<1,dim,real>,nstate> phys_flux_state_int;
+//        std::array<dealii::Tensor<1,dim,real>,nstate> phys_flux_state_ext;
         for(int istate=0; istate<nstate; istate++){
             soln_state_int[istate] = soln_at_surf_q_int[istate][iquad];
             soln_state_ext[istate] = soln_at_surf_q_ext[istate][iquad];
             for(int idim=0; idim<dim; idim++){
                 aux_soln_state_int[istate][idim] = aux_soln_at_surf_q_int[istate][idim][iquad];
                 aux_soln_state_ext[istate][idim] = aux_soln_at_surf_q_int[istate][idim][iquad];
+
+//                for(int jdim=0; jdim<dim; jdim++){
+//                    ref_interp_soln_state_int[istate][idim][jdim] = ref_transformed_soln_int_interp_face[istate][idim][jdim][iquad];
+//                    ref_interp_soln_state_ext[istate][idim][jdim] = ref_transformed_soln_ext_interp_face[istate][idim][jdim][iquad];
+//                }
+//                phys_flux_state_int[istate][idim] = phys_flux_int_interp_face[istate][idim][iquad];
+//                phys_flux_state_ext[istate][idim] = phys_flux_ext_interp_face[istate][idim][iquad];
             }
         }
 
@@ -1470,7 +1543,33 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
         std::array<real,nstate> conv_num_flux_dot_n_at_q;
         std::array<real,nstate> diss_auxi_num_flux_dot_n_at_q;
         //Convective numerical flux. 
-        conv_num_flux_dot_n_at_q = this->conv_num_flux_double->evaluate_flux(soln_state_int, soln_state_ext, unit_phys_normal_int);
+//        if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
+//            for(int istate=0; istate<nstate; istate++){
+//                pcout<<"sol int "<<soln_state_int[istate]<<"sol ext "<<soln_state_ext[istate]<<std::endl;
+//                for(int idim=0; idim<dim; idim++){
+//                    pcout<<"flux int "<<phys_flux_state_int[istate][idim]<<"flux ext "<<phys_flux_state_ext[istate][idim]<<std::endl;
+//                    for(int jdim=0; jdim<dim; jdim++){
+//                        pcout<<"interp sol ref int "<<ref_interp_soln_state_int[istate][idim][jdim]<<std::endl;
+//                        pcout<<"interp sol ref ext "<<ref_interp_soln_state_ext[istate][idim][jdim]<<std::endl;
+//                    }
+//                }
+//
+//            }
+//            conv_num_flux_dot_n_at_q = this->conv_num_flux_double->evaluate_Tadmor_shuffle_modified(
+//                                                phys_flux_state_int,
+//                                                phys_flux_state_ext,
+//                                                ref_interp_soln_state_int,
+//                                                ref_interp_soln_state_ext,
+//                                                soln_state_int,
+//                                                soln_state_ext,
+//                                                unit_ref_normal_int);
+//            for(int istate=0; istate<nstate; istate++){
+//                pcout<<"num flux "<<conv_num_flux_dot_n_at_q[istate]<<std::endl;
+//            }
+//        }
+//        else {
+            conv_num_flux_dot_n_at_q = this->conv_num_flux_double->evaluate_flux(soln_state_int, soln_state_ext, unit_phys_normal_int);
+//        }
         //dissipative numerical flux
         diss_auxi_num_flux_dot_n_at_q = this->diss_num_flux_double->evaluate_auxiliary_flux(
             current_cell_index, neighbor_cell_index,
