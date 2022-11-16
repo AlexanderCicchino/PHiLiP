@@ -16,7 +16,7 @@ set two_point_num_flux_type = Ra
 
 set use_curvilinear_split_form = true
 
-set energy_file = testing_4x4
+set energy_file = Ra_4x4_with_p_work_coll_cplus
 
 # The PDE we want to solve
 set pde_type = euler
