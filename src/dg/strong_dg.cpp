@@ -1863,6 +1863,13 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
             std::array<real,nstate> soln_state_face_ext;
             soln_state_face_ext = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var_face_ext);
 
+
+//            for(int istate=0; istate<nstate; istate++){
+//                soln_state_face_int[istate] = soln_at_surf_q_int[istate][iquad_face];
+//                soln_state_face_ext[istate] = soln_at_surf_q_ext[istate][iquad_face];
+//            }
+
+
             for (unsigned int iquad_vol=0; iquad_vol<n_quad_pts_vol_int; ++iquad_vol) {
                 // Copy Metric Cofactor in a way can use for transforming Tensor Blocks to reference space
                 // The way it is stored in metric_operators is to use sum-factorization in each direction,

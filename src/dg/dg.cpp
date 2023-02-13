@@ -176,28 +176,29 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
         const dealii::FESystem<1,1> fe_system_1D_1state(fe_dg_1D, 1);
         fe_coll_1D_1state.push_back (fe_system_1D_1state);
 
-        dealii::Quadrature<1>     oneD_quad(degree+1);
-        dealii::Quadrature<dim>   volume_quad(degree+1);
-        dealii::Quadrature<dim-1> face_quad(degree+1); //removed const
+        const unsigned int overintegration = parameters_input->overintegration;
+        dealii::Quadrature<1>     oneD_quad(degree+1+overintegration);
+        dealii::Quadrature<dim>   volume_quad(degree+1+overintegration);
+        dealii::Quadrature<dim-1> face_quad(degree+1+overintegration); //removed const
 
         if (parameters_input->use_collocated_nodes) {
 
-            dealii::QGaussLobatto<1> oneD_quad_Gauss_Lobatto (degree+1);
-            dealii::QGaussLobatto<dim> vol_quad_Gauss_Lobatto (degree+1);
+            dealii::QGaussLobatto<1> oneD_quad_Gauss_Lobatto (degree+1+overintegration);
+            dealii::QGaussLobatto<dim> vol_quad_Gauss_Lobatto (degree+1+overintegration);
             oneD_quad = oneD_quad_Gauss_Lobatto;
             volume_quad = vol_quad_Gauss_Lobatto;
 
             if(dim == 1) {
-                dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1);
+                dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
                 face_quad = face_quad_Gauss_Legendre;
             } else {
-                dealii::QGaussLobatto<dim-1> face_quad_Gauss_Lobatto (degree+1);
+                dealii::QGaussLobatto<dim-1> face_quad_Gauss_Lobatto (degree+1+overintegration);
                 face_quad = face_quad_Gauss_Lobatto;
             }
         } else {
-            dealii::QGauss<1> oneD_quad_Gauss_Legendre (degree+1);
-            dealii::QGauss<dim> vol_quad_Gauss_Legendre (degree+1);
-            dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1);
+            dealii::QGauss<1> oneD_quad_Gauss_Legendre (degree+1+overintegration);
+            dealii::QGauss<dim> vol_quad_Gauss_Legendre (degree+1+overintegration);
+            dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
             oneD_quad = oneD_quad_Gauss_Legendre;
             volume_quad = vol_quad_Gauss_Legendre;
             face_quad = face_quad_Gauss_Legendre;
@@ -232,28 +233,33 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
         const dealii::FESystem<1,1> fe_system_1D_1state(fe_dg_1D, 1);
         fe_coll_1D_1state.push_back (fe_system_1D_1state);
 
-        dealii::Quadrature<1>     oneD_quad(degree+1);
-        dealii::Quadrature<dim>   volume_quad(degree+1);
-        dealii::Quadrature<dim-1> face_quad(degree+1); //removed const
+        const unsigned int overintegration = parameters_input->overintegration;
+        dealii::Quadrature<1>     oneD_quad(degree+1+overintegration);
+        dealii::Quadrature<dim>   volume_quad(degree+1+overintegration);
+        dealii::Quadrature<dim-1> face_quad(degree+1+overintegration); //removed const
+//        dealii::Quadrature<1>     oneD_quad(degree+1);
+//        dealii::Quadrature<dim>   volume_quad(degree+1);
+//        dealii::Quadrature<dim-1> face_quad(degree+1); //removed const
 
         if (parameters_input->use_collocated_nodes) {
-            dealii::QGaussLobatto<1> oneD_quad_Gauss_Lobatto (degree+1);
-            dealii::QGaussLobatto<dim> vol_quad_Gauss_Lobatto (degree+1);
+//            const unsigned int overintegration = parameters_input->overintegration;
+            dealii::QGaussLobatto<1> oneD_quad_Gauss_Lobatto (degree+1+overintegration);
+            dealii::QGaussLobatto<dim> vol_quad_Gauss_Lobatto (degree+1+overintegration);
             oneD_quad = oneD_quad_Gauss_Lobatto;
             volume_quad = vol_quad_Gauss_Lobatto;
 
             if(dim == 1)
             {
-                dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1);
+                dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);
                 face_quad = face_quad_Gauss_Legendre;
             }
             else
             {
-                dealii::QGaussLobatto<dim-1> face_quad_Gauss_Lobatto (degree+1);
+                dealii::QGaussLobatto<dim-1> face_quad_Gauss_Lobatto (degree+1+overintegration);
                 face_quad = face_quad_Gauss_Lobatto;
             }
         } else {
-            const unsigned int overintegration = parameters_input->overintegration;
+//            const unsigned int overintegration = parameters_input->overintegration;
             dealii::QGauss<1> oneD_quad_Gauss_Legendre (degree+1+overintegration);
             dealii::QGauss<dim> vol_quad_Gauss_Legendre (degree+1+overintegration);
             dealii::QGauss<dim-1> face_quad_Gauss_Legendre (degree+1+overintegration);

@@ -315,22 +315,22 @@ double EulerTaylorGreen<dim, nstate>::compute_pressure_work(const std::shared_pt
 
 
             //end of get volume entropy var and interp to face
-//            std::array<std::vector<double>,nstate> soln_at_surf_q_int;
-//            std::array<std::vector<double>,nstate> soln_at_surf_q_ext;
-//            for(int istate=0; istate<nstate; ++istate){
-//                // allocate
-//                soln_at_surf_q_int[istate].resize(n_face_quad_pts);
-//                soln_at_surf_q_ext[istate].resize(n_face_quad_pts);
-//                // solve soln at facet cubature nodes
-//                soln_basis.matrix_vector_mult_surface_1D(iface,
-//                                                         soln_coeff[istate], soln_at_surf_q_int[istate],
-//                                                         soln_basis.oneD_surf_operator,
-//                                                         soln_basis.oneD_vol_operator);
-//                soln_basis.matrix_vector_mult_surface_1D(neighbor_iface,
-//                                                         soln_coeff_ext[istate], soln_at_surf_q_ext[istate],
-//                                                         soln_basis.oneD_surf_operator,
-//                                                         soln_basis.oneD_vol_operator);
-//            }
+            std::array<std::vector<double>,nstate> soln_at_surf_q_int;
+            std::array<std::vector<double>,nstate> soln_at_surf_q_ext;
+            for(int istate=0; istate<nstate; ++istate){
+                // allocate
+                soln_at_surf_q_int[istate].resize(n_face_quad_pts);
+                soln_at_surf_q_ext[istate].resize(n_face_quad_pts);
+                // solve soln at facet cubature nodes
+                soln_basis.matrix_vector_mult_surface_1D(iface,
+                                                         soln_coeff[istate], soln_at_surf_q_int[istate],
+                                                         soln_basis.oneD_surf_operator,
+                                                         soln_basis.oneD_vol_operator);
+                soln_basis.matrix_vector_mult_surface_1D(neighbor_iface,
+                                                         soln_coeff_ext[istate], soln_at_surf_q_ext[istate],
+                                                         soln_basis.oneD_surf_operator,
+                                                         soln_basis.oneD_vol_operator);
+            }
 
             std::array<std::vector<double>,dim> vel_at_surf_q_int;
             for(int idim=0; idim<dim; ++idim){
@@ -360,6 +360,11 @@ double EulerTaylorGreen<dim, nstate>::compute_pressure_work(const std::shared_pt
                 soln_state_int = euler_double->compute_conservative_variables_from_entropy_variables (entropy_var_face_int);
                 std::array<double,nstate> soln_state_ext;
                 soln_state_ext = euler_double->compute_conservative_variables_from_entropy_variables (entropy_var_face_ext);
+
+//                for(int istate=0; istate<nstate; istate++){
+//                    soln_state_int[istate] = soln_at_surf_q_int[istate][iquad];
+//                    soln_state_ext[istate] = soln_at_surf_q_ext[istate][iquad];
+//                }
                 
                 const double pressure_int = euler_double->compute_pressure(soln_state_int);
                 const double pressure_ext = euler_double->compute_pressure(soln_state_ext);
