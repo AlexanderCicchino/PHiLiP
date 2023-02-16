@@ -65,6 +65,10 @@ private:
     std::array<double,2> compute_change_in_entropy(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const;
     ///Computes the pressure work.
     double compute_pressure_work(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const;
+    ///Computes the surface cross terms entropy production.
+    double compute_surface_cross_terms(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const;
+    ///Computes the volume term entropy production.
+    double compute_volume_term(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const;
     /// Computes the timestep from max eignevector.
     double get_timestep(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree, const double delta_x) const;
 };

@@ -6,7 +6,7 @@ set test_type = euler_split_taylor_green
 
 set use_weak_form = false
 
-set use_collocated_nodes = true
+set use_collocated_nodes = false
 
 set overintegration = 0
 
@@ -16,7 +16,7 @@ set two_point_num_flux_type = Ra
 
 set use_curvilinear_split_form = true
 
-set energy_file = Ra_4x4_with_p_work_coll_cplus
+set energy_file = Ra_4x4_with_p_work_UNcoll_cplus
 
 # The PDE we want to solve
 set pde_type = euler
@@ -48,7 +48,7 @@ subsection ODE solver
 
   set initial_time_step = 0.001
 
-  set output_solution_every_x_steps = 1
+#  set output_solution_every_x_steps = 1
 
   set runge_kutta_method = rk4_ex
 
