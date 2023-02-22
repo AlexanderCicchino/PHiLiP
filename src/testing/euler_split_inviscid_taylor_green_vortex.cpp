@@ -1260,7 +1260,7 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
     std::cout << "ODE solver successfully created" << std::endl;
     double finalTime = 14.;
-    finalTime = 0.4;
+//    finalTime = 0.4;
     // finalTime = 0.1;//to speed things up locally in tests, doesn't need full 14seconds to verify.
     double dt = all_parameters_new.ode_solver_param.initial_time_step;
     // double dt = all_parameters_new.ode_solver_param.initial_time_step / 10.0;
