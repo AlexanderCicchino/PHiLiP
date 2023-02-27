@@ -1089,6 +1089,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
 
                      //   if((stiff_dim[idim][iquad][flux_basis]*(flux_avg[istate][idim] - conv_phys_flux_2pt[istate][idim])* ( soln_state_flux_basis[istate]-soln_state[istate]) <0) ){
                        // if((stiff_dim[idim][iquad][flux_basis]*(flux_avg[istate][idim] - conv_phys_flux_2pt[istate][idim])* ( entropy_variables_ext[istate]-entropy_variables_int[istate]) <0) ){
+                           if(this->all_parameters->use_asymptotic_stable){
                         if((stiff_dim[idim][iquad][flux_basis]*(flux_avg[istate][idim] - conv_phys_flux_2pt[istate][idim])* ( entropy_variables_ext[istate]-entropy_variables_int[istate]) <0) ){
 //                        if((stiff_dim[idim][iquad][flux_basis]*(flux_avg[istate][idim] - conv_phys_flux_2pt[istate][idim])* ( difference) <0) ){
                       // if(((stiff_dim[idim][iquad][flux_basis]*(flux_avg[istate][idim] - conv_phys_flux_2pt[istate][idim])* ( entropy_variables_ext[istate]-entropy_variables_int[istate]) <0) ) ||
@@ -1118,6 +1119,10 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                       //         conv_phys_flux_2pt_switch[istate][idim] -= 1.0/12.0 * ( entropy_variables_ext[istate]-entropy_variables_int[istate])
                       //                                                  * ( entropy_variables_ext[istate]-entropy_variables_int[istate]);
 
+                        }
+                        }       
+                        else{
+                            conv_phys_flux_2pt_switch[istate][idim] = conv_phys_flux_2pt[istate][idim];
                         }
                     }
                 }

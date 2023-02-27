@@ -41,6 +41,9 @@ NumericalFluxFactory<dim, nstate, real>
     else if (conv_num_flux_type == AllParam::ConvectiveNumericalFlux::entropy_conserving_flux_with_lax_friedrichs_dissipation) {
         return std::make_unique< EntropyConservingWithLaxFriedrichsDissipation<dim, nstate, real> > (physics_input);
     } 
+    else if (conv_num_flux_type == AllParam::ConvectiveNumericalFlux::asymptotic_stable_flux) {
+        return std::make_unique< AsymptoticStable<dim, nstate, real> > (physics_input);
+    } 
     else {
         (void) pde_type;
         (void) model_type;

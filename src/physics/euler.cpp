@@ -548,6 +548,8 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim, nstate, real>
 
     std::array<dealii::Tensor<1,dim,real>,nstate> conv_num_split_flux;
     const real rho_log = compute_ismail_roe_logarithmic_mean(conservative_soln1[0], conservative_soln2[0]);
+   //My min dissipation rho
+  //  const real rho_log = 0.5*(conservative_soln1[0] + conservative_soln2[0]);
     const real pressure1 = compute_pressure<real>(conservative_soln1);
     const real pressure2 = compute_pressure<real>(conservative_soln2);
 
@@ -558,6 +560,8 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim, nstate, real>
     const real beta2 = conservative_soln2[0]/(pressure2);
 
     const real beta_log = compute_ismail_roe_logarithmic_mean(beta1, beta2);
+   //My min dissipation fix
+   // const real beta_log = rho_log / (0.5*(pressure1 + pressure2));
     const dealii::Tensor<1,dim,real> vel1 = compute_velocities<real>(conservative_soln1);
     const dealii::Tensor<1,dim,real> vel2 = compute_velocities<real>(conservative_soln2);
 

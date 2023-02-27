@@ -66,6 +66,10 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       dealii::Patterns::Bool(),
                       "Use Gauss-Legendre by default. Otherwise, use Gauss-Lobatto to collocate.");
 
+    prm.declare_entry("use_asymptotic_stable", "false",
+                      dealii::Patterns::Bool(),
+                      "Use original form by defualt. Otherwise, use asymptotic stability upwinding.");
+
     prm.declare_entry("use_split_form", "false",
                       dealii::Patterns::Bool(),
                       "Use original form by defualt. Otherwise, split the fluxes.");
@@ -242,6 +246,7 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       " l2roe | "
                       " central_flux | "
                       " entropy_conserving_flux | "
+                      " asymptotic_stable_flux | "
                       " entropy_conserving_flux_with_lax_friedrichs_dissipation | "
                       " entropy_conserving_flux_with_roe_dissipation | "
                       " entropy_conserving_flux_with_l2roe_dissipation"),
@@ -252,6 +257,7 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       " l2roe | "
                       " central_flux | "
                       " entropy_conserving_flux | "
+                      " asymptotic_stable_flux | "
                       " entropy_conserving_flux_with_lax_friedrichs_dissipation | "
                       " entropy_conserving_flux_with_roe_dissipation | "
                       " entropy_conserving_flux_with_l2roe_dissipation>.");
@@ -386,6 +392,7 @@ void AllParameters::parse_parameters (dealii::ParameterHandler &prm)
     use_weak_form = prm.get_bool("use_weak_form");
     use_collocated_nodes = prm.get_bool("use_collocated_nodes");
     use_split_form = prm.get_bool("use_split_form");
+    use_asymptotic_stable = prm.get_bool("use_asymptotic_stable");
 
     const std::string two_point_num_flux_string = prm.get("two_point_num_flux_type");
     if (two_point_num_flux_string == "KG") { two_point_num_flux_type = TwoPointNumericalFlux::KG; }
@@ -410,6 +417,7 @@ void AllParameters::parse_parameters (dealii::ParameterHandler &prm)
     if (conv_num_flux_string == "l2roe")                                                   { conv_num_flux_type = ConvectiveNumericalFlux::l2roe; }
     if (conv_num_flux_string == "central_flux")                                            { conv_num_flux_type = ConvectiveNumericalFlux::central_flux; }
     if (conv_num_flux_string == "entropy_conserving_flux")                                 { conv_num_flux_type = ConvectiveNumericalFlux::entropy_conserving_flux; }
+    if (conv_num_flux_string == "asymptotic_stable_flux")                                 { conv_num_flux_type = ConvectiveNumericalFlux::asymptotic_stable_flux; }
     if (conv_num_flux_string == "entropy_conserving_flux_with_lax_friedrichs_dissipation") { conv_num_flux_type = ConvectiveNumericalFlux::entropy_conserving_flux_with_lax_friedrichs_dissipation; }
     if (conv_num_flux_string == "entropy_conserving_flux_with_roe_dissipation")            { conv_num_flux_type = ConvectiveNumericalFlux::entropy_conserving_flux_with_roe_dissipation; }
     if (conv_num_flux_string == "entropy_conserving_flux_with_l2roe_dissipation")          { conv_num_flux_type = ConvectiveNumericalFlux::entropy_conserving_flux_with_l2roe_dissipation; }

@@ -93,6 +93,9 @@ public:
     /// Flag to use Gauss-Lobatto Nodes;
     bool use_collocated_nodes;
 
+    /// Flag to use asymptotic stability upwinding.
+    bool use_asymptotic_stable;
+
     /// Flag to use split form.
     bool use_split_form;
 
@@ -225,6 +228,7 @@ public:
         l2roe, 
         central_flux,
         entropy_conserving_flux,
+        asymptotic_stable_flux,
         entropy_conserving_flux_with_lax_friedrichs_dissipation,
         entropy_conserving_flux_with_roe_dissipation,
         entropy_conserving_flux_with_l2roe_dissipation
