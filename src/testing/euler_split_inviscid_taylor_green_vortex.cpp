@@ -269,22 +269,24 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
     double left = 0.0;
     double right = 2 * dealii::numbers::PI;
-    const int n_refinements = 2;
-    unsigned int poly_degree = 3;
+//    const int n_refinements = 2;
+    const unsigned int n_refinements = all_parameters->flow_solver_param.number_of_grid_elements_per_dimension;
+//    unsigned int poly_degree = 3;
+    const unsigned int poly_degree= all_parameters->flow_solver_param.poly_degree;
 
     // set the warped grid
-    const unsigned int grid_degree = poly_degree;
-    PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, n_refinements);
+//    const unsigned int grid_degree = poly_degree;
+//    PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, n_refinements);
 
-//    const unsigned int grid_degree = 1;
-//    const bool colorize = true;
-//    dealii::GridGenerator::hyper_cube(*grid, left, right, colorize);
-//    std::vector<dealii::GridTools::PeriodicFacePair<typename dealii::Triangulation<PHILIP_DIM>::cell_iterator> > matched_pairs;
-//    dealii::GridTools::collect_periodic_faces(*grid,0,1,0,matched_pairs);
-//    dealii::GridTools::collect_periodic_faces(*grid,2,3,1,matched_pairs);
-//    dealii::GridTools::collect_periodic_faces(*grid,4,5,2,matched_pairs);
-//    grid->add_periodicity(matched_pairs);
-//    grid->refine_global(n_refinements);
+    const unsigned int grid_degree = 1;
+    const bool colorize = true;
+    dealii::GridGenerator::hyper_cube(*grid, left, right, colorize);
+    std::vector<dealii::GridTools::PeriodicFacePair<typename dealii::Triangulation<PHILIP_DIM>::cell_iterator> > matched_pairs;
+    dealii::GridTools::collect_periodic_faces(*grid,0,1,0,matched_pairs);
+    dealii::GridTools::collect_periodic_faces(*grid,2,3,1,matched_pairs);
+    dealii::GridTools::collect_periodic_faces(*grid,4,5,2,matched_pairs);
+    grid->add_periodicity(matched_pairs);
+    grid->refine_global(n_refinements);
 
     // Create DG
     std::shared_ptr < PHiLiP::DGBase<dim, double> > dg = PHiLiP::DGFactory<dim,double>::create_discontinuous_galerkin(&all_parameters_new, poly_degree, poly_degree, grid_degree, grid);
@@ -296,7 +298,7 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     SetInitialCondition<dim,nstate,double>::set_initial_condition(initial_condition_function, dg, &all_parameters_new);
 
     const unsigned int n_global_active_cells2 = grid->n_global_active_cells();
-    double delta_x = (right-left)/n_global_active_cells2/(poly_degree+1.0);
+    double delta_x = (right-left)/pow(n_global_active_cells2,1.0/dim)/(poly_degree+1.0);
     pcout<<" delta x "<<delta_x<<std::endl;
 
     all_parameters_new.ode_solver_param.initial_time_step =  get_timestep(dg,poly_degree,delta_x);
@@ -304,10 +306,11 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     std::cout << "creating ODE solver" << std::endl;
     std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
     std::cout << "ODE solver successfully created" << std::endl;
-    double finalTime = 14.;
-    finalTime = 0.4;
+//    double finalTime = 14.;
+    const double finalTime = all_parameters_new.flow_solver_param.final_time;
+//    finalTime = 0.4;
     // finalTime = 0.1;//to speed things up locally in tests, doesn't need full 14seconds to verify.
-    double dt = all_parameters_new.ode_solver_param.initial_time_step;
+//    double dt = all_parameters_new.ode_solver_param.initial_time_step;
     // double dt = all_parameters_new.ode_solver_param.initial_time_step / 10.0;
 //    finalTime = 14.0;
 
@@ -318,26 +321,27 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     // this causes some issues with outputs (only one file is output, which is overwritten at each time step)
     // also the ode solver output doesn't make sense (says "iteration 1 out of 1")
     // but it works. I'll keep it for now and need to modify the output functions later to account for this.
-    double initialcond_energy = compute_kinetic_energy(dg, poly_degree);
-    double initialcond_energy_mpi = (dealii::Utilities::MPI::sum(initialcond_energy, mpi_communicator));
-    std::cout << std::setprecision(16) << std::fixed;
-    pcout << "Energy for initial condition " << initialcond_energy_mpi/(8*pow(dealii::numbers::PI,3)) << std::endl;
+//    double initialcond_energy = compute_kinetic_energy(dg, poly_degree);
+//    double initialcond_energy_mpi = (dealii::Utilities::MPI::sum(initialcond_energy, mpi_communicator));
+//    std::cout << std::setprecision(16) << std::fixed;
+//    pcout << "Energy for initial condition " << initialcond_energy_mpi/(8*pow(dealii::numbers::PI,3)) << std::endl;
 
-    pcout << "Energy at time " << 0 << " is " << compute_kinetic_energy(dg, poly_degree) << std::endl;
-    ode_solver->current_iteration = 0;
-    ode_solver->advance_solution_time(dt/10.0);
-    double initial_energy = compute_kinetic_energy(dg, poly_degree);
-    double initial_entropy = compute_entropy(dg, poly_degree);
-    pcout<<"Initial MK Entropy "<<initial_entropy<<std::endl;
-    std::array<double,2> initial_change_entropy = compute_change_in_entropy(dg, poly_degree);
-    pcout<<"Initial change in Entropy "<<initial_change_entropy[0]<<std::endl;
-    pcout<<"Initial change in kinetic Energy "<<initial_change_entropy[1]<<std::endl;
+//    pcout << "Energy at time " << 0 << " is " << compute_kinetic_energy(dg, poly_degree) << std::endl;
+//    ode_solver->current_iteration = 0;
+//    ode_solver->advance_solution_time(dt/10.0);
+//    double initial_energy = compute_kinetic_energy(dg, poly_degree);
+//    double initial_entropy = compute_entropy(dg, poly_degree);
+//    pcout<<"Initial MK Entropy "<<initial_entropy<<std::endl;
+//    std::array<double,2> initial_change_entropy = compute_change_in_entropy(dg, poly_degree);
+//    pcout<<"Initial change in Entropy "<<initial_change_entropy[0]<<std::endl;
+//    pcout<<"Initial change in kinetic Energy "<<initial_change_entropy[1]<<std::endl;
+//
+//    std::cout << std::setprecision(16) << std::fixed;
+//    pcout << "Energy at one timestep is " << initial_energy/(8*pow(dealii::numbers::PI,3)) << std::endl;
+//    // std::ofstream myfile ("kinetic_energy_3D_TGV_cdg_curv_grid_4x4.gpl" , std::ios::trunc);
+//    std::ofstream myfile (all_parameters_new.energy_file + ".gpl"  , std::ios::trunc);
 
-    std::cout << std::setprecision(16) << std::fixed;
-    pcout << "Energy at one timestep is " << initial_energy/(8*pow(dealii::numbers::PI,3)) << std::endl;
-    // std::ofstream myfile ("kinetic_energy_3D_TGV_cdg_curv_grid_4x4.gpl" , std::ios::trunc);
-    std::ofstream myfile (all_parameters_new.energy_file + ".gpl"  , std::ios::trunc);
-
+#if 0
     for (int i = 0; i < std::ceil(finalTime/dt); ++ i) {
         ode_solver->advance_solution_time(dt);
         double current_energy = compute_kinetic_energy(dg,poly_degree);
@@ -368,6 +372,29 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     }
 
     myfile.close();
+#endif
+    ode_solver->current_iteration = 0;
+    ode_solver->allocate_ode_system();
+    while(ode_solver->current_time < finalTime){
+        const double time_step =  get_timestep(dg,poly_degree, delta_x);
+      //  const double M_infty_temp = sqrt(2.0/1.4);
+      //  double time_step = 0.1 * delta_x / M_infty_temp;
+        if(ode_solver->current_iteration%all_parameters_new.ode_solver_param.print_iteration_modulo==0)
+            pcout<<"time step "<<time_step<<" current time "<<ode_solver->current_time<<std::endl;
+        const double dt = dealii::Utilities::MPI::min(time_step, mpi_communicator);
+        ode_solver->step_in_time(dt, false);
+       // ode_solver->advance_solution_time(dt);
+        ode_solver->current_iteration += 1;
+        const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
+        if (is_output_iteration) {
+            const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
+            dg->output_results_vtk(file_number);
+        }
+
+        std::array<double,2> current_change_entropy = compute_change_in_entropy(dg, poly_degree);
+        pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy[0]<< std::endl;
+        pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_entropy[1]<< std::endl;
+    }
 
     return 0;
 }

@@ -68,6 +68,10 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       "Flux nodes type, default is GL for uncollocated. NOTE: Solution nodes are type GLL."
                       "Choices are <GL | GLL>.");
 
+    prm.declare_entry("use_asymptotic_stable", "false",
+                      dealii::Patterns::Bool(),
+                      "Use original form by defualt. Otherwise, use asymptotic stable.");
+
     prm.declare_entry("use_split_form", "false",
                       dealii::Patterns::Bool(),
                       "Use original form by defualt. Otherwise, split the fluxes.");
@@ -164,6 +168,9 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       " time_refinement_study | "
                       " time_refinement_study_reference | "
                       " burgers_energy_conservation_rrk | "
+                      " burgers_linear_stability | "
+                      " euler_isentropic_vortex | "
+                      " euler_density_wave | "
                       " euler_entropy_conserving_split_forms_check"),
                       "The type of test we want to solve. "
                       "Choices are " 
@@ -198,6 +205,9 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       "  time_refinement_study | "
                       "  time_refinement_study_reference | "
                       "  burgers_energy_conservation_rrk | "
+                      "  burgers_linear_stability | "
+                      "  euler_isentropic_vortex | "
+                      "  euler_density_wave | "
                       "  euler_entropy_conserving_split_forms_check>.");
 
     prm.declare_entry("pde_type", "advection",
@@ -241,6 +251,7 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       " roe | "
                       " l2roe | "
                       " central_flux | "
+                      " asymptotic_stable_flux | "
                       " two_point_flux | "
                       " two_point_flux_with_lax_friedrichs_dissipation | "
                       " two_point_flux_with_roe_dissipation | "
@@ -251,6 +262,7 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       " roe | "
                       " l2roe | "
                       " central_flux | "
+                      " asymptotic_stable_flux | "
                       " two_point_flux | "
                       " two_point_flux_with_lax_friedrichs_dissipation | "
                       " two_point_flux_with_roe_dissipation | "
@@ -342,6 +354,9 @@ void AllParameters::parse_parameters (dealii::ParameterHandler &prm)
     else if (test_string == "time_refinement_study_reference")          { test_type = time_refinement_study_reference; }
     else if (test_string == "burgers_energy_conservation_rrk")          { test_type = burgers_energy_conservation_rrk; }
     else if (test_string == "euler_entropy_conserving_split_forms_check")           { test_type = euler_entropy_conserving_split_forms_check; }
+    else if (test_string == "burgers_linear_stability")                 { test_type = burgers_linear_stability; }
+    else if (test_string == "euler_isentropic_vortex")                  { test_type = euler_isentropic_vortex; }
+    else if (test_string == "euler_density_wave")                       { test_type = euler_density_wave; }
     
     overintegration = prm.get_integer("overintegration");
 
@@ -352,6 +367,8 @@ void AllParameters::parse_parameters (dealii::ParameterHandler &prm)
     if (flux_nodes_string == "GLL") { flux_nodes_type = FluxNodes::GLL; }
 
     use_collocated_nodes = (flux_nodes_type==FluxNodes::GLL) && (overintegration==0);
+
+    use_asymptotic_stable = prm.get_bool("use_asymptotic_stable");
 
     use_split_form = prm.get_bool("use_split_form");
 
@@ -378,6 +395,7 @@ void AllParameters::parse_parameters (dealii::ParameterHandler &prm)
     if (conv_num_flux_string == "roe")                                                     { conv_num_flux_type = ConvectiveNumericalFlux::roe; }
     if (conv_num_flux_string == "l2roe")                                                   { conv_num_flux_type = ConvectiveNumericalFlux::l2roe; }
     if (conv_num_flux_string == "central_flux")                                            { conv_num_flux_type = ConvectiveNumericalFlux::central_flux; }
+    if (conv_num_flux_string == "asymptotic_stable_flux")                                  { conv_num_flux_type = ConvectiveNumericalFlux::asymptotic_stable_flux; }
     if (conv_num_flux_string == "two_point_flux")                                 { conv_num_flux_type = ConvectiveNumericalFlux::two_point_flux; }
     if (conv_num_flux_string == "two_point_flux_with_lax_friedrichs_dissipation") { conv_num_flux_type = ConvectiveNumericalFlux::two_point_flux_with_lax_friedrichs_dissipation; }
     if (conv_num_flux_string == "two_point_flux_with_roe_dissipation")            { conv_num_flux_type = ConvectiveNumericalFlux::two_point_flux_with_roe_dissipation; }

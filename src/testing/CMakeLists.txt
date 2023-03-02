@@ -4,6 +4,7 @@ set(TESTS_SOURCE
     grid_study.cpp
     grid_refinement_study.cpp
     burgers_stability.cpp
+    burgers_linear_stability.cpp
     diffusion_exact_adjoint.cpp
     euler_gaussian_bump.cpp
     euler_gaussian_bump_enthalpy_check.cpp
@@ -19,6 +20,8 @@ set(TESTS_SOURCE
     advection_explicit_periodic.cpp
     convection_diffusion_explicit_periodic.cpp
     euler_split_inviscid_taylor_green_vortex.cpp
+    euler_density_wave.cpp
+    euler_isentropic_vortex.cpp
     optimization_inverse_manufactured/optimization_inverse_manufactured.cpp
     dual_weighted_residual_mesh_adaptation.cpp
     taylor_green_vortex_energy_check.cpp

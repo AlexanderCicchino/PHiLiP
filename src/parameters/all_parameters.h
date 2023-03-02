@@ -98,6 +98,9 @@ public:
     /// Flag for using collocated nodes; determined based on flux_nodes_type and overintegration input parameters
     bool use_collocated_nodes;
 
+    /// Flag to use asymptotic stable.
+    bool use_asymptotic_stable;
+
     /// Flag to use split form.
     bool use_split_form;
 
@@ -179,6 +182,9 @@ public:
         time_refinement_study_reference,
         burgers_energy_conservation_rrk,
         euler_entropy_conserving_split_forms_check,
+        burgers_linear_stability,
+        euler_density_wave,
+        euler_isentropic_vortex,
         homogeneous_isotropic_turbulence_initialization_check,
     };
     /// Store selected TestType from the input file.
@@ -228,6 +234,7 @@ public:
         roe, 
         l2roe, 
         central_flux,
+        asymptotic_stable_flux,
         two_point_flux,
         two_point_flux_with_lax_friedrichs_dissipation,
         two_point_flux_with_roe_dissipation,

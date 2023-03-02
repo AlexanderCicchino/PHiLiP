@@ -12,6 +12,7 @@
 #include "grid_study.h"
 #include "grid_refinement_study.h"
 #include "burgers_stability.h"
+#include "burgers_linear_stability.h"
 #include "diffusion_exact_adjoint.h"
 #include "euler_gaussian_bump.h"
 #include "euler_gaussian_bump_enthalpy_check.h"
@@ -22,6 +23,8 @@
 #include "euler_entropy_waves.h"
 #include "advection_explicit_periodic.h"
 #include "euler_split_inviscid_taylor_green_vortex.h"
+#include "euler_density_wave.h"
+#include "euler_isentropic_vortex.h"
 #include "optimization_inverse_manufactured/optimization_inverse_manufactured.h"
 #include "euler_bump_optimization.h"
 #include "euler_naca0012_optimization.hpp"
@@ -235,6 +238,8 @@ std::unique_ptr< TestsBase > TestsFactory<dim,nstate,MeshType>
         return std::make_unique<GridRefinementStudy<dim,nstate,MeshType>>(parameters_input);
     } else if(test_type == Test_enum::burgers_energy_stability) {
         if constexpr (dim==1 && nstate==1) return std::make_unique<BurgersEnergyStability<dim,nstate>>(parameters_input);
+    } else if(test_type == Test_enum::burgers_linear_stability) {
+        if constexpr (dim==1 && nstate==1) return std::make_unique<BurgersLinearStability<dim,nstate>>(parameters_input);
     } else if(test_type == Test_enum::diffusion_exact_adjoint) {
         if constexpr (dim>=1 && nstate==1) return std::make_unique<DiffusionExactAdjoint<dim,nstate>>(parameters_input);
     } else if (test_type == Test_enum::advection_periodicity){
@@ -289,6 +294,10 @@ std::unique_ptr< TestsBase > TestsFactory<dim,nstate,MeshType>
         if constexpr (dim==1 && nstate==1)  return std::make_unique<BurgersEnergyConservationRRK<dim, nstate>>(parameters_input, parameter_handler_input);
     } else if(test_type == Test_enum::euler_entropy_conserving_split_forms_check) {
         if constexpr (dim==3 && nstate==dim+2)  return std::make_unique<EulerSplitEntropyCheck<dim, nstate>>(parameters_input, parameter_handler_input);
+    } else if(test_type == Test_enum::euler_density_wave) {
+        if constexpr (nstate==dim+2)  return std::make_unique<EulerDensityWave<dim, nstate>>(parameters_input);
+    } else if(test_type == Test_enum::euler_isentropic_vortex) {
+        if constexpr (dim==2 && nstate==dim+2)  return std::make_unique<EulerIsentropicVortex<dim, nstate>>(parameters_input);
     } else {
         std::cout << "Invalid test. You probably forgot to add it to the list of tests in tests.cpp" << std::endl;
         std::abort();

@@ -954,6 +954,29 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
     // The matrix of two-pt fluxes for Hadamard products
     std::array<dealii::Tensor<1,dim,dealii::FullMatrix<real>>,nstate> conv_ref_2pt_flux_at_q;
 
+    OPERATOR::local_basis_stiffness<dim,2*dim> stiff(1,poly_degree, this->high_order_grid->fe_system.tensor_degree());
+    stiff.build_1D_volume_operator(this->oneD_fe_collection_flux[poly_degree], this->oneD_quadrature_collection[poly_degree]);
+   // stiff.build_1D_volume_operator(this->oneD_fe_collection_1state[poly_degree], this->oneD_quadrature_collection[poly_degree]);
+    OPERATOR::local_mass<dim,2*dim> mass(1,poly_degree, this->high_order_grid->fe_system.tensor_degree());
+    mass.build_1D_volume_operator(this->oneD_fe_collection_flux[poly_degree], this->oneD_quadrature_collection[poly_degree]);
+   // mass.build_1D_volume_operator(this->oneD_fe_collection_1state[poly_degree], this->oneD_quadrature_collection[poly_degree]);
+    std::array<dealii::FullMatrix<real>,dim> stiff_dim;
+    for(int idim=0; idim<dim; idim++){
+        stiff_dim[idim].reinit(n_quad_pts,n_quad_pts);
+        if(idim==0)
+            stiff_dim[idim] = stiff.tensor_product(stiff.oneD_vol_operator,
+                                                   mass.oneD_vol_operator,
+                                                   mass.oneD_vol_operator);
+        if(idim==1)
+            stiff_dim[idim] = stiff.tensor_product(mass.oneD_vol_operator,
+                                                   stiff.oneD_vol_operator,
+                                                   mass.oneD_vol_operator);
+        if(idim==2)
+            stiff_dim[idim] = stiff.tensor_product(mass.oneD_vol_operator,
+                                                   mass.oneD_vol_operator,
+                                                   stiff.oneD_vol_operator);
+    }
+
     for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
         //extract soln and auxiliary soln at quad pt to be used in physics
         std::array<real,nstate> soln_state;
@@ -1000,10 +1023,39 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                 //Compute the physical flux
                 conv_phys_flux_2pt = this->pde_physics_double->convective_numerical_split_flux(soln_state, soln_state_flux_basis);
 
+                std::array<dealii::Tensor<1,dim,real>,nstate> flux_avg;
+                std::array<dealii::Tensor<1,dim,real>,nstate> flux_int;
+                std::array<dealii::Tensor<1,dim,real>,nstate> flux_ext;
+                flux_int = this->pde_physics_double->convective_flux (soln_state);
+                flux_ext = this->pde_physics_double->convective_flux (soln_state_flux_basis);
+                for(int istate=0; istate<nstate; istate++){
+                    flux_avg[istate] = 0.5*(flux_int[istate] + flux_ext[istate]);
+                }
+
+                std::array<dealii::Tensor<1,dim,real>,nstate> conv_phys_flux_2pt_switch;
+                std::array<real,nstate> entropy_variables_int = this->pde_physics_double->compute_entropy_variables(soln_state);
+                std::array<real,nstate> entropy_variables_ext = this->pde_physics_double->compute_entropy_variables(soln_state_flux_basis);
+                for(int istate=0; istate<nstate; istate++){
+                    for(int idim=0; idim<dim; idim++){
+                        if(this->all_parameters->use_asymptotic_stable){
+                            if((stiff_dim[idim][iquad][flux_basis]*(flux_avg[istate][idim] - conv_phys_flux_2pt[istate][idim])* ( entropy_variables_ext[istate]-entropy_variables_int[istate]) <0) ){
+                                conv_phys_flux_2pt_switch[istate][idim] = flux_avg[istate][idim];
+                            }
+                            else{
+                                conv_phys_flux_2pt_switch[istate][idim] = conv_phys_flux_2pt[istate][idim];
+                            }
+                        }       
+                        else{
+                            conv_phys_flux_2pt_switch[istate][idim] = conv_phys_flux_2pt[istate][idim];
+                        }
+                    }
+                }
+
                 for(int istate=0; istate<nstate; istate++){
                     //For each state, transform the physical flux to a reference flux.
                     metric_oper.transform_physical_to_reference(
-                        conv_phys_flux_2pt[istate],
+                       // conv_phys_flux_2pt[istate],
+                        conv_phys_flux_2pt_switch[istate],
                         0.5*(metric_cofactor + metric_cofactor_flux_basis),
                         conv_ref_flux_2pt[flux_basis][istate]);
                 }

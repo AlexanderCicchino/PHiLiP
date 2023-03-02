@@ -25,6 +25,8 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " advection | "
                           " periodic_1D_unsteady | "
                           " gaussian_bump | "
+                          " euler_isentropic_vortex | "
+                          " euler_density_wave | "
                           " sshock "),
                           "The type of flow we want to simulate. "
                           "Choices are "
@@ -38,6 +40,8 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " advection | "
                           " periodic_1D_unsteady | "
                           " gaussian_bump | "
+                          " euler_isentropic_vortex | "
+                          " euler_density_wave | "
                           " sshock>. ");
 
         prm.declare_entry("poly_degree", "1",
@@ -254,6 +258,8 @@ void FlowSolverParam::parse_parameters(dealii::ParameterHandler &prm)
         else if (flow_case_type_string == "periodic_1D_unsteady")       {flow_case_type = periodic_1D_unsteady;}
         else if (flow_case_type_string == "gaussian_bump")              {flow_case_type = gaussian_bump;}
         else if (flow_case_type_string == "sshock")                     {flow_case_type = sshock;}
+        else if (flow_case_type_string == "euler_isentropic_vortex")    {flow_case_type = euler_isentropic_vortex;}
+        else if (flow_case_type_string == "euler_density_wave")         {flow_case_type = euler_density_wave;}
 
         poly_degree = prm.get_integer("poly_degree");
         
