@@ -1,0 +1,7 @@
+set(TEST_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR})                                                                     
+configure_file(3D_DNS_TGV.prm 3D_DNS_TGV.prm COPYONLY)                                                                                                                                            
+add_test(                                                                                                                                                                                                                                 
+ NAME MPI_3D_DNS_TAYLOR_GREEN                                                                                                                                                                                    
+ COMMAND mpirun -n ${MPIMAX} ${EXECUTABLE_OUTPUT_PATH}/PHiLiP_3D -i ${CMAKE_CURRENT_BINARY_DIR}/3D_DNS_TGV.prm                                                                                                                                                                                                                                  
+  WORKING_DIRECTORY ${TEST_OUTPUT_DIR}                                                                                                                                                                                                      
+)                                                                                                                       
