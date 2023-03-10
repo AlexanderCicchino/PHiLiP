@@ -37,25 +37,25 @@ BurgersLinearStability<dim, nstate>::BurgersLinearStability(const PHiLiP::Parame
 template <int dim, int nstate>
 int BurgersLinearStability<dim, nstate>::run_test() const
 {
-    pcout << " Running Burgers energy stability. " << std::endl;
+    pcout << " Running Burgers linear stability. " << std::endl;
 
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
    double left  = -1.0;
    double right =  1.0;
   //  double left  = 0.0;
   //  double right = 2.0;
-   // const unsigned int n_grids = 4;
+    const unsigned int n_grids = 4;
    // const unsigned int n_grids = 5;
-    const unsigned int n_grids = 2;
+   // const unsigned int n_grids = 2;
     std::vector<double> grid_size(n_grids);
     std::vector<double> soln_error(n_grids);
-  //  unsigned int poly_degree = 4;
+    unsigned int poly_degree = 4;
     //unsigned int poly_degree = 8;
-    unsigned int poly_degree = 15;
+  //  unsigned int poly_degree = 15;
     dealii::ConvergenceTable convergence_table;
-   // const unsigned int igrid_start = 3;
+    const unsigned int igrid_start = 3;
    // const unsigned int igrid_start = 4;
-    const unsigned int igrid_start = 1;
+  //  const unsigned int igrid_start = 1;
     const unsigned int grid_degree = 1;
 
     for(unsigned int igrid = igrid_start; igrid<n_grids; igrid++){
@@ -176,25 +176,25 @@ int BurgersLinearStability<dim, nstate>::run_test() const
         for(unsigned int i=0; i<eigen_solver.eigenvalues().size(); i++){
             if(eigen_solver.eigenvalues()[i].real() > 1e-6){
                 pcout<<"time "<<ode_solver->current_time<<" eigenvalue "<<eigen_solver.eigenvalues()[i].real()<<std::endl;
-                Eigen::VectorXcd eigen_vect = eigen_solver.eigenvectors().col(i);
-                pcout<< "the eigenvector "<<std::endl<<std::fixed << std::setprecision(16) << eigen_vect<< std::fixed << std::endl;
-        pcout<<"the DRDU"<<std::endl;
-            for(unsigned int i=0; i<dg->solution.size(); i++){
-            for(unsigned int j=0; j<dg->solution.size(); j++){
-                pcout<<dRdU(i,j)<<" ";
-            }
-            pcout<<std::endl;
-            }
+//                Eigen::VectorXcd eigen_vect = eigen_solver.eigenvectors().col(i);
+//                pcout<< "the eigenvector "<<std::endl<<std::fixed << std::setprecision(16) << eigen_vect<< std::fixed << std::endl;
+//        pcout<<"the DRDU"<<std::endl;
+//            for(unsigned int i=0; i<dg->solution.size(); i++){
+//            for(unsigned int j=0; j<dg->solution.size(); j++){
+//                pcout<<dRdU(i,j)<<" ";
+//            }
+//            pcout<<std::endl;
+//            }
             }
         }
 
-        pcout<<"the DRDU"<<std::endl;
-            for(unsigned int i=0; i<dg->solution.size(); i++){
-            for(unsigned int j=0; j<dg->solution.size(); j++){
-                pcout<<dRdU(i,j)<<" ";
-            }
-            pcout<<std::endl;
-            }
+//        pcout<<"the DRDU"<<std::endl;
+//            for(unsigned int i=0; i<dg->solution.size(); i++){
+//            for(unsigned int j=0; j<dg->solution.size(); j++){
+//                pcout<<dRdU(i,j)<<" ";
+//            }
+//            pcout<<std::endl;
+//            }
 
         }//end ode solver
 
@@ -202,7 +202,7 @@ int BurgersLinearStability<dim, nstate>::run_test() const
 
         //Print to a file the eigenvalues vs x to plot
        // std::ofstream myfile ("dRdU_burgers.gpl" , std::ios::trunc);
-        std::ofstream myfile ("computed_eigenvalues_burgers_play_around.gpl" , std::ios::trunc);
+        std::ofstream myfile ("computed_eigenvalues_burgers_play_around_new.gpl" , std::ios::trunc);
 //        for(unsigned int i=0; i<dg->solution.size(); i++){
 //            for(unsigned int j=0; j<dg->solution.size(); j++){
                 std::cout << std::setprecision(16) << std::fixed;

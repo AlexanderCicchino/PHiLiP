@@ -209,19 +209,36 @@ std::array<real, nstate> AsymptoticStableBaselineNumericalFluxConvective<dim,nst
     for (int s=0; s<nstate; s++) {
         real flux_entropy_dot_n = 0.0;
         real flux_avg_dot_n = 0.0;
+//        real flux_dot_n = 0.0;
         for (int d=0; d<dim; ++d) {
             flux_entropy_dot_n += conv_phys_split_flux[s][d] * normal_int[d];
 
             flux_avg_dot_n += 0.5*(conv_phys_flux_int[s][d] + conv_phys_flux_ext[s][d]) * normal_int[d];
-        }
 
+#if 0
+            real flux_entropy_cons = conv_phys_split_flux[s][d];
+            real flux_central = 0.5*(conv_phys_flux_int[s][d] + conv_phys_flux_ext[s][d]);
+            if((flux_central - flux_entropy_cons)*(entropy_var_ext[s] - entropy_var_int[s]) < 0){
+                flux_dot_n += flux_central * normal_int[d];
+            }
+            else {
+                flux_dot_n += flux_entropy_cons * normal_int[d];
+            }
+#endif
+        }
+//        numerical_flux_dot_n[s] = flux_dot_n;
+//#if 0
         if((flux_avg_dot_n - flux_entropy_dot_n)*(entropy_var_ext[s] - entropy_var_int[s]) < 0){
             numerical_flux_dot_n[s] = flux_avg_dot_n;
 
         }
         else {
             numerical_flux_dot_n[s] = flux_entropy_dot_n;
+            //added dissipation
+         //   numerical_flux_dot_n[s] -= (flux_avg_dot_n - flux_entropy_dot_n);
+         //   numerical_flux_dot_n[s] -= abs(entropy_var_int[s]+entropy_var_ext[s])/4.0*(-entropy_var_int[s]+entropy_var_ext[s]);
         }
+//#endif
     }
     return numerical_flux_dot_n;
 }

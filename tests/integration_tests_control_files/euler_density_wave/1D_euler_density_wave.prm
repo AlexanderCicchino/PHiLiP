@@ -21,9 +21,7 @@ set use_asymptotic_stable = true
 # The PDE we want to solve
 set pde_type = euler
 
-#set conv_num_flux = entropy_conserving_flux_with_lax_friedrichs_dissipation
-#set conv_num_flux = entropy_conserving_flux_with_l2roe_dissipation
-#set conv_num_flux = entropy_conserving_flux
+#set conv_num_flux = two_point_flux
 set conv_num_flux = asymptotic_stable_flux
 #set conv_num_flux = central_flux
 #set conv_num_flux = lax_friedrichs

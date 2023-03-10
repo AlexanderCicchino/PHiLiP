@@ -240,8 +240,8 @@ inline real InitialConditionFunction_BurgersInviscidLinearStability<dim,nstate,r
 {
     real value = 1.0;
     if constexpr(dim >= 1)
-       // value *= sin(dealii::numbers::PI*point[0] - 0.7);
-        value *= sin(4.0*dealii::numbers::PI*point[0] - 0.7);
+        value *= sin(dealii::numbers::PI*point[0] - 0.7);
+       // value *= sin(4.0*dealii::numbers::PI*point[0] - 0.7);
        // value *= sin(8.0*dealii::numbers::PI*point[0] - 0.7);
     if constexpr(dim >= 2)
         value *= sin(dealii::numbers::PI*point[1] - 0.7);
@@ -569,6 +569,8 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
                     param->euler_param.side_slip_angle);
             return std::make_shared<FreeStreamInitialConditions<dim,nstate,real>>(euler_physics_double);
         }
+    } else if (param->test_type==Test_enum::burgers_linear_stability) {
+        if constexpr (dim==1 && nstate==1) return std::make_shared<InitialConditionFunction_BurgersInviscidLinearStability<dim,nstate,real> > ();
     } else if (flow_type == FlowCaseEnum::burgers_inviscid && param->use_energy==false) {
         if constexpr (dim==1 && nstate==1) return std::make_shared<InitialConditionFunction_BurgersInviscid<dim,nstate,real> > ();
     } else if (flow_type == FlowCaseEnum::burgers_inviscid && param->use_energy==true) {
@@ -589,8 +591,6 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
         if constexpr (nstate==dim+2) return std::make_shared<InitialConditionFunction_EulerDensityWave<dim,nstate,real> > ();
     } else if (flow_type == FlowCaseEnum::euler_isentropic_vortex){
         if constexpr (dim==2 && nstate==dim+2) return std::make_shared<InitialConditionFunction_EulerIsentropicVortex<dim,nstate,real> > ();
-    } else if (param->test_type==Test_enum::burgers_linear_stability) {
-        if constexpr (dim==1 && nstate==1) return std::make_shared<InitialConditionFunction_BurgersInviscidLinearStability<dim,nstate,real> > ();
     } else {
         std::cout << "Invalid Flow Case Type. You probably forgot to add it to the list of flow cases in initial_condition_function.cpp" << std::endl;
         std::abort();

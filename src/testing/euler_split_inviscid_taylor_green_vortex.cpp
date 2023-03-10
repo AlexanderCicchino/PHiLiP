@@ -375,6 +375,9 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
 #endif
     ode_solver->current_iteration = 0;
     ode_solver->allocate_ode_system();
+
+    const double initial_energy = compute_kinetic_energy(dg, poly_degree);
+    const double initial_energy_mpi = (dealii::Utilities::MPI::sum(initial_energy, mpi_communicator));
     while(ode_solver->current_time < finalTime){
         const double time_step =  get_timestep(dg,poly_degree, delta_x);
       //  const double M_infty_temp = sqrt(2.0/1.4);
@@ -391,9 +394,14 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
             dg->output_results_vtk(file_number);
         }
 
-        std::array<double,2> current_change_entropy = compute_change_in_entropy(dg, poly_degree);
-        pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy[0]<< std::endl;
-        pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_entropy[1]<< std::endl;
+        const std::array<double,2> current_change_entropy = compute_change_in_entropy(dg, poly_degree);
+        const double current_change_entropy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[0], mpi_communicator);
+        const double current_change_energy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[1], mpi_communicator);
+        pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy_mpi<< std::endl;
+        pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_energy_mpi<< std::endl;
+        const double current_energy = compute_kinetic_energy(dg, poly_degree);
+        const double current_energy_mpi = (dealii::Utilities::MPI::sum(current_energy, mpi_communicator));
+        pcout << "Normalized kinetic energy " << ode_solver->current_time << " is " << current_energy_mpi/initial_energy_mpi<< std::endl;
     }
 
     return 0;

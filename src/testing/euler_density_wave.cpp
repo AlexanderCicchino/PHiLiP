@@ -105,6 +105,7 @@ double EulerDensityWave<dim, nstate>::compute_entropy(std::shared_ptr < DGBase<d
     }
 
    // double entropy = entropy_var_hat_global * mass_matrix_times_solution;
+    dg->assemble_residual();
     double entropy = entropy_var_hat_global * dg->right_hand_side;
 
 //    entropy = integrated_entropy;
@@ -247,8 +248,9 @@ double EulerDensityWave<dim, nstate>::get_timestep(std::shared_ptr < DGBase<dim,
             convective_eigenvalues[isol] = pde_physics_double->max_convective_eigenvalue (soln_at_q[isol]);
         }
         const double max_eig = *(std::max_element(convective_eigenvalues.begin(), convective_eigenvalues.end()));
-       // double cfl = 0.05 * delta_x/max_eig;
-        double cfl = 0.1 * delta_x/max_eig;
+        double cfl = 0.05 * delta_x/max_eig;
+       // double cfl = 0.1 * delta_x/max_eig;
+       // double cfl = 0.5 * delta_x/max_eig;
 
        // double cfl = 0.000005 * delta_x/max_eig;
         if(cfl < cfl_min)
@@ -281,7 +283,8 @@ int EulerDensityWave<dim, nstate>::run_test() const
     double left = -1.0;
     double right = 1.0;
 //    const bool colorize = true;
-    const int n_refinements = 4;
+   // const int n_refinements = 4;
+    const int n_refinements = 2;
    // const int n_refinements = 8;
 //    const int n_refinements = 32;
   //  const int n_refinements = 16;
@@ -315,8 +318,10 @@ int EulerDensityWave<dim, nstate>::run_test() const
     SetInitialCondition<dim,nstate,double>::set_initial_condition(initial_condition_function, dg, &all_parameters_new);
 
 
-//#if 0
+#if 0
     //Do eigenvalues
+
+
 
     std::cout<<"doing eig"<<std::endl;
     Eigen::EigenSolver<Eigen::MatrixXd> eigen_solver;
@@ -325,8 +330,8 @@ int EulerDensityWave<dim, nstate>::run_test() const
     dealii::LinearAlgebra::distributed::Vector<double> col_dRdU(dg->right_hand_side.size());
 //    dealii::LinearAlgebra::distributed::Vector<double> col_dRdU;
 //    col_dRdU.reinit(dg->locally_owned_dofs, dg->ghost_dofs, MPI_COMM_WORLD);
-  //  const double perturbation = 1e-8;
-    const double perturbation = 1e-5;
+    const double perturbation = 1e-8;
+  //  const double perturbation = 1e-5;
     std::cout<<"doing perturbations"<<std::endl;
     for(unsigned int eig_direction=0; eig_direction<dg->solution.size(); eig_direction++){
         double solution_init_value = dg->solution[eig_direction];
@@ -391,7 +396,7 @@ int EulerDensityWave<dim, nstate>::run_test() const
     myfile3.close();
 
     //end eigenvalues
-//#endif
+#endif
 
 
     SetInitialCondition<dim,nstate,double>::set_initial_condition(initial_condition_function, dg, &all_parameters_new);
@@ -446,6 +451,8 @@ finalTime=10.0;
    // while(ode_solver->current_time <= finalTime){
     ode_solver->current_iteration = 0;
     ode_solver->allocate_ode_system();
+    const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
+    dg->output_results_vtk(file_number);
     while(ode_solver->current_time < finalTime){
 //        ode_solver->advance_solution_time(dt);
         ode_solver->step_in_time(dt,false);

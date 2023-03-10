@@ -3,7 +3,8 @@
  
 set dimension = 3
 set run_type = flow_simulation
-set pde_type = navier_stokes
+#set pde_type = navier_stokes #viscous
+set pde_type = euler #inviscid
 set model_type = large_eddy_simulation
 #set solution_vtk_files_directory_name = ./solution_files
 set output_high_order_grid = false

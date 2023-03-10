@@ -210,6 +210,8 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
         std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
 //        double finalTime = 0.0;
         const double finalTime = all_parameters_new.flow_solver_param.final_time;
+      //  const double finalTime = all_parameters_new.ode_solver_param.initial_time_step;
+       // const double finalTime = 100.0*all_parameters_new.ode_solver_param.initial_time_step;
 
 
         // finalTime = 0.1;//to speed things up locally in tests, doesn't need full 14seconds to verify.
@@ -296,6 +298,7 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
                // double time_step =  get_timestep(dg,poly_degree, delta_x);
                 const double M_infty_temp = sqrt(2.0/1.4);
                 double time_step = 0.1 * delta_x / M_infty_temp;
+               // double time_step = 0.05 * delta_x / M_infty_temp;
                 if(ode_solver->current_iteration%all_parameters_new.ode_solver_param.print_iteration_modulo==0)
                     pcout<<"time step "<<time_step<<" current time "<<ode_solver->current_time<<std::endl;
                 double dt = dealii::Utilities::MPI::min(time_step, mpi_communicator);
@@ -373,7 +376,8 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
                  //from Carolyn
                  // Setting constants
                  const double t = finalTime;
-    const double L = 10.0; // half-width of domain
+  //  const double L = 10.0; // half-width of domain
+    const double L  = all_parameters->flow_solver_param.grid_right_bound;
    // const double L = 5.0; // half-width of domain
     const double pi = dealii::numbers::PI;
     const double gam = 1.4;

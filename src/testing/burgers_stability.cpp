@@ -99,7 +99,8 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
     unsigned int poly_degree = 4;
     dealii::ConvergenceTable convergence_table;
     const unsigned int igrid_start = 3;
-    const unsigned int grid_degree = 1;
+   // const unsigned int grid_degree = 1;
+    const unsigned int grid_degree = 4;
 
     for(unsigned int igrid = igrid_start; igrid<n_grids; igrid++){
 
@@ -175,9 +176,17 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         std::ofstream myfile ("energy_plot_burgers.gpl" , std::ios::trunc);
          
         ode_solver->current_iteration = 0;
+        ode_solver->allocate_ode_system();
         for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
         {
-                ode_solver->advance_solution_time(dt);
+        //        ode_solver->advance_solution_time(dt);
+            ode_solver->step_in_time(dt, false);
+            ode_solver->current_iteration += 1;
+            const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
+            if (is_output_iteration) {
+                const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
+                dg->output_results_vtk(file_number);
+            }
                 //Energy
                 double current_energy = compute_energy(dg);
                 current_energy /=initial_energy;
