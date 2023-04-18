@@ -215,6 +215,21 @@ std::array<real,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
 }
 
 template <int dim, int nstate, typename real, int nstate_baseline_physics>
+std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
+::compute_entropy_potential (
+    const std::array<real,nstate> &conservative_soln) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_potential;
+    if constexpr(nstate==nstate_baseline_physics) {
+        entropy_potential = physics_baseline->compute_entropy_potential(conservative_soln);
+    } else {
+        // TO DO, make use of the physics_model object for nstate>nstate_baseline_physics
+        std::abort();
+    }
+    return entropy_potential;
+}
+
+template <int dim, int nstate, typename real, int nstate_baseline_physics>
 std::array<real,nstate> PhysicsModel<dim,nstate,real,nstate_baseline_physics>
 ::convective_eigenvalues (
     const std::array<real,nstate> &conservative_soln,

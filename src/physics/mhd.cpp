@@ -345,6 +345,17 @@ std::array<real,nstate> MHD<dim, nstate, real>
 }
 
 template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> MHD<dim, nstate, real>
+::compute_entropy_potential (
+    const std::array<real,nstate> &/*conservative_soln*/) const
+{
+    std::cout<<"Entropy potential for MHD hasn't been done yet."<<std::endl;
+    std::abort();
+    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_potential;
+    return entropy_potential;
+}
+
+template <int dim, int nstate, typename real>
 std::array<real,nstate> MHD<dim,nstate,real>
 ::convective_normal_flux (const std::array<real,nstate> &conservative_soln, const dealii::Tensor<1,dim,real> &normal) const
 {

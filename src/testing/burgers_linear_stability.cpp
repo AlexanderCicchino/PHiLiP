@@ -45,15 +45,18 @@ int BurgersLinearStability<dim, nstate>::run_test() const
   //  double left  = 0.0;
   //  double right = 2.0;
     const unsigned int n_grids = 4;
+   // const unsigned int n_grids = 3;
    // const unsigned int n_grids = 5;
    // const unsigned int n_grids = 2;
     std::vector<double> grid_size(n_grids);
     std::vector<double> soln_error(n_grids);
     unsigned int poly_degree = 4;
+   // unsigned int poly_degree = 3;
     //unsigned int poly_degree = 8;
   //  unsigned int poly_degree = 15;
     dealii::ConvergenceTable convergence_table;
     const unsigned int igrid_start = 3;
+   // const unsigned int igrid_start = 2;
    // const unsigned int igrid_start = 4;
   //  const unsigned int igrid_start = 1;
     const unsigned int grid_degree = 1;
@@ -135,6 +138,7 @@ int BurgersLinearStability<dim, nstate>::run_test() const
         const double perturbation = 1e-8;
         std::cout<<"doing perturbations"<<std::endl;
         for(unsigned int eig_direction=0; eig_direction<dg->solution.size(); eig_direction++){
+//            pcout<<"perturbing soln "<<eig_direction<<std::endl;
             double solution_init_value = dg->solution[eig_direction];
             dg->solution[eig_direction] += perturbation;
             dg->assemble_residual();
@@ -188,13 +192,13 @@ int BurgersLinearStability<dim, nstate>::run_test() const
             }
         }
 
-//        pcout<<"the DRDU"<<std::endl;
-//            for(unsigned int i=0; i<dg->solution.size(); i++){
-//            for(unsigned int j=0; j<dg->solution.size(); j++){
-//                pcout<<dRdU(i,j)<<" ";
-//            }
-//            pcout<<std::endl;
-//            }
+        pcout<<"the DRDU"<<std::endl;
+            for(unsigned int i=0; i<dg->solution.size(); i++){
+            for(unsigned int j=0; j<dg->solution.size(); j++){
+                pcout<<dRdU(i,j)<<" ";
+            }
+            pcout<<std::endl;
+            }
 
         }//end ode solver
 

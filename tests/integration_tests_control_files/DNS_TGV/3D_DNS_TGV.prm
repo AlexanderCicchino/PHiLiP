@@ -12,13 +12,13 @@ set output_high_order_grid = false
 # DG formulation
 set use_weak_form = false
 set overintegration = 0
-set flux_nodes_type = GLL
+set flux_nodes_type = GL
 set use_split_form = true
 set use_classical_FR = false
-set flux_reconstruction = cDG
+set flux_reconstruction = cPlus
 set use_inverse_mass_on_the_fly = true
 set use_periodic_bc = true
-set use_asymptotic_stable = true
+set use_asymptotic_stable = false
 set use_weight_adjusted_mass = true
 
 # Enable output high-order solution
@@ -26,7 +26,8 @@ set enable_higher_order_vtk_output = true
  
 # numerical fluxes
 set two_point_num_flux_type = Ra
-set conv_num_flux = asymptotic_stable_flux
+#set conv_num_flux = asymptotic_stable_flux
+set conv_num_flux = two_point_flux
 set diss_num_flux = symm_internal_penalty
  
 # ODE solver
@@ -67,7 +68,7 @@ end
 subsection flow_solver
   set flow_case_type = taylor_green_vortex
   set poly_degree = 3
-  set final_time = 20.001
+  set final_time = 14.0
   set courant_friedrich_lewy_number = 0.1
   set adaptive_time_step = true
   set unsteady_data_table_filename = turbulent_quantities

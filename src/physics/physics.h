@@ -76,6 +76,10 @@ public:
     virtual std::array<real,nstate> compute_conservative_variables_from_entropy_variables (
                 const std::array<real,nstate> &entropy_var) const = 0;
 
+    /// Computes the entropy potential.
+    virtual std::array<dealii::Tensor<1,dim,real>,nstate> compute_entropy_potential (
+                const std::array<real,nstate> &conservative_soln) const = 0;
+
     /// Spectral radius of convective term Jacobian.
     /** Used for scalar dissipation
      */

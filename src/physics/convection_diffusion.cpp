@@ -106,6 +106,20 @@ std::array<real,nstate> ConvectionDiffusion<dim, nstate, real>
 }
 
 template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim, nstate, real>
+::compute_entropy_potential (
+    const std::array<real,nstate> &conservative_soln) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_potential;
+    for(int s=0; s<nstate; s++){
+        for(int idim=0; idim<dim; idim++){
+            entropy_potential[s][idim] = 0.5 * conservative_soln[s] * conservative_soln[s];
+        }
+    }
+    return entropy_potential;
+}
+
+template <int dim, int nstate, typename real>
 dealii::Tensor<1,dim,real> ConvectionDiffusion<dim,nstate,real>
 ::advection_speed () const
 {

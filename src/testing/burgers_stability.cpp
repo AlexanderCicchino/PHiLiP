@@ -99,8 +99,8 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
     unsigned int poly_degree = 4;
     dealii::ConvergenceTable convergence_table;
     const unsigned int igrid_start = 3;
-   // const unsigned int grid_degree = 1;
-    const unsigned int grid_degree = 4;
+    const unsigned int grid_degree = 1;
+  //  const unsigned int grid_degree = 4;
 
     for(unsigned int igrid = igrid_start; igrid<n_grids; igrid++){
 

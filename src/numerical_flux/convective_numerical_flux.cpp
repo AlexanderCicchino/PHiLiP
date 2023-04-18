@@ -229,6 +229,7 @@ std::array<real, nstate> AsymptoticStableBaselineNumericalFluxConvective<dim,nst
 //        numerical_flux_dot_n[s] = flux_dot_n;
 //#if 0
         if((flux_avg_dot_n - flux_entropy_dot_n)*(entropy_var_ext[s] - entropy_var_int[s]) < 0){
+       // if((flux_avg_dot_n - flux_entropy_dot_n)*(entropy_var_ext[s] + entropy_var_int[s]) > 0){
             numerical_flux_dot_n[s] = flux_avg_dot_n;
 
         }
@@ -238,7 +239,32 @@ std::array<real, nstate> AsymptoticStableBaselineNumericalFluxConvective<dim,nst
          //   numerical_flux_dot_n[s] -= (flux_avg_dot_n - flux_entropy_dot_n);
          //   numerical_flux_dot_n[s] -= abs(entropy_var_int[s]+entropy_var_ext[s])/4.0*(-entropy_var_int[s]+entropy_var_ext[s]);
         }
+//        numerical_flux_dot_n[s] = flux_entropy_dot_n;
+//        real lambda = abs(flux_avg_dot_n - flux_entropy_dot_n);
+//        if((entropy_var_ext[s]-entropy_var_int[s])<0)
+//            lambda  *=-1.0;
+////        if(normal_int[0]<0)
+////            lambda *=-1.0;
+//        numerical_flux_dot_n[s] -= lambda;
 //#endif
+      //  numerical_flux_dot_n[s] -= abs(entropy_var_int[s]+entropy_var_ext[s])/4.0*(-entropy_var_int[s]+entropy_var_ext[s]);
+#if 0
+        //Ismail-Roe
+        numerical_flux_dot_n[s] = flux_entropy_dot_n;
+        numerical_flux_dot_n[s] -= abs(-entropy_var_int[s]+entropy_var_ext[s])/12.0*(-entropy_var_int[s]+entropy_var_ext[s]);
+        numerical_flux_dot_n[s] -= abs(entropy_var_int[s]+entropy_var_ext[s])/4.0*(-entropy_var_int[s]+entropy_var_ext[s]);
+#endif
+#if 0
+        if((entropy_var_ext[s] + entropy_var_int[s]) > 0){
+            numerical_flux_dot_n[s] = flux_entropy_dot_n
+                                    + abs(flux_avg_dot_n - flux_entropy_dot_n);
+        }
+        else{
+            numerical_flux_dot_n[s] = flux_entropy_dot_n
+                                    - abs(flux_avg_dot_n - flux_entropy_dot_n);
+        }
+#endif
+
     }
     return numerical_flux_dot_n;
 }

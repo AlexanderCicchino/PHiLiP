@@ -31,8 +31,10 @@ set use_asymptotic_stable = true
 #set conv_num_flux = lax_friedrichs
 #set conv_num_flux = central_flux
 #set conv_num_flux = two_point_flux_with_lax_friedrichs_dissipation
-#set conv_num_flux = two_point_flux
-set conv_num_flux = asymptotic_stable_flux
+set conv_num_flux = two_point_flux
+#set conv_num_flux = asymptotic_stable_flux
+
+set enable_higher_order_vtk_output = true
 
 subsection ODE solver
 

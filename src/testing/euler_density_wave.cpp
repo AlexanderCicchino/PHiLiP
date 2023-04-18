@@ -318,7 +318,7 @@ int EulerDensityWave<dim, nstate>::run_test() const
     SetInitialCondition<dim,nstate,double>::set_initial_condition(initial_condition_function, dg, &all_parameters_new);
 
 
-#if 0
+//#if 0
     //Do eigenvalues
 
 
@@ -396,7 +396,7 @@ int EulerDensityWave<dim, nstate>::run_test() const
     myfile3.close();
 
     //end eigenvalues
-#endif
+//#endif
 
 
     SetInitialCondition<dim,nstate,double>::set_initial_condition(initial_condition_function, dg, &all_parameters_new);
@@ -419,7 +419,7 @@ int EulerDensityWave<dim, nstate>::run_test() const
   // finalTime = 100.0*dt;
   //finalTime =0.0;
 
-finalTime=10.0;
+//finalTime=10.0;
     std::cout << " number dofs " << dg->dof_handler.n_dofs()<<std::endl;
     std::cout << "preparing to advance solution in time" << std::endl;
 

@@ -234,6 +234,10 @@ public:
     std::array<real,nstate> compute_conservative_variables_from_entropy_variables (
                 const std::array<real,nstate> &entropy_var) const;
 
+    /// Computes the entropy potential.
+    std::array<dealii::Tensor<1,dim,real>,nstate> compute_entropy_potential (
+                const std::array<real,nstate> &conservative_soln) const;
+
     /// Mean density given two sets of conservative solutions.
     /** Used in the implementation of the split form.
      */
