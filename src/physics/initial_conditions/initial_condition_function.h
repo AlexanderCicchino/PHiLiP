@@ -350,6 +350,41 @@ public:
     real value(const dealii::Point<dim,real> &point, const unsigned int istate = 0) const override;
 };
 
+/// Initial Condition Function: Inviscid Strong Vortex Shock Wave Interaction
+template <int dim, int nstate, typename real>
+class InitialConditionFunction_InviscidVortexShockInteraction : public InitialConditionFunction<dim,nstate,real>
+{
+protected:
+    using dealii::Function<dim,real>::value; ///< dealii::Function we are templating on
+
+public:
+    /// Constructor for InitialConditionFunction_VortexShockInteraction
+    /** Calls the Function(const unsigned int n_components) constructor in deal.II
+     *  This sets the public attribute n_components = nstate, which can then be accessed
+     *  by all the other functions
+     * Reference https://how5.cenaero.be/sites/how5.cenaero.be/files/CI2_StrongVortexShock_0.pdf
+     */
+    InitialConditionFunction_InviscidVortexShockInteraction (
+            Parameters::AllParameters const *const param);
+
+    const double gamma_gas; ///< Constant heat capacity ratio of fluid.
+    const double mach_shock; ///< Mach number of the shock wave.
+    const double mach_shock_sqr; ///< Farfield Mach number squared.
+        
+    /// Value of initial condition expressed in terms of conservative variables
+    real value (const dealii::Point<dim,real> &point, const unsigned int istate = 0) const override;
+
+protected:
+    /// Value of initial condition expressed in terms of primitive variables
+    real primitive_value(const dealii::Point<dim,real> &point, const unsigned int istate = 0) const;
+    
+    /// Converts value from: primitive to conservative
+    real convert_primitive_to_conservative_value(const dealii::Point<dim,real> &point, const unsigned int istate = 0) const;
+
+    // Euler physics pointer. Used to convert primitive to conservative.
+    std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_physics;
+};
+
 /// Initial condition function factory
 template <int dim, int nstate, typename real>
 class InitialConditionFactory

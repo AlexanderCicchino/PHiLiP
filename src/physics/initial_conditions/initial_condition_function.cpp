@@ -468,6 +468,175 @@ real InitialConditionFunction_Zero<dim, nstate, real>
     return 0.0;
 }
 
+// ========================================================
+// Inviscid Vortex Shock Interaction -- Initial Condition
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_InviscidVortexShockInteraction <dim,nstate,real>
+::InitialConditionFunction_InviscidVortexShockInteraction (
+        Parameters::AllParameters const *const param)
+    : InitialConditionFunction<dim,nstate,real>()
+    , gamma_gas(param->euler_param.gamma_gas)
+    , mach_shock(param->euler_param.mach_shock)
+    , mach_shock_sqr(mach_shock*mach_shock)
+{
+    // Euler object; create using dynamic_pointer_cast and the create_Physics factory
+    // Note that Euler primitive/conservative vars are the same as NS
+    PHiLiP::Parameters::AllParameters parameters_euler = *param;
+    parameters_euler.pde_type = Parameters::AllParameters::PartialDifferentialEquation::euler;
+    this->euler_physics = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(
+                Physics::PhysicsFactory<dim,dim+2,double>::create_Physics(&parameters_euler));
+}
+template <int dim, int nstate, typename real>
+real InitialConditionFunction_InviscidVortexShockInteraction <dim,nstate,real>
+::primitive_value(const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+    // Note: This is in non-dimensional form (free-stream values as reference)
+    real value = 0.;
+    if constexpr(dim == 2) {
+        const real x = point[0], y = point[1];
+
+        //get upstream conditions
+        const real rho_upstream = 1.0;
+        const real u_upstream = mach_shock * sqrt(gamma_gas);
+        const real v_upstream = 0.0;
+        const real p_upstream = 1.0;
+
+        //Use stationary normal shock condition to get downstream condition
+        const real density_ratio  = (2.0 + (gamma_gas-1.0)*mach_shock_sqr)
+                                  / ( (gamma_gas + 1.0)*mach_shock_sqr);
+        const real pressure_ratio  = 1.0 + (2.0 * gamma_gas) / (gamma_gas + 1.0)
+                                   * (mach_shock_sqr -1.0);
+        const real rho_downstream = rho_upstream / density_ratio;
+        const real u_downstream = u_upstream * density_ratio;
+        const real v_downstream = 0.0;
+        const real p_downstream = p_upstream * pressure_ratio;
+
+        if( x <= 0.5 && x >= 0.0){
+            if(istate == 0){
+                value = rho_upstream;
+            }
+            if(istate == 1){
+                value = u_upstream;
+            }
+            if(istate == 2){
+                value = v_upstream;
+            }
+            if(istate == 3){
+                value = p_upstream;
+            }
+        }
+        else if( x > 0.5 && x<= 2.0){
+            if(istate == 0){
+                value = rho_downstream;
+            }
+            if(istate == 1){
+                value = u_downstream;
+            }
+            if(istate == 2){
+                value = v_downstream;
+            }
+            if(istate == 3){
+                value = p_downstream;
+            }
+        }
+        else{
+            std::cout<<"The domain is incorrect. Aborting..."<<std::endl;
+            std::abort();
+        }
+
+        //Set vortex
+        const real x_c = 0.25;
+        const real y_c = 0.5;
+        const real a = 0.075;
+        const real b = 0.175;
+        const real radius = sqrt((x-x_c)*(x-x_c) + (y-y_c)*(y-y_c));
+        const real mach_vortex = 0.9;
+        const real vel_max = mach_vortex * sqrt(gamma_gas);
+        real vel_angular = 0.0;
+        bool in_vortex = false;//flag if point is in vortex
+        //get angular velocity within vortex
+        if(radius<= a){
+            vel_angular = vel_max * radius / a;
+            in_vortex = true;
+        }
+        if( radius >a && radius <= b){
+            vel_angular = vel_max * (a/(a*a - b*b)) * (radius - (b*b)/radius); 
+            in_vortex = true;
+        }
+        
+        real u_vortex = u_upstream + vel_angular * (x-x_c) / radius;//x-component of angular vel
+        real v_vortex = v_upstream + vel_angular * (y-y_c) / radius;//y-component of angular vel
+        const real T_upstream = p_upstream / rho_upstream;//obtained using R=1
+        real T_vor = 0.0;
+        const real gas_constant = 287.05;
+//        const real gas_constant = 1.0;
+        //get the temperature within vortex via integral relation.
+        if(in_vortex){
+            real integral = 0.0;
+            if(radius<= a){
+                integral = vel_max * vel_max /(2.0 * a) *( a*a - radius*radius)
+                              + vel_max * a /(a*a-b*b) *(b-a + b - b*b/a);
+                integral *= (gamma_gas - 1.0) / (gas_constant * gamma_gas);
+            }
+            if( radius >a && radius <= b){
+                integral = vel_max * a /(a*a-b*b) *(b-radius + b - b*b/radius);
+                integral *= (gamma_gas - 1.0) / (gas_constant * gamma_gas);
+            }
+            T_vor = T_upstream - integral;
+        }
+
+        real rho_vortex = rho_upstream * pow(T_vor / T_upstream, 1.0/(gamma_gas - 1.0));
+        real p_vortex = p_upstream * pow(T_vor / T_upstream, gamma_gas/(gamma_gas - 1.0));
+
+        if(in_vortex){
+            if(istate == 0){
+                value = rho_vortex;
+            }
+            if(istate == 1){
+                value = u_vortex;
+            }
+            if(istate == 2){
+                value = v_vortex;
+            }
+            if(istate == 3){
+                value = p_vortex;
+            }
+        }
+    }
+    return value;
+}
+
+template <int dim, int nstate, typename real>
+real InitialConditionFunction_InviscidVortexShockInteraction <dim,nstate,real>
+::convert_primitive_to_conservative_value(
+    const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+    real value = 0.0;
+    if constexpr(dim == 2) {
+        std::array<real,nstate> soln_primitive;
+
+        soln_primitive[0] = primitive_value(point,0);
+        soln_primitive[1] = primitive_value(point,1);
+        soln_primitive[2] = primitive_value(point,2);
+        soln_primitive[3] = primitive_value(point,3);
+
+        const std::array<real,nstate> soln_conservative = this->euler_physics->convert_primitive_to_conservative(soln_primitive);
+        value = soln_conservative[istate];
+    }
+
+    return value;
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_InviscidVortexShockInteraction <dim, nstate, real>
+::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+    real value = 0.0;
+    value = convert_primitive_to_conservative_value(point,istate);
+    return value;
+}
+
 // =========================================================
 // Initial Condition Factory
 // =========================================================
@@ -526,6 +695,8 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
         if constexpr (dim>1 && nstate==dim+2) return std::make_shared<InitialConditionFunction_KHI<dim,nstate,real> > (param);
     } else if (flow_type == FlowCaseEnum::non_periodic_cube_flow) {
         if constexpr (dim==2 && nstate==1)  return std::make_shared<InitialConditionFunction_Zero<dim,nstate,real> > ();
+    } else if (flow_type == FlowCaseEnum::inviscid_vortex_shock_interaction) {
+        if constexpr (dim==2 && nstate==dim+2)  return std::make_shared<InitialConditionFunction_InviscidVortexShockInteraction<dim,nstate,real> > (param);
     } else {
         std::cout << "Invalid Flow Case Type. You probably forgot to add it to the list of flow cases in initial_condition_function.cpp" << std::endl;
         std::abort();
@@ -560,6 +731,7 @@ template class InitialConditionFunction_IsentropicVortex <PHILIP_DIM, PHILIP_DIM
 #endif
 #if PHILIP_DIM==2
 template class InitialConditionFunction_KHI <PHILIP_DIM, PHILIP_DIM+2, double>;
+template class InitialConditionFunction_InviscidVortexShockInteraction <PHILIP_DIM, PHILIP_DIM+2, double>;
 #endif
 // functions instantiated for all dim
 template class InitialConditionFunction_Zero <PHILIP_DIM,1, double>;

@@ -25,6 +25,9 @@ void EulerParam::declare_parameters (dealii::ParameterHandler &prm)
         prm.declare_entry("side_slip_angle", "0.0",
                           dealii::Patterns::Double(-180, 180),
                           "Side slip angle in degrees. Required for 3D");
+        prm.declare_entry("mach_shock", "1.0",
+                          dealii::Patterns::Double(1e-15, 10),
+                          "Mach number of a shock wave.");
     }
     prm.leave_subsection();
 }
@@ -39,6 +42,7 @@ void EulerParam ::parse_parameters (dealii::ParameterHandler &prm)
         const double pi = atan(1.0) * 4.0;
         angle_of_attack = prm.get_double("angle_of_attack") * pi/180.0;
         side_slip_angle = prm.get_double("side_slip_angle") * pi/180.0;
+        mach_shock      = prm.get_double("mach_shock");
     }
     prm.leave_subsection();
 }

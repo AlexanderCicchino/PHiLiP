@@ -974,8 +974,15 @@ void Euler<dim,nstate,real>
     std::array<real,nstate> primitive_int = convert_conservative_to_primitive<real>(soln_int);
     std::array<real,nstate> primitive_ext;
     primitive_ext[0] = density_inf;
-    for (int d=0;d<dim;d++) { primitive_ext[1+d] = velocities_inf[d]; }
-    primitive_ext[nstate-1] = pressure_inf;
+    for (int d=0;d<dim;d++) { 
+        if(d==0)
+            primitive_ext[1+d] = (2.0 +0.4*1.5*1.5)/(2.4*1.5*1.5)*1.5*sqrt(1.4); 
+        if(d ==1)
+            primitive_ext[1+d] = 0.0;
+    }
+    primitive_ext[nstate-1] = 1.0+2.0*1.4*(1.5*1.5-1.0)/2.4;
+   // for (int d=0;d<dim;d++) { primitive_ext[1+d] = velocities_inf[d]; }
+   // primitive_ext[nstate-1] = pressure_inf;
 
     const dealii::Tensor<1,dim,real> velocities_int = extract_velocities_from_primitive<real>(primitive_int);
     const dealii::Tensor<1,dim,real> velocities_ext = extract_velocities_from_primitive<real>(primitive_ext);
@@ -1332,8 +1339,10 @@ void Euler<dim,nstate,real>
    std::array<dealii::Tensor<1,dim,real>,nstate> &soln_grad_bc) const
 {
     // NEED TO PROVIDE AS INPUT ************************************** (ask Doug where this should be moved to, protected member?)
-    const real total_inlet_pressure = pressure_inf*pow(1.0+0.5*gamm1*mach_inf_sqr, gam/gamm1);
-    const real total_inlet_temperature = temperature_inf*pow(total_inlet_pressure/pressure_inf, gamm1/gam);
+   // const real total_inlet_pressure = pressure_inf*pow(1.0+0.5*gamm1*mach_inf_sqr, gam/gamm1);
+   // const real total_inlet_temperature = temperature_inf*pow(total_inlet_pressure/pressure_inf, gamm1/gam);
+    const real total_inlet_pressure = 1.0;
+    const real total_inlet_temperature = gam*1.0/1.0*1.5;
 
     if (boundary_type == 1000) {
         // Manufactured solution boundary condition
