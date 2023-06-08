@@ -1419,6 +1419,8 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
     }
     right_hand_side = 0;
 
+    //set cell entropy production to 0
+    cell_entropy_production = 0;
 
     //const dealii::MappingManifold<dim,dim> mapping;
     //const dealii::MappingQ<dim,dim> mapping(10);//;max_degree+1);
@@ -1545,6 +1547,8 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
 
     right_hand_side.compress(dealii::VectorOperation::add);
     right_hand_side.update_ghost_values();
+    //for cell entropy correction
+    apply_entropy_production_correction();
     if ( compute_dRdW ) {
         system_matrix.compress(dealii::VectorOperation::add);
 
@@ -2189,6 +2193,20 @@ void DGBase<dim,real,MeshType>::allocate_system (
 
     // Set use_auxiliary_eq flag
     set_use_auxiliary_eq();
+
+    //for cell entorpy production
+//    dealii::DoFHandler<dim> dof_handler_p0(*triangulation);
+//    const dealii::FE_DGQ<dim> fe_dg0(0);
+//    const dealii::FESystem<dim,dim> fe_system0(fe_dg0, 1);
+//    dof_handler_p0.initialize(*triangulation, fe_system0);
+//    dof_handler_p0.distribute_dofs(fe_system0);
+//    dealii::IndexSet locally_owned_dofs0 = dof_handler_p0.locally_owned_dofs();
+//    dealii::IndexSet ghost_dofs0;
+//    dealii::DoFTools::extract_locally_relevant_dofs(dof_handler_p0, ghost_dofs0);
+//    dealii::IndexSet locally_relevant_dofs0 = ghost_dofs0;
+//    ghost_dofs0.subtract_set(locally_owned_dofs0);
+    //only use idof=0 for it for now
+    cell_entropy_production.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
 
     // Allocate for auxiliary equation only.
     if(use_auxiliary_eq) allocate_auxiliary_equation ();
@@ -3334,6 +3352,377 @@ template <int dim, typename real, typename MeshType>
 void DGBase<dim,real,MeshType>::set_current_time(const real current_time_input)
 {
     this->current_time = current_time_input;
+}
+
+template <int dim, int nstate, typename real, typename MeshType>
+void DGBaseState<dim,nstate,real,MeshType>::apply_entropy_production_correction()
+{
+
+    //add ghost values
+    this->cell_entropy_production.compress(dealii::VectorOperation::add);
+    this->cell_entropy_production.update_ghost_values();
+
+    const unsigned int init_grid_degree = this->high_order_grid->fe_system.tensor_degree();
+    //Constructor for the operators
+    OPERATOR::basis_functions<dim,2*dim> soln_basis(1, this->max_degree, init_grid_degree); 
+    OPERATOR::vol_projection_operator<dim,2*dim> soln_basis_projection_oper(1, this->max_degree, init_grid_degree); 
+
+    OPERATOR::mapping_shape_functions<dim,2*dim> mapping_basis(1, init_grid_degree, init_grid_degree);
+   // mapping_basis.build_1D_shape_functions_at_volume_flux_nodes(this->high_order_grid->oneD_fe_system, this->oneD_quadrature_collection[this->max_degree]);
+    mapping_basis.build_1D_shape_functions_at_grid_nodes(this->high_order_grid->oneD_fe_system, this->high_order_grid->oneD_grid_nodes);
+    mapping_basis.build_1D_shape_functions_at_flux_nodes(this->high_order_grid->oneD_fe_system, this->oneD_quadrature_collection[this->max_degree], this->oneD_face_quadrature);
+    const unsigned int grid_degree = this->high_order_grid->fe_system.tensor_degree();
+    const dealii::FESystem<dim> &fe_metric = this->high_order_grid->fe_system;
+    const unsigned int n_metric_dofs = this->high_order_grid->fe_system.dofs_per_cell;
+
+    //build the oneD operator to perform interpolation/projection
+    soln_basis.build_1D_volume_operator(this->oneD_fe_collection_1state[this->max_degree], this->oneD_quadrature_collection[this->max_degree]);
+    soln_basis.build_1D_gradient_operator(this->oneD_fe_collection_1state[this->max_degree], this->oneD_quadrature_collection[this->max_degree]);
+    soln_basis_projection_oper.build_1D_volume_operator(this->oneD_fe_collection_1state[this->max_degree], this->oneD_quadrature_collection[this->max_degree]);
+
+
+    soln_basis.build_1D_surface_gradient_operator(this->oneD_fe_collection_1state[this->max_degree], this->oneD_face_quadrature);
+    soln_basis.build_1D_surface_operator(this->oneD_fe_collection_1state[this->max_degree], this->oneD_face_quadrature);
+    auto metric_cell = this->high_order_grid->dof_handler_grid.begin_active();
+    for (auto soln_cell = this->dof_handler.begin_active(); soln_cell != this->dof_handler.end(); ++soln_cell, ++metric_cell) {
+        if (!soln_cell->is_locally_owned()) continue;
+
+        std::vector<dealii::types::global_dof_index> current_dofs_indices;
+        // Current reference element related to this physical cell
+        const int poly_degree = soln_cell->active_fe_index();
+        const dealii::FESystem<dim,dim> &current_fe_ref = this->fe_collection[poly_degree];
+        const unsigned int n_dofs_curr_cell = current_fe_ref.n_dofs_per_cell();
+
+
+        // get mapping support points and determinant of Jacobian
+        // setup metric cell
+        std::vector<dealii::types::global_dof_index> metric_dof_indices(n_metric_dofs);
+        metric_cell->get_dof_indices (metric_dof_indices);
+        // get mapping_support points
+        std::array<std::vector<real>,dim> mapping_support_points;
+        for(int idim=0; idim<dim; idim++){
+            mapping_support_points[idim].resize(n_metric_dofs/dim);
+        }
+        const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<dim>(grid_degree);
+        for (unsigned int idof = 0; idof< n_metric_dofs; ++idof) {
+            const real val = (this->high_order_grid->volume_nodes[metric_dof_indices[idof]]);
+            const unsigned int istate = fe_metric.system_to_component_index(idof).first; 
+            const unsigned int ishape = fe_metric.system_to_component_index(idof).second; 
+            const unsigned int igrid_node = index_renumbering[ishape];
+            mapping_support_points[istate][igrid_node] = val; 
+        }
+        //get determinant of Jacobian
+        const unsigned int n_quad_pts = this->volume_quadrature_collection[poly_degree].size();
+        const unsigned int n_grid_nodes = n_metric_dofs / dim;
+        //get determinant of Jacobian
+        OPERATOR::metric_operators<real, dim, 2*dim> metric_oper(1, poly_degree, grid_degree);
+        metric_oper.build_determinant_volume_metric_Jacobian(
+                        n_quad_pts, n_grid_nodes, 
+                        mapping_support_points,
+                        mapping_basis);
+
+
+        // Obtain the mapping from local dof indices to global dof indices
+        current_dofs_indices.resize(n_dofs_curr_cell);
+        soln_cell->get_dof_indices (current_dofs_indices);
+
+        //Extract the local solution dofs in the cell from the global solution dofs
+        std::array<std::vector<real>,nstate> soln_dofs;
+        const unsigned int n_shape_fns = n_dofs_curr_cell / nstate;
+        for(unsigned int istate=0; istate<nstate; ++istate){
+            //allocate soln_dofs
+            soln_dofs[istate].resize(n_shape_fns);
+        }
+	for(unsigned int idof = 0; idof<n_dofs_curr_cell; ++idof){
+            const unsigned int istate = this->fe_collection[poly_degree].system_to_component_index(idof).first;
+            const unsigned int ishape = this->fe_collection[poly_degree].system_to_component_index(idof).second;
+            soln_dofs[istate][ishape] = this->solution[current_dofs_indices[idof]];
+	}
+        std::array<std::vector<real>,nstate> soln_at_q;
+        for(int istate=0; istate<nstate; istate++){
+            soln_at_q[istate].resize(n_quad_pts);
+            soln_basis.matrix_vector_mult_1D(soln_dofs[istate], soln_at_q[istate],
+                                             soln_basis.oneD_vol_operator);
+        }
+        std::array<std::vector<real>,nstate> entropy_var_vol;
+        for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+            std::array<real,nstate> soln_state;
+            for(int istate=0; istate<nstate; istate++){
+                soln_state[istate] = soln_at_q[istate][iquad];
+            }
+            std::array<real,nstate> entropy_var;
+            entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+            for(int istate=0; istate<nstate; istate++){
+                if(iquad==0){
+                    entropy_var_vol[istate].resize(n_quad_pts);
+                }
+                entropy_var_vol[istate][iquad] = entropy_var[istate];
+            }
+        }
+        std::array<std::vector<real>,nstate> projected_entropy_var_coef;
+        for(int istate=0; istate<nstate; istate++){
+            // allocate
+            projected_entropy_var_coef[istate].resize(n_shape_fns);
+            //project
+            soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_vol[istate],
+                                                             projected_entropy_var_coef[istate],
+                                                             soln_basis_projection_oper.oneD_vol_operator);
+        }
+
+        //volume streamline diffusion
+        std::array<std::vector<real>,nstate> df_dv;
+        real df_dv_avg=0.0;
+        for(int istate=0; istate<nstate; istate++){
+            df_dv[istate].resize(n_shape_fns);
+            for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                df_dv[istate][ishape] = projected_entropy_var_coef[istate][ishape];
+                df_dv_avg += df_dv[istate][ishape];
+            }
+        }
+        df_dv_avg /= n_shape_fns;
+        std::array<std::vector<real>,nstate> grad_entropy_var;
+        for(int istate=0; istate<nstate; istate++){
+            grad_entropy_var[istate].resize(n_shape_fns);
+            soln_basis.matrix_vector_mult_1D(projected_entropy_var_coef[istate],grad_entropy_var[istate],
+                                             soln_basis.oneD_grad_operator);
+        }
+        const std::vector<real> &quad_weights = this->volume_quadrature_collection[poly_degree].get_weights();
+        real tau = 0.0;
+        for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+            real K_term =0.0;
+            for(unsigned int iquad=0; iquad<n_shape_fns; iquad++){
+                K_term += df_dv_avg * soln_basis.oneD_grad_operator[iquad][ishape] * quad_weights[ishape];
+            }
+            K_term /= metric_oper.det_Jac_vol[0];
+            if(K_term<0.0)
+                K_term = 0.0;
+            tau += K_term;
+        }
+        tau = 1.0 / (tau+1e-20);
+
+//        tau = 1.0 / (n_shape_fns * df_dv_avg);
+
+        std::vector<real> psi(n_shape_fns);
+        real psi_entropy = 0.0;
+        for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+            psi[ishape] = 0.0;
+            for(unsigned int iquad=0; iquad<n_shape_fns; iquad++){
+                psi[ishape] += quad_weights[iquad] * soln_basis.oneD_grad_operator[iquad][ishape]
+//                             * df_dv[0][iquad] * df_dv[0][iquad]
+                             /metric_oper.det_Jac_vol[0]
+                             * tau
+                             * grad_entropy_var[0][iquad];
+            }
+            psi_entropy += psi[ishape] * projected_entropy_var_coef[0][ishape];
+        }
+        std::array<std::vector<real>,nstate> rhs_coeff;
+        for(unsigned int istate=0; istate<nstate; ++istate){
+            rhs_coeff[istate].resize(n_shape_fns);
+        }
+	for(unsigned int idof = 0; idof<n_dofs_curr_cell; ++idof){
+            const unsigned int istate = this->fe_collection[poly_degree].system_to_component_index(idof).first;
+            const unsigned int ishape = this->fe_collection[poly_degree].system_to_component_index(idof).second;
+            rhs_coeff[istate][ishape] = this->right_hand_side[current_dofs_indices[idof]];
+	}
+        real cell_entropy_production_value = 0.0;
+        for(int istate=0; istate<nstate; istate++){
+            for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                cell_entropy_production_value += rhs_coeff[istate][ishape] * projected_entropy_var_coef[istate][ishape]; 
+            }
+        }
+
+        for(int istate=0; istate<nstate; istate++){
+            for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                const unsigned int idof = istate * n_shape_fns + ishape;
+             //   this->right_hand_side[current_dofs_indices[idof]] += -cell_entropy_production_value/(psi_entropy + 1e-14) * psi[ishape];
+            //    this->right_hand_side[current_dofs_indices[idof]] += -abs(cell_entropy_production_value/(psi_entropy + 1e-14)) * psi[ishape];
+               // this->right_hand_side[current_dofs_indices[idof]] += -0.01 * psi[ishape];
+               // this->right_hand_side[current_dofs_indices[idof]] -= 1.0/12.0 * psi[ishape];
+   //             this->right_hand_side[current_dofs_indices[idof]] -= 0.001 * psi[ishape];
+                this->right_hand_side[current_dofs_indices[idof]] -= 0.0 * psi[ishape];
+               // this->right_hand_side[current_dofs_indices[idof]] += -std::max(cell_entropy_production_value/(psi_entropy + 1e-14),0.0) * psi[ishape];
+            }
+        }
+
+
+        //face loop
+        std::vector<real> psi_surf(n_shape_fns);
+        for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+            psi_surf[ishape] = 0.0;
+        }
+        real psi_surf_entropy = 0.0;
+        for (unsigned int iface=0; iface < dealii::GeometryInfo<dim>::faces_per_cell; ++iface) {
+
+            const unsigned int n_face_quad_pts = this->face_quadrature_collection[poly_degree].size();
+            metric_oper.build_facet_metric_operators(
+                iface,
+                n_face_quad_pts, n_metric_dofs/dim,
+                mapping_support_points,
+                mapping_basis,
+                false);
+        
+            const dealii::Tensor<1,dim,real> unit_normal_int = dealii::GeometryInfo<dim>::unit_normal_vector[iface];
+            std::vector<dealii::Tensor<1,dim,real>> normals_int(n_face_quad_pts);
+            for(unsigned int iquad=0; iquad<n_face_quad_pts; iquad++){
+                for(unsigned int idim=0; idim<dim; idim++){
+                    normals_int[iquad][idim] =  0.0;
+                    for(int idim2=0; idim2<dim; idim2++){
+                        normals_int[iquad][idim] += unit_normal_int[idim2] * metric_oper.metric_cofactor_surf[idim][idim2][iquad];//\hat{n}^r * C_m^T 
+                    }
+                }
+            }
+
+            const std::vector<real> &quad_weights_surf = this->face_quadrature_collection[poly_degree].get_weights();
+            std::vector<real> grad_entropy_var_face(n_face_quad_pts);
+            const int iface_1D = iface % 2;//the reference face number
+            soln_basis.matrix_vector_mult_1D(projected_entropy_var_coef[0],grad_entropy_var_face,
+                                             soln_basis.oneD_surf_grad_operator[iface_1D]);
+            for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                for(unsigned int iquad=0; iquad<n_face_quad_pts; iquad++){
+                    psi_surf[ishape] += soln_basis.oneD_surf_grad_operator[iface_1D][iquad][ishape]
+                                      * quad_weights_surf[iquad]
+                                      * normals_int[iquad][0]
+                                      / metric_oper.det_Jac_surf[iquad]
+                                      * grad_entropy_var_face[iquad];
+                }
+                psi_surf_entropy += psi_surf[ishape] * projected_entropy_var_coef[0][ishape];
+            }
+        }
+        this->pcout<<"psi surf entropy "<<psi_surf_entropy<<std::endl;
+        for(int istate=0; istate<nstate; istate++){
+            for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                const unsigned int idof = istate * n_shape_fns + ishape;
+                this->right_hand_side[current_dofs_indices[idof]] += -abs(cell_entropy_production_value/(psi_surf_entropy + 1e-14)) * psi_surf[ishape];
+            }
+        }
+
+
+#if 0
+
+#if 0
+        real entropy_prod = 0.0;
+        for(int istate=0; istate<nstate; istate++){
+            for(unsigned int ishape=1;ishape<n_shape_fns; ishape++){
+               // entropy_prod += 1.0/12.0 * abs(projected_entropy_var_coef[istate][ishape] - projected_entropy_var_coef[istate][ishape-1])
+                entropy_prod += 1.0/12.0 * (projected_entropy_var_coef[istate][ishape] - projected_entropy_var_coef[istate][ishape-1])
+                              * (projected_entropy_var_coef[istate][ishape] - projected_entropy_var_coef[istate][ishape-1])
+                              * (projected_entropy_var_coef[istate][ishape] - projected_entropy_var_coef[istate][ishape-1]);
+            }
+        }
+#endif
+
+//#if 0
+        //extract rhs coeff
+        std::array<std::vector<real>,nstate> rhs_coeff;
+        for(unsigned int istate=0; istate<nstate; ++istate){
+            rhs_coeff[istate].resize(n_shape_fns);
+        }
+	for(unsigned int idof = 0; idof<n_dofs_curr_cell; ++idof){
+            const unsigned int istate = this->fe_collection[poly_degree].system_to_component_index(idof).first;
+            const unsigned int ishape = this->fe_collection[poly_degree].system_to_component_index(idof).second;
+            rhs_coeff[istate][ishape] = this->right_hand_side[current_dofs_indices[idof]];
+	}
+        real cell_entropy_production_value = 0.0;
+        for(int istate=0; istate<nstate; istate++){
+            for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                cell_entropy_production_value += rhs_coeff[istate][ishape] * projected_entropy_var_coef[istate][ishape]; 
+            }
+        }
+//        cell_entropy_production_value = 0.0;
+//        cell_entropy_production_value = 1.0;
+//#endif
+
+  //      cell_entropy_production_value = cell_entropy_production_value - this->cell_entropy_production[current_dofs_indices[0]];
+
+//        this->pcout<<"cell entropy prod "<<cell_entropy_production_value<<" vs  "<<this->cell_entropy_production[current_dofs_indices[0]]<<std::endl;
+//        const real cell_entropy_production_value = this->cell_entropy_production[current_dofs_indices[0]];
+//        if(cell_entropy_production_value > 0){
+            for(int istate=0; istate<nstate; istate++){
+                real entropy_var_avg;
+                real entropy_var_avg_diff;
+                entropy_var_avg= 0.0;
+                const std::vector<real> &quad_weights = this->volume_quadrature_collection[poly_degree].get_weights();
+                for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                 //   entropy_var_avg += projected_entropy_var_coef[istate][ishape];
+                   // entropy_var_avg_int += soln_coeff_int[istate][ishape];
+                   // entropy_var_avg_ext += soln_coeff_ext[istate][ishape];
+                    entropy_var_avg += projected_entropy_var_coef[istate][ishape] * quad_weights[ishape];
+                }
+                entropy_var_avg/= n_shape_fns;
+                entropy_var_avg_diff= 0.0;
+                for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                  //  entropy_var_avg_diff += (projected_entropy_var_coef[istate][ishape] - entropy_var_avg)
+                  //                        * projected_entropy_var_coef[istate][ishape];
+                    entropy_var_avg_diff += (projected_entropy_var_coef[istate][ishape]*quad_weights[ishape] - entropy_var_avg)
+                                          * projected_entropy_var_coef[istate][ishape];
+                   // entropy_var_avg_diff_int += pow(soln_coeff_int[istate][ishape] - entropy_var_avg_int,2);
+                   // entropy_var_avg_diff_ext += pow(soln_coeff_ext[istate][ishape] - entropy_var_avg_ext,2);
+                }
+
+//                real entropy_flux_avg = 0.0;
+//                for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+//                    entropy_flux_avg += 1.0/3.0 * pow(projected_entropy_var_coef[istate][ishape],3);
+//                }
+//                entropy_flux_avg /= n_shape_fns;
+//                real entropy_avg = 0.0;
+//                for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+//                    entropy_avg += 1.0/2.0 * pow(projected_entropy_var_coef[istate][ishape],2);
+//                }
+//                entropy_avg /= n_shape_fns;
+//
+
+#if 0
+                std::vector<real> entropy_flux(n_shape_fns);
+                std::vector<real> flux(n_shape_fns);
+                for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                    entropy_flux[ishape] = 1.0/3.0*pow(projected_entropy_var_coef[istate][ishape],3);
+                    flux[ishape] = 1.0/2.0*pow(projected_entropy_var_coef[istate][ishape],2);
+                }
+                std::vector<real> deriv_entropy_flux(n_shape_fns);
+                soln_basis.matrix_vector_mult_1D(entropy_flux, deriv_entropy_flux,
+                                                 soln_basis.oneD_grad_operator);
+                std::vector<real> deriv_flux(n_shape_fns);
+                soln_basis.matrix_vector_mult_1D(flux, deriv_flux,
+                                                 soln_basis.oneD_grad_operator);
+                real entropy_prod =0.0;
+                const std::vector<real> &quad_weights = this->volume_quadrature_collection[poly_degree].get_weights();
+                for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                //    entropy_prod += 1.0/3.0*pow(projected_entropy_var_coef[istate][ishape],3) -entropy_flux_avg
+                //                      - entropy_var_avg *(1.0/2.0*pow(projected_entropy_var_coef[istate][ishape],2) - entropy_avg);
+//                    entropy_prod += (1.0/3.0*pow(projected_entropy_var_coef[istate][ishape],3) -
+//                                      - projected_entropy_var_coef[istate][ishape] *(1.0/2.0*pow(projected_entropy_var_coef[istate][ishape],2)))
+//                                    * quad_weights[ishape];
+                   // entropy_prod += deriv_entropy_flux[ishape] * quad_weights[ishape];
+                    entropy_prod += (deriv_entropy_flux[ishape] - projected_entropy_var_coef[istate][ishape]*flux[ishape])
+                                  * quad_weights[ishape];
+                }
+#endif
+
+
+                for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                    const unsigned int idof = istate * n_shape_fns + ishape;
+                  //  this->right_hand_side[current_dofs_indices[idof]] += -(2.0*abs(cell_entropy_production_value))
+//                    this->right_hand_side[current_dofs_indices[idof]] += -(cell_entropy_production_value + abs(cell_entropy_production_value))
+
+                  //  this->right_hand_side[current_dofs_indices[idof]] += -entropy_prod
+                   // this->right_hand_side[current_dofs_indices[idof]] += -(entropy_prod+cell_entropy_production_value)
+                    this->right_hand_side[current_dofs_indices[idof]] += -abs(cell_entropy_production_value)
+                  //  this->right_hand_side[current_dofs_indices[idof]] += -abs(entropy_prod)
+//                    this->right_hand_side[current_dofs_indices[idof]] += -(cell_entropy_production_value)
+//                    this->right_hand_side[current_dofs_indices[idof]] += (cell_entropy_production_value)
+                  //  this->right_hand_side[current_dofs_indices[idof]] += -(abs(cell_entropy_production_value))
+                                                                     //  * (projected_entropy_var_coef[istate][ishape] - entropy_var_avg)
+                                                                       * (projected_entropy_var_coef[istate][ishape]*quad_weights[ishape] - entropy_var_avg)
+                                             // * (soln_coeff_int[istate][ishape] - entropy_var_avg_int)
+                                                                       /(entropy_var_avg_diff + 1e-20);
+                }
+            }
+//        }
+
+
+#endif
+    }//end of cell loop
+
 }
 // No support for anisotropic mesh refinement with parallel::distributed::Triangulation
 // template<int dim, typename real>

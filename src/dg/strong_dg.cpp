@@ -2176,38 +2176,40 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
     std::array<std::vector<real>,nstate> projected_entropy_var_vol_ext;
     std::array<std::vector<real>,nstate> projected_entropy_var_surf_int;
     std::array<std::vector<real>,nstate> projected_entropy_var_surf_ext;
+    std::array<std::vector<real>,nstate> projected_entropy_var_coef_int;
+    std::array<std::vector<real>,nstate> projected_entropy_var_coef_ext;
     for(int istate=0; istate<nstate; istate++){
         // allocate
         projected_entropy_var_vol_int[istate].resize(n_quad_pts_vol_int);
         projected_entropy_var_vol_ext[istate].resize(n_quad_pts_vol_ext);
         projected_entropy_var_surf_int[istate].resize(n_face_quad_pts);
         projected_entropy_var_surf_ext[istate].resize(n_face_quad_pts);
+        projected_entropy_var_coef_int[istate].resize(n_shape_fns_int);
+        projected_entropy_var_coef_ext[istate].resize(n_shape_fns_ext);
 
         //interior
-        std::vector<real> entropy_var_coeff_int(n_shape_fns_int);
         soln_basis_projection_oper_int.matrix_vector_mult_1D(entropy_var_vol_int[istate],
-                                                             entropy_var_coeff_int,
+                                                             projected_entropy_var_coef_int[istate],
                                                              soln_basis_projection_oper_int.oneD_vol_operator);
-        soln_basis_int.matrix_vector_mult_1D(entropy_var_coeff_int,
+        soln_basis_int.matrix_vector_mult_1D(projected_entropy_var_coef_int[istate],
                                              projected_entropy_var_vol_int[istate],
                                              soln_basis_int.oneD_vol_operator);
         soln_basis_int.matrix_vector_mult_surface_1D(iface,
-                                                     entropy_var_coeff_int, 
+                                                     projected_entropy_var_coef_int[istate], 
                                                      projected_entropy_var_surf_int[istate],
                                                      soln_basis_int.oneD_surf_operator,
                                                      soln_basis_int.oneD_vol_operator);
 
         //exterior
-        std::vector<real> entropy_var_coeff_ext(n_shape_fns_ext);
         soln_basis_projection_oper_ext.matrix_vector_mult_1D(entropy_var_vol_ext[istate],
-                                                             entropy_var_coeff_ext,
+                                                             projected_entropy_var_coef_ext[istate],
                                                              soln_basis_projection_oper_ext.oneD_vol_operator);
 
-        soln_basis_ext.matrix_vector_mult_1D(entropy_var_coeff_ext,
+        soln_basis_ext.matrix_vector_mult_1D(projected_entropy_var_coef_ext[istate],
                                              projected_entropy_var_vol_ext[istate],
                                              soln_basis_ext.oneD_vol_operator);
         soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
-                                                     entropy_var_coeff_ext, 
+                                                     projected_entropy_var_coef_ext[istate], 
                                                      projected_entropy_var_surf_ext[istate],
                                                      soln_basis_ext.oneD_surf_operator,
                                                      soln_basis_ext.oneD_vol_operator);
@@ -2605,6 +2607,85 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
             local_rhs_ext_cell(istate*n_shape_fns_ext + ishape) += rhs_ext[ishape];
         }
     }
+
+
+    //compute entropyproduction on face
+    for(int istate=0; istate<nstate; istate++){
+        real entropy_production_int =0.0;
+        real entropy_production_ext =0.0;
+        for(unsigned int iquad=0; iquad<n_face_quad_pts; iquad++){
+//            entropy_production_int += - projected_entropy_var_surf_int[istate][iquad]
+//                                    * conv_num_flux_dot_n[istate][iquad]
+//                                    + 1.0 /6.0 * pow(soln_at_surf_q_int[istate][iquad],3)*unit_ref_normal_int[0];
+//            entropy_production_ext += -( - projected_entropy_var_surf_ext[istate][iquad]
+//                                    * conv_num_flux_dot_n[istate][iquad]
+//                                    + 1.0 /6.0 * pow(soln_at_surf_q_ext[istate][iquad],3))*unit_ref_normal_int[0];
+            //F surf integral
+            real avg_val = 0.5*(soln_at_surf_q_int[istate][iquad] + soln_at_surf_q_ext[istate][iquad]);
+           // entropy_production_int += 1.0 /3.0 * pow(soln_at_surf_q_int[istate][iquad],3);
+           // entropy_production_ext += -(1.0 /3.0 * pow(soln_at_surf_q_ext[istate][iquad],3));
+            entropy_production_int += 1.0 /3.0 * pow(avg_val,3)*unit_ref_normal_int[0];
+            entropy_production_ext += -(1.0 /3.0 * pow(avg_val,3))*unit_ref_normal_int[0];
+        }
+        this->cell_entropy_production[dof_indices_int[0]] += entropy_production_int;
+        this->cell_entropy_production[dof_indices_ext[0]] += entropy_production_ext;
+    }
+#if 0
+    //do entropy correction
+    for(int istate=0; istate<nstate; istate++){
+        real entropy_var_avg_int;
+        real entropy_var_avg_ext;
+        real entropy_var_avg_diff_int;
+        real entropy_var_avg_diff_ext;
+        real entropy_production_int =0.0;
+        real entropy_production_ext =0.0;
+        for(unsigned int iquad=0; iquad<n_face_quad_pts; iquad++){
+            entropy_production_int += - projected_entropy_var_surf_int[istate][iquad]
+                                    * conv_num_flux_dot_n[istate][iquad]
+                                    + 1.0 /6.0 * pow(soln_at_surf_q_int[istate][iquad],3);
+            entropy_production_ext += -( - projected_entropy_var_surf_ext[istate][iquad]
+                                    * conv_num_flux_dot_n[istate][iquad]
+                                    + 1.0 /6.0 * pow(soln_at_surf_q_ext[istate][iquad],3));
+        }
+        if(entropy_production_int<0)
+            entropy_production_int = 0.0;
+        if(entropy_production_ext<0)
+            entropy_production_ext = 0.0;
+        entropy_var_avg_int = 0.0;
+        entropy_var_avg_ext = 0.0;
+        for(unsigned int ishape=0; ishape<n_shape_fns_int; ishape++){
+            entropy_var_avg_int += projected_entropy_var_coef_int[istate][ishape];
+            entropy_var_avg_ext += projected_entropy_var_coef_ext[istate][ishape];
+           // entropy_var_avg_int += soln_coeff_int[istate][ishape];
+           // entropy_var_avg_ext += soln_coeff_ext[istate][ishape];
+        }
+        entropy_var_avg_int /= n_shape_fns_int;
+        entropy_var_avg_ext /= n_shape_fns_ext;
+        entropy_var_avg_diff_int = 0.0;
+        entropy_var_avg_diff_ext = 0.0;
+        for(unsigned int ishape=0; ishape<n_shape_fns_int; ishape++){
+            entropy_var_avg_diff_int += (projected_entropy_var_coef_int[istate][ishape] - entropy_var_avg_int)
+                                      * projected_entropy_var_coef_int[istate][ishape];
+            entropy_var_avg_diff_ext += (projected_entropy_var_coef_ext[istate][ishape] - entropy_var_avg_ext)
+                                      * projected_entropy_var_coef_ext[istate][ishape];
+           // entropy_var_avg_diff_int += pow(soln_coeff_int[istate][ishape] - entropy_var_avg_int,2);
+           // entropy_var_avg_diff_ext += pow(soln_coeff_ext[istate][ishape] - entropy_var_avg_ext,2);
+        }
+        for(unsigned int ishape=0; ishape<n_shape_fns_int; ishape++){
+            const unsigned int idof = istate * n_shape_fns_int + ishape;
+            local_rhs_int_cell(idof) += -(entropy_production_int+abs(entropy_production_int))
+          //  local_rhs_int_cell(idof) -= (abs(entropy_production_int))
+                                      * (projected_entropy_var_coef_int[istate][ishape] - entropy_var_avg_int)
+                                     // * (soln_coeff_int[istate][ishape] - entropy_var_avg_int)
+                                      /(entropy_var_avg_diff_int + 1e-14);
+            local_rhs_ext_cell(idof) += -(entropy_production_ext+abs(entropy_production_ext))
+           // local_rhs_ext_cell(idof) -= (abs(entropy_production_ext))
+                                      * (projected_entropy_var_coef_ext[istate][ishape] - entropy_var_avg_ext)
+                                     // * (soln_coeff_ext[istate][ishape] - entropy_var_avg_ext)
+                                      /(entropy_var_avg_diff_ext + 1e-14);
+        }
+    }
+#endif
 }
 
 

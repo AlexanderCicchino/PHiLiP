@@ -72,12 +72,13 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Burgers<dim,nstate,real>::convecti
                 const std::array<real,nstate> &conservative_soln2) const
 {
     std::array<dealii::Tensor<1,dim,real>,nstate> conv_flux;
-        for (int flux_dim=0; flux_dim<dim; ++flux_dim) {
-            for (int s=0; s<nstate; ++s) {
-                conv_flux[s][flux_dim] = 1./6. * (conservative_soln1[flux_dim]*conservative_soln1[flux_dim] + conservative_soln1[flux_dim]*conservative_soln2[s] + conservative_soln2[s]*conservative_soln2[s]);
-            }
+    for (int flux_dim=0; flux_dim<dim; ++flux_dim) {
+        for (int s=0; s<nstate; ++s) {
+            conv_flux[s][flux_dim] = 1./6. * (conservative_soln1[flux_dim]*conservative_soln1[flux_dim] + conservative_soln1[flux_dim]*conservative_soln2[s] + conservative_soln2[s]*conservative_soln2[s]);
         }
-        return conv_flux;
+    }
+
+    return conv_flux;
 }
 
 template <int dim, int nstate, typename real>

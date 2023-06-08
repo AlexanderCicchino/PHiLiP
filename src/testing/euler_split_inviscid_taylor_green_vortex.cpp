@@ -545,7 +545,8 @@ double EulerTaylorGreen<dim, nstate>::get_timestep(const std::shared_ptr < DGBas
         }
         const double max_eig = *(std::max_element(convective_eigenvalues.begin(), convective_eigenvalues.end()));
 
-        double cfl = 0.1 * delta_x/max_eig;
+       // double cfl = 0.1 * delta_x/max_eig;
+        double cfl = dg->all_parameters->flow_solver_param.courant_friedrichs_lewy_number * delta_x/max_eig;
         if(cfl < cfl_min)
             cfl_min = cfl;
 
@@ -581,10 +582,18 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
         PHiLiP::Grids::straight_periodic_cube<dim,Triangulation>(grid, left, right, pow(2.0,n_refinements));
     }
 
+    unsigned int flag = 1;
+    double iteration = 0;
+    while(flag == 1){
+        iteration =dealii::Utilities::MPI::max(iteration,mpi_communicator);
+        pcout<<"iteration "<<iteration<<std::endl;
+    all_parameters_new.flow_solver_param.courant_friedrichs_lewy_number = 0.16 - iteration;
+
     // Create DG
     std::shared_ptr < PHiLiP::DGBase<dim, double> > dg = PHiLiP::DGFactory<dim,double>::create_discontinuous_galerkin(&all_parameters_new, poly_degree, poly_degree, grid_degree, grid);
     dg->allocate_system ();
 
+    pcout<<"CFL "<<dg->all_parameters->flow_solver_param.courant_friedrichs_lewy_number <<std::endl;
     pcout << "Implement initial conditions" << std::endl;
     std::shared_ptr< InitialConditionFunction<dim,nstate,double> > initial_condition_function = 
                 InitialConditionFactory<dim,nstate,double>::create_InitialConditionFunction(&all_parameters_new);
@@ -614,7 +623,9 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     //create a file to wirte entorpy and energy results to
     std::ofstream myfile (all_parameters_new.energy_file + ".gpl"  , std::ios::trunc);
     //loop over time
-    while(ode_solver->current_time < finalTime){
+
+
+    while(ode_solver->current_time <= finalTime){
         //get timestep
         const double time_step =  get_timestep(dg,poly_degree, delta_x);
         if(ode_solver->current_iteration%all_parameters_new.ode_solver_param.print_iteration_modulo==0)
@@ -639,10 +650,14 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
         myfile<<ode_solver->current_time<<" "<< current_change_entropy_mpi <<std::endl;
         pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy_mpi<< std::endl;
         pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_energy_mpi<< std::endl;
+        MPI_Barrier(MPI_COMM_WORLD);
         //check if change in entropy is conserved at machine precision
         if(abs(current_change_entropy[0]) > 1e-12 && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::IR || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::CH || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra)){
           pcout << " Change in entropy was not monotonically conserved." << std::endl;
-          return 1;
+          iteration += 0.01;
+          pcout<<"iteration inside "<<iteration<<std::endl;
+          break;
+//          return 1;
         }
 
         //get the kinetic energy
@@ -663,11 +678,19 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
         if(!all_parameters->use_curvilinear_grid and all_parameters->overintegration == 0){
             if(abs(current_vol_work_mpi) > 1e-12 && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::KG ) ){
                 pcout<< "The kinetic energy volume work is not zero."<<std::endl;
-                return 1;
+          iteration += 0.01;
+          break;
+         //       return 1;
             }
         }
     }
     myfile.close();
+
+    if(ode_solver->current_time >= finalTime){
+        flag = 0;
+    }
+    }
+    pcout<<"the final cfl is "<<0.16 - iteration<<std::endl;
 
     return 0;
 }

@@ -209,7 +209,7 @@ int AdvectionPeriodic<dim, nstate>::run_test() const
                 std::cout << std::setprecision(16) << std::fixed;
                 this->pcout << "Normalized Conservation at time " << i * dt << " is " << current_conservation<< std::endl;
                 myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_conservation << std::endl;
-                if (current_conservation*initial_conservation - initial_conservation >= 10.00)
+                if (current_conservation*initial_conservation - initial_conservation >= 1e-12)
                 // if (current_energy - initial_energy >= 10.00)
                 {
                     this->pcout << "Not conserved" << std::endl;

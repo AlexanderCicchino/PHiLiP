@@ -256,11 +256,13 @@ int ODESolverBase<dim,real,MeshType>::advance_solution_time (double time_advance
 
     if(this->current_iteration == 0) allocate_ode_system ();
 
-    if (ode_param.output_solution_every_x_steps >= 0) {
-        this->dg->output_results_vtk(this->current_iteration);  
-    } else if (ode_param.output_solution_every_dt_time_intervals > 0.0) {
-        this->dg->output_results_vtk(this->current_iteration);
-        this->current_desired_time_for_output_solution_every_dt_time_intervals += ode_param.output_solution_every_dt_time_intervals;
+    if(this->current_iteration == 0){ 
+        if (ode_param.output_solution_every_x_steps >= 0) {
+            this->dg->output_results_vtk(this->current_iteration);  
+        } else if (ode_param.output_solution_every_dt_time_intervals > 0.0) {
+            this->dg->output_results_vtk(this->current_iteration);
+            this->current_desired_time_for_output_solution_every_dt_time_intervals += ode_param.output_solution_every_dt_time_intervals;
+        }
     }
 
     while (this->current_iteration < number_of_time_steps)
