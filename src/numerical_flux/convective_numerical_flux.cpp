@@ -170,6 +170,7 @@ std::array<real, nstate> EntropyConservingBaselineNumericalFluxConvective<dim,ns
         }
         numerical_flux_dot_n[s] = flux_dot_n;
     }
+
     return numerical_flux_dot_n;
 }
 

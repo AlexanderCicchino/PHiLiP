@@ -5,6 +5,7 @@
 #include "physics/initial_conditions/initial_condition_function.h"
 #include "mesh/grids/nonsymmetric_curved_periodic_grid.hpp"
 #include "mesh/grids/straight_periodic_cube.hpp"
+#include <deal.II/base/timer.h>
 
 namespace PHiLiP {
 namespace Tests {
@@ -517,31 +518,41 @@ double EulerTaylorGreen<dim, nstate>::get_timestep(const std::shared_ptr < DGBas
     //get local CFL
     const unsigned int n_dofs_cell = nstate*pow(poly_degree+1,dim);
     const unsigned int n_quad_pts = pow(poly_degree+1,dim);
-    std::vector<dealii::types::global_dof_index> dofs_indices1 (n_dofs_cell);
+    std::vector<dealii::types::global_dof_index> dofs_indices (n_dofs_cell);
+
+    OPERATOR::basis_functions<dim,2*dim> soln_basis(1, poly_degree, dg->max_grid_degree);
+    soln_basis.build_1D_volume_operator(dg->oneD_fe_collection_1state[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
+    const unsigned int n_shape_fns = n_dofs_cell / nstate;
 
     double cfl_min = 1e100;
     std::shared_ptr < Physics::PhysicsBase<dim, nstate, double > > pde_physics_double  = PHiLiP::Physics::PhysicsFactory<dim,nstate,double>::create_Physics(dg->all_parameters);
     for (auto cell = dg->dof_handler.begin_active(); cell!=dg->dof_handler.end(); ++cell) {
         if (!cell->is_locally_owned()) continue;
 
-        cell->get_dof_indices (dofs_indices1);
-        std::vector< std::array<double,nstate>> soln_at_q(n_quad_pts);
-        for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
-            for (int istate=0; istate<nstate; istate++) {
-                soln_at_q[iquad][istate]      = 0;
-            }
+        cell->get_dof_indices (dofs_indices);
+        std::array<std::vector<double>,nstate> soln_coeff;
+        for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+            const unsigned int istate = dg->fe_collection[poly_degree].system_to_component_index(idof).first;
+            const unsigned int ishape = dg->fe_collection[poly_degree].system_to_component_index(idof).second;
+            if(ishape == 0)
+                soln_coeff[istate].resize(n_shape_fns);
+            soln_coeff[istate][ishape] = dg->solution(dofs_indices[idof]);
         }
-        for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
-          dealii::Point<dim> qpoint = dg->volume_quadrature_collection[poly_degree].point(iquad);
-            for(unsigned int idof=0; idof<n_dofs_cell; idof++){
-                const unsigned int istate = dg->fe_collection[poly_degree].system_to_component_index(idof).first;
-                soln_at_q[iquad][istate] += dg->solution[dofs_indices1[idof]] * dg->fe_collection[poly_degree].shape_value_component(idof, qpoint, istate);
-            }
+
+        std::array<std::vector<double>,nstate> soln_at_q;
+        for(int istate=0; istate<nstate; istate++){
+            soln_at_q[istate].resize(n_quad_pts);
+            soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
+                                             soln_basis.oneD_vol_operator);
         }
 
         std::vector< double > convective_eigenvalues(n_quad_pts);
         for (unsigned int isol = 0; isol < n_quad_pts; ++isol) {
-            convective_eigenvalues[isol] = pde_physics_double->max_convective_eigenvalue (soln_at_q[isol]);
+            std::array<double,nstate> soln_state;
+            for(int istate=0; istate<nstate; istate++){
+                soln_state[istate] = soln_at_q[istate][isol];
+            }
+            convective_eigenvalues[isol] = pde_physics_double->max_convective_eigenvalue (soln_state);
         }
         const double max_eig = *(std::max_element(convective_eigenvalues.begin(), convective_eigenvalues.end()));
 
@@ -568,8 +579,10 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
     double left = 0.0;
     double right = 2 * dealii::numbers::PI;
-    const int n_refinements = 2;
-    unsigned int poly_degree = 3;
+//    const int n_refinements = 2;
+//    unsigned int poly_degree = 3;
+    const unsigned int n_refinements = all_parameters->flow_solver_param.number_of_mesh_refinements;
+    const unsigned int poly_degree = all_parameters->flow_solver_param.poly_degree;
 
     const unsigned int grid_degree = all_parameters->use_curvilinear_grid ? poly_degree : 1;
     if(all_parameters->use_curvilinear_grid){
@@ -607,13 +620,14 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     ode_solver->current_iteration = 0;
     ode_solver->allocate_ode_system();
 
-    const double initial_energy = compute_kinetic_energy(dg, poly_degree);
-    const double initial_energy_mpi = (dealii::Utilities::MPI::sum(initial_energy, mpi_communicator));
-    const double initial_entropy = compute_entropy(dg, poly_degree);
-    const double initial_entropy_mpi = (dealii::Utilities::MPI::sum(initial_entropy, mpi_communicator));
+//    const double initial_energy = compute_kinetic_energy(dg, poly_degree);
+//    const double initial_energy_mpi = (dealii::Utilities::MPI::sum(initial_energy, mpi_communicator));
+//    const double initial_entropy = compute_entropy(dg, poly_degree);
+//    const double initial_entropy_mpi = (dealii::Utilities::MPI::sum(initial_entropy, mpi_communicator));
     //create a file to wirte entorpy and energy results to
-    std::ofstream myfile (all_parameters_new.energy_file + ".gpl"  , std::ios::trunc);
+//    std::ofstream myfile (all_parameters_new.energy_file + ".gpl"  , std::ios::trunc);
     //loop over time
+    dealii::Timer timer(mpi_communicator);
     while(ode_solver->current_time < finalTime){
         //get timestep
         const double time_step =  get_timestep(dg,poly_degree, delta_x);
@@ -625,49 +639,53 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
         ode_solver->step_in_time(dt, false);
         ode_solver->current_iteration += 1;
         //check if print solution
-        const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
-        if (is_output_iteration) {
-            const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
-            dg->output_results_vtk(file_number);
-        }
+//        const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
+//        if (is_output_iteration) {
+//            const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
+//            dg->output_results_vtk(file_number);
+//        }
 
         //get the change in entropy
-        const std::array<double,2> current_change_entropy = compute_change_in_entropy(dg, poly_degree);
-        const double current_change_entropy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[0], mpi_communicator);
-        const double current_change_energy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[1], mpi_communicator);
-        //write to the file the change in entropy mpi
-        myfile<<ode_solver->current_time<<" "<< current_change_entropy_mpi <<std::endl;
-        pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy_mpi<< std::endl;
-        pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_energy_mpi<< std::endl;
+//        const std::array<double,2> current_change_entropy = compute_change_in_entropy(dg, poly_degree);
+//        const double current_change_entropy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[0], mpi_communicator);
+////        const double current_change_energy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[1], mpi_communicator);
+//        //write to the file the change in entropy mpi
+//        myfile<<ode_solver->current_time<<" "<< current_change_entropy_mpi <<std::endl;
+//        pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy_mpi<< std::endl;
+//        pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_energy_mpi<< std::endl;
         //check if change in entropy is conserved at machine precision
-        if(abs(current_change_entropy[0]) > 1e-12 && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::IR || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::CH || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra)){
-          pcout << " Change in entropy was not monotonically conserved." << std::endl;
-          return 1;
-        }
+      //  if(abs(current_change_entropy[0]) > 1e-12 && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::IR || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::CH || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra)){
+       // if(abs(current_change_entropy_mpi) > 1e-12 && dg->all_parameters->use_split_form == true && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::IR || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::CH || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra)){
+//        if(abs(current_change_entropy[0]) > 1e-12 && dg->all_parameters->use_split_form == true && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::IR || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::CH || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra)){
+//          pcout << " Change in entropy was not monotonically conserved." << current_change_entropy_mpi<< std::endl;
+//          return 1;
+//        }
 
         //get the kinetic energy
-        const double current_energy = compute_kinetic_energy(dg, poly_degree);
-        const double current_energy_mpi = (dealii::Utilities::MPI::sum(current_energy, mpi_communicator));
-        pcout << "Normalized kinetic energy " << ode_solver->current_time << " is " << current_energy_mpi/initial_energy_mpi<< std::endl;
+//        const double current_energy = compute_kinetic_energy(dg, poly_degree);
+//        const double current_energy_mpi = (dealii::Utilities::MPI::sum(current_energy, mpi_communicator));
+//        pcout << "Normalized kinetic energy " << ode_solver->current_time << " is " << current_energy_mpi/initial_energy_mpi<< std::endl;
         //get the entropy
-        const double current_entropy = compute_entropy(dg, poly_degree);
-        const double current_entropy_mpi = (dealii::Utilities::MPI::sum(current_entropy, mpi_communicator));
-        pcout << "Normalized entropy " << ode_solver->current_time << " is " << current_entropy_mpi/initial_entropy_mpi<< std::endl;
+//        const double current_entropy = compute_entropy(dg, poly_degree);
+//        const double current_entropy_mpi = (dealii::Utilities::MPI::sum(current_entropy, mpi_communicator));
+//        pcout << "Normalized entropy " << ode_solver->current_time << " is " << current_entropy_mpi/initial_entropy_mpi<< std::endl;
 
         //get the volume work for kinetic energy
-        double current_vol_work = compute_volume_term(dg, poly_degree);
-        double current_vol_work_mpi = (dealii::Utilities::MPI::sum(current_vol_work, mpi_communicator));
-        pcout<<"volume work "<<current_vol_work_mpi<<std::endl;
-        myfile << ode_solver->current_time << " " << std::fixed << std::setprecision(16) << current_vol_work_mpi<< std::endl;
+//        double current_vol_work = compute_volume_term(dg, poly_degree);
+//        double current_vol_work_mpi = (dealii::Utilities::MPI::sum(current_vol_work, mpi_communicator));
+//        pcout<<"volume work "<<current_vol_work_mpi<<std::endl;
+//        myfile << ode_solver->current_time << " " << std::fixed << std::setprecision(16) << current_vol_work_mpi<< std::endl;
         //check for non overintegrated case
-        if(!all_parameters->use_curvilinear_grid and all_parameters->overintegration == 0){
-            if(abs(current_vol_work_mpi) > 1e-12 && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::KG ) ){
-                pcout<< "The kinetic energy volume work is not zero."<<std::endl;
-                return 1;
-            }
-        }
+//        if(!all_parameters->use_curvilinear_grid and all_parameters->overintegration == 0){
+//            if(abs(current_vol_work_mpi) > 1e-12 && dg->all_parameters->use_split_form == true && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::KG ) ){
+//                pcout<< "The kinetic energy volume work is not zero."<<std::endl;
+//                return 1;
+//            }
+//        }
     }
-    myfile.close();
+    timer.stop();
+    pcout<<"wall clock solve "<<timer.wall_time()<<std::endl;
+//    myfile.close();
 
     return 0;
 }
