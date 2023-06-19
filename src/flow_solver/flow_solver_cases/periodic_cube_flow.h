@@ -30,6 +30,7 @@ protected:
     const double domain_left; ///< Domain left-boundary value for generating the grid
     const double domain_right; ///< Domain right-boundary value for generating the grid
     const double domain_size; ///< Domain size (length in 1D, area in 2D, and volume in 3D)
+    const double use_curvilinear_grid; ///< Flag to use a nonsymmetric cuvrilinear grid.
 
     /// Display additional more specific flow case parameters
     virtual void display_additional_flow_case_specific_parameters() const override;

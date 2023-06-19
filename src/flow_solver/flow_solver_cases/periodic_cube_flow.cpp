@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include "mesh/grids/straight_periodic_cube.hpp"
+#include "mesh/grids/nonsymmetric_curved_periodic_grid.hpp"
 
 namespace PHiLiP {
 
@@ -17,6 +18,7 @@ PeriodicCubeFlow<dim, nstate>::PeriodicCubeFlow(const PHiLiP::Parameters::AllPar
         , domain_left(this->all_param.flow_solver_param.grid_left_bound)
         , domain_right(this->all_param.flow_solver_param.grid_right_bound)
         , domain_size(pow(this->domain_right - this->domain_left, dim))
+        , use_curvilinear_grid(parameters_input->use_curvilinear_grid)
 { }
 
 template <int dim, int nstate>
@@ -27,7 +29,12 @@ std::shared_ptr<Triangulation> PeriodicCubeFlow<dim,nstate>::generate_grid() con
             this->mpi_communicator
 #endif
     );
-    Grids::straight_periodic_cube<dim,Triangulation>(grid, domain_left, domain_right, number_of_cells_per_direction);
+    if(use_curvilinear_grid){
+        PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, log(number_of_cells_per_direction)/log(2.0), true, domain_left, domain_right);
+    }
+    else{
+        Grids::straight_periodic_cube<dim,Triangulation>(grid, domain_left, domain_right, number_of_cells_per_direction);
+    }
 
     return grid;
 }

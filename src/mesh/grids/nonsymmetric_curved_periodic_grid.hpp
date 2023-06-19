@@ -15,7 +15,10 @@ namespace Grids {
 template<int dim, typename TriangulationType>
 void nonsymmetric_curved_grid(
     TriangulationType &grid,
-    const unsigned int n_subdivisions);
+    const unsigned int n_subdivisions,
+    const bool input_bounds = false,
+    const double left_input=-1000,
+    const double right_input=1000);
 
 /// Nonsymmetric manifold.
 template<int dim,int spacedim,int chartdim>

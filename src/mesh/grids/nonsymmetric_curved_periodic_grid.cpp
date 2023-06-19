@@ -10,15 +10,24 @@ namespace Grids {
 template<int dim, typename TriangulationType>
 void nonsymmetric_curved_grid(
     TriangulationType &grid,
-    const unsigned int n_subdivisions)
+    const unsigned int n_subdivisions,
+    const bool input_bounds,
+    const double left_input,
+    const double right_input)
 {
     double left, right;
-    if constexpr(dim==3){
-        left = 0.0;
-        right = 2.0 * atan(1) * 4.0;
-    } else{
-        left = -1.0;
-        right = 1.0;
+    if(input_bounds){
+        left = left_input;
+        right = right_input;
+    }
+    else{
+        if constexpr(dim==3){
+            left = 0.0;
+            right = 2.0 * atan(1) * 4.0;
+        } else{
+            left = -1.0;
+            right = 1.0;
+        }
     }
     // const double left = 0.0;
     // const double right = 2.0 * atan(1) * 4.0;
@@ -236,9 +245,9 @@ std::unique_ptr<dealii::Manifold<dim,spacedim> > NonsymmetricCurvedGridManifold<
     return std::make_unique<NonsymmetricCurvedGridManifold<dim,spacedim,chartdim>>();
 }
 
-template void nonsymmetric_curved_grid<1, dealii::Triangulation<1> >                       (dealii::Triangulation<1> &grid, const unsigned int n_subdivisions);
-template void nonsymmetric_curved_grid<2, dealii::parallel::distributed::Triangulation<2>> (dealii::parallel::distributed::Triangulation<2> &grid, const unsigned int n_subdivisions);
-template void nonsymmetric_curved_grid<3, dealii::parallel::distributed::Triangulation<3>> (dealii::parallel::distributed::Triangulation<3> &grid, const unsigned int n_subdivisions);
+template void nonsymmetric_curved_grid<1, dealii::Triangulation<1> >                       (dealii::Triangulation<1> &grid, const unsigned int n_subdivisions, const bool input_bounds, const double left_input, const double right_input);
+template void nonsymmetric_curved_grid<2, dealii::parallel::distributed::Triangulation<2>> (dealii::parallel::distributed::Triangulation<2> &grid, const unsigned int n_subdivisions, const bool input_bounds, const double left_input, const double right_input);
+template void nonsymmetric_curved_grid<3, dealii::parallel::distributed::Triangulation<3>> (dealii::parallel::distributed::Triangulation<3> &grid, const unsigned int n_subdivisions, const bool input_bounds, const double left_input, const double right_input);
 
 } // namespace Grids
 } // namespace PHiLiP
