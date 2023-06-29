@@ -107,6 +107,11 @@ public:
         const std::array<real,nstate> &solution,
         const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const;
 
+    /// Vanishing viscosity
+    std::array<dealii::Tensor<1,dim,real>,nstate> vanishing_viscosity (
+        const std::array<real,nstate> &solution,
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const;
+
     /// Source term is zero or depends on manufactured solution
     std::array<real,nstate> source_term (
         const dealii::Point<dim,real> &pos,

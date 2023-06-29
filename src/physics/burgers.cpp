@@ -168,7 +168,13 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Burgers<dim,nstate,real>
     const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient,
     const dealii::types::global_dof_index /*cell_index*/) const
 {
-    return dissipative_flux(solution, solution_gradient);
+    std::array<dealii::Tensor<1,dim,real>,nstate> diss_flux;
+    if(this->all_parameters->use_vanishing_viscosity)
+        diss_flux = vanishing_viscosity(solution, solution_gradient);
+    if(this->has_nonzero_diffusion)//can't use vanishing viscosity with diffusion at the moment
+        diss_flux = dissipative_flux(solution, solution_gradient);
+
+    return diss_flux;
 }
 
 template <int dim, int nstate, typename real>
@@ -184,6 +190,26 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Burgers<dim,nstate,real>
             diss_flux[i][d1] = 0.0;
             for (int d2=0; d2<dim; d2++) {
                 diss_flux[i][d1] += -diff_coeff*((this->diffusion_tensor[d1][d2])*solution_gradient[i][d2]);
+            }
+        }
+    }
+    return diss_flux;
+}
+
+template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> Burgers<dim,nstate,real>
+::vanishing_viscosity (
+    const std::array<real,nstate> &/*solution*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> diss_flux;
+    for (int i=0; i<nstate; i++) {
+        for (int d1=0; d1<dim; d1++) {
+            diss_flux[i][d1] = 0.0;
+            for (int d2=0; d2<dim; d2++) {
+              //  diss_flux[i][d1] += -0.5 * (abs(solution[i]) + 1.0 / 6.0 * abs(solution_gradient[i][d2]))
+                diss_flux[i][d1] += -0.5 * (1.0 / 6.0 * abs(solution_gradient[i][d2]))
+                                  * solution_gradient[i][d2];
             }
         }
     }

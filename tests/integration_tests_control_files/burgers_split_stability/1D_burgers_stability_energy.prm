@@ -4,7 +4,7 @@ set dimension = 1
 
 set use_weak_form = false
 
-set overintegration = 2
+set overintegration = 0
 
 set do_renumber_dofs = false
 
@@ -20,7 +20,7 @@ set use_classical_FR = false
 
 set use_periodic_bc = true
 
-set flux_reconstruction = cPlus
+set flux_reconstruction = cDG
 
 set use_inverse_mass_on_the_fly = true
 
@@ -33,6 +33,9 @@ set pde_type = burgers_inviscid
 #set conv_num_flux = two_point_flux_with_lax_friedrichs_dissipation
 set conv_num_flux = two_point_flux
 
+set diss_num_flux = central_visc_flux
+set use_vanishing_viscosity = true
+
 subsection ODE solver
 
   set ode_output = verbose
@@ -40,6 +43,8 @@ subsection ODE solver
   set nonlinear_max_iterations = 500000
 
   set print_iteration_modulo = 1000
+
+  set output_solution_every_x_steps = 100
 
   set ode_solver_type = runge_kutta
 

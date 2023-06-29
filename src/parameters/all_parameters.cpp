@@ -139,6 +139,10 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       dealii::Patterns::Bool(),
                       "Check validty of metric Jacobian when high-order grid is constructed by default. Do not check if false. Not checking is useful if the metric terms are built on the fly with operators, it reduces the memory cost for high polynomial grids. The metric Jacobian is never checked for strong form, regardless of the user input.");
 
+    prm.declare_entry("use_vanishing_viscosity", "false",
+                      dealii::Patterns::Bool(),
+                      "False as default. If true, add vanishing viscosity mechnism.");
+
     prm.declare_entry("energy_file", "energy_file",
                       dealii::Patterns::FileName(dealii::Patterns::FileName::FileType::input),
                       "Input file for energy test.");
@@ -423,6 +427,7 @@ void AllParameters::parse_parameters (dealii::ParameterHandler &prm)
     if(!use_weak_form){
         check_valid_metric_Jacobian = false;
     }
+    use_vanishing_viscosity = prm.get_bool("use_vanishing_viscosity");
 
     energy_file = prm.get("energy_file");
 

@@ -148,6 +148,9 @@ public:
     /// Flag to check if the metric Jacobian is valid when high-order grid is constructed.
     bool check_valid_metric_Jacobian;
 
+    /// Flag to use vanishing viscosity.
+    bool use_vanishing_viscosity;
+
     /// Energy file.
     std::string energy_file;
 
