@@ -82,6 +82,7 @@ public:
 
     /// Value of the exact solution at a point 
     real value (const dealii::Point<dim,real> &point, const unsigned int istate = 0) const override;
+
 };
 
 /// Exact solution function factory

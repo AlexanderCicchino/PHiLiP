@@ -375,14 +375,15 @@ template <int dim, int nstate, typename real>
 inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
 ::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
 {
+#if 0
     // Setting constants
     const double pi = dealii::numbers::PI;
     const double gam = 1.4;
-    const double M_infty = sqrt(2/gam);
-    const double R = 1;
-    const double sigma = 1;
-    const double beta = M_infty * 5 * sqrt(2.0)/4.0/pi * exp(1.0/2.0);
-    const double alpha = pi/4; //rad
+    const double M_infty = sqrt(2.0/gam);
+    const double R = 1.0;
+    const double sigma = 1.0;
+    const double beta = M_infty * 5.0 * sqrt(2.0)/4.0/pi * exp(1.0/2.0);
+    const double alpha = pi/4.0; //rad
 
     // Centre of the vortex  at t=0
     const double x0 = 0.0;
@@ -397,16 +398,69 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
 
     // Primitive
     std::array<real,nstate> soln_primitive;
-    soln_primitive[0] = pow((1 + delta_T), 1.0/(gam-1.0));
+    soln_primitive[0] = pow((1.0 + delta_T), 1.0/(gam-1.0));
     soln_primitive[1] = M_infty * cos(alpha) + delta_Ux;
     soln_primitive[2] = M_infty * sin(alpha) + delta_Uy;
     #if PHILIP_DIM==3
-    soln_primitive[3] = 0;
+    soln_primitive[3] = 0.0;
     #endif
-    soln_primitive[nstate-1] = 1.0/gam*pow(1+delta_T, gam/(gam-1.0));
+    soln_primitive[nstate-1] = 1.0/gam*pow(1.0+delta_T, gam/(gam-1.0));
 
     const std::array<real,nstate> soln_conservative = this->euler_physics->convert_primitive_to_conservative(soln_primitive);
     return soln_conservative[istate];
+#endif
+
+    //Jesse Chan isentropic vortex
+    const double Pi_max = 0.4;
+    const double c_1 = 5.0;
+    const double c_2 = 5.0;
+    const double gamma = 1.4;
+    const double P_0 = 1.0/gamma;
+    //location
+    const double x = point[0];
+    const double y = point[1];
+    const double r_square = (y - c_2)*(y - c_2) + (x - c_1)*(x - c_1);
+    const double Pi = Pi_max * exp(0.5 * (1.0 - r_square));
+
+    //conservative variables
+    const real density = pow(1.0 - 0.4 / 2.0 * Pi * Pi, 1.0 / (0.4) );
+    const real u = Pi * ( - (y - c_2));
+   // const real v = Pi * ( (x - c_1));
+    const real v = 1.0 + Pi * ( (x - c_1));
+    const real pressure = P_0 * pow(density, gamma);
+    // Primitive
+    std::array<real,nstate> soln_primitive;
+    soln_primitive[0] = density;
+    soln_primitive[1] = u;
+    soln_primitive[2] = v;
+    #if PHILIP_DIM==3
+    soln_primitive[3] = 0.0;
+    #endif
+    soln_primitive[nstate-1] = pressure;
+    const std::array<real,nstate> soln_conservative = this->euler_physics->convert_primitive_to_conservative(soln_primitive);
+    return soln_conservative[istate];
+//    if(istate == 0){
+//        return density;
+//    }
+//    if(istate == 1){
+//        return density * u;
+//    }
+//    if(istate == 2){
+//        return density * v;
+//    }
+//    if(istate == 3 && dim == 2){
+//        const real rho_e = P_0 / 0.4 * pow(density,gamma) +  density / 2.0 * ( u * u + v * v);
+//        return rho_e;
+//    }
+//    if(istate == 3 && dim == 3){
+//        return 0.0;
+//    }
+//    if(istate == 4){
+//        const real rho_e = P_0 / 0.4 * pow(density,gamma) +  density / 2.0 * ( u * u + v * v);
+//        return rho_e;
+//    }
+//    else return 0;
+
 }
 
 // ========================================================

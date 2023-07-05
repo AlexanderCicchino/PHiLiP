@@ -27,6 +27,7 @@ public:
         periodic_1D_unsteady,
         gaussian_bump,
         isentropic_vortex,
+        euler_isentropic_vortex,
         kelvin_helmholtz_instability,
         non_periodic_cube_flow
         };

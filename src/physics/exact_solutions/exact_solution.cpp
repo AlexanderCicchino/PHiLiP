@@ -56,13 +56,13 @@ ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
         : ExactSolutionFunction<dim,nstate,real>()
         , t(time_compare)
 {
-    // Nothing to do here yet
 }
 
 template <int dim, int nstate, typename real>
 inline real ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
 ::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
 {
+#if 0
     // Setting constants
     const double L = 10.0; // half-width of domain
     const double pi = dealii::numbers::PI;
@@ -100,6 +100,68 @@ inline real ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
     else if (istate == 2) return rho * Uy;  //y-momentum
     else if (istate == 3) return rho * Uz;  //z-momentum
     else return 0;
+#endif
+
+    //Jesse Chan isentropic vortex
+    const double Pi_max = 0.4;
+    const double c_1 = 5.0;
+    const double c_2 = 5.0;
+    const double gamma = 1.4;
+    const double P_0 = 1.0/gamma;
+
+    const double pi = dealii::numbers::PI;
+    const double length = 4.0 * pi;
+    double distance_travelled = t;//v_0 * t with v_0 = t
+    if(distance_travelled > length - c_2)//reached the edge first
+        distance_travelled -= (length - c_2);
+    double distance_in_domain_after_periodicity = fmod(distance_travelled / length, 1.0) * length;
+    //location
+    const double x = point[0];
+    const double y = point[1];
+   // const double r_square = (y - c_2 - t)*(y - c_2 - t) + (x - c_1)*(x - c_1);
+    const double r_square = (y - c_2 - distance_in_domain_after_periodicity)*(y - c_2 - distance_in_domain_after_periodicity) + (x - c_1)*(x - c_1);
+   // const double r_square = (y - c_2 - t)*(y - c_2 - t) + (x - c_1 - t)*(x - c_1 - t);
+    const double Pi = Pi_max * exp(0.5 * (1.0 - r_square));
+
+    //conservative variables
+    const real density = pow(1.0 - 0.4 / 2.0 * Pi * Pi, 1.0 / (0.4) );
+    const real u = Pi * ( - (y - c_2 - distance_in_domain_after_periodicity));
+  //  const real u = Pi * ( - (y - c_2 - t));
+   // const real v = Pi * ( (x - c_1));
+    const real v = 1.0 + Pi * ( (x - c_1));
+   // const real v = Pi * ( (x - c_1 - t));
+    const real pressure = P_0 * pow(density, gamma);
+    // Primitive
+    std::array<real,nstate> soln_conservative;
+    soln_conservative[0] = density;
+    soln_conservative[1] = density * u;
+    soln_conservative[2] = density * v;
+    #if PHILIP_DIM==3
+    soln_conservative[3] = 0.0;
+    #endif
+    soln_conservative[nstate-1] = pressure / 0.4 + 0.5 * density * (u*u + v*v);
+    return soln_conservative[istate];
+//    if(istate == 0){
+//        return density;
+//    }
+//    if(istate == 1){
+//        return density * u;
+//    }
+//    if(istate == 2){
+//        return density * v;
+//    }
+//    if(istate == 3 && dim == 2){
+//        const real rho_e = P_0 / 0.4 * pow(density,gamma) +  density / 2.0 * ( u * u + v * v);
+//        return rho_e;
+//    }
+//    if(istate == 3 && dim == 3){
+//        return 0.0;
+//    }
+//    if(istate == 4){
+//        const real rho_e = P_0 / 0.4 * pow(density,gamma) +  density / 2.0 * ( u * u + v * v);
+//        return rho_e;
+//    }
+//    else return 0;
 
 }
 
