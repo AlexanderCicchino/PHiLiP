@@ -5,6 +5,7 @@
 #include "physics/initial_conditions/initial_condition_function.h"
 #include "mesh/grids/straight_periodic_cube.hpp"
 #include "mesh/grids/nonsymmetric_curved_periodic_grid.hpp"
+#include "mesh/grids/nonsymmetric_curved_periodic_grid_chan.hpp"
 #include "physics/exact_solutions/exact_solution.h"
 
 #include <eigen/Eigen/Eigenvalues>
@@ -127,6 +128,7 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
 
         // Create DG
+        pcout<<"about to create DG"<<std::endl;
         std::shared_ptr < PHiLiP::DGBase<dim, double> > dg = PHiLiP::DGFactory<dim,double>::create_discontinuous_galerkin(&all_parameters_new, poly_degree, poly_degree, grid_degree, grid);
         pcout<<"created DG"<<std::endl;
         dg->allocate_system (false, false, false);
@@ -270,8 +272,8 @@ int EulerIsentropicVortex<dim, nstate>::run_test() const
     std::array<double,2> grid_size;
     std::array<double,2> soln_error;
     const unsigned int n_cells_start = all_parameters->flow_solver_param.number_of_grid_elements_per_dimension;
-    const unsigned int igrid_start = log(n_cells_start)/log(2.0);
-    const unsigned int n_grids = igrid_start + 3;
+    const unsigned int igrid_start = 0;
+    const unsigned int n_grids = 3;
 
 pcout<<"igrd start is "<<igrid_start<<std::endl;
 
@@ -284,16 +286,38 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
                 dealii::Triangulation<dim>::smoothing_on_coarsening));
         pcout<<"got triangulation "<<std::endl;
 
+        const unsigned int n_cells_per_dim = pow(2.0,igrid)*n_cells_start;
+
         const unsigned int grid_degree = all_parameters->use_curvilinear_grid ? poly_degree : 1;
         if(all_parameters->use_curvilinear_grid){
             //if curvilinear
            // PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, n_refinements);
-            PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid, true, left, right);
+           // PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid, true, left, right);
+            PHiLiP::Grids::nonsymmetric_curved_grid_chan<dim,Triangulation>(*grid, n_cells_per_dim);
         }
         else{
             //if straight
-            PHiLiP::Grids::straight_periodic_cube<dim,Triangulation>(grid, left, right, pow(2.0, igrid));
+           // PHiLiP::Grids::straight_periodic_cube<dim,Triangulation>(grid, left, right, pow(2.0, igrid));
+            const double x_right = 10.0;
+            const double z_right = 10.0;
+            const double y_right = 20.0;
+            const bool colorize = true;
+            std::vector<unsigned int> repititions(dim);
+            dealii::Point<dim> point1;
+            dealii::Point<dim> point2;
+            for(int idim=0; idim<dim; idim++){
+                repititions[idim] = n_cells_per_dim;
+                point1[idim] = 0.0;
+                if(idim==0)
+                    point2[idim] = x_right;
+                if(idim==1)
+                    point2[idim] = y_right;
+                if(idim==2)
+                    point2[idim] = z_right;
+            }
+            dealii::GridGenerator::subdivided_hyper_rectangle (*grid, repititions, point1, point2, colorize);
         }
+        pcout<<"did warping"<<std::endl;
        // dealii::GridGenerator::hyper_cube(*grid, left, right, true);
 //        pcout<<"generated grid "<<std::endl;
 //        std::vector<dealii::GridTools::PeriodicFacePair<typename dealii::parallel::distributed::Triangulation<PHILIP_DIM>::cell_iterator> > matched_pairs;

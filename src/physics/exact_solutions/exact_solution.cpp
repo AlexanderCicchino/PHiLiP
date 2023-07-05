@@ -109,12 +109,14 @@ inline real ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
     const double gamma = 1.4;
     const double P_0 = 1.0/gamma;
 
-    const double pi = dealii::numbers::PI;
-    const double length = 4.0 * pi;
+//    const double pi = dealii::numbers::PI;
+   // const double length = 4.0 * pi;
+//    const double length = 20.0;
     double distance_travelled = t;//v_0 * t with v_0 = t
-    if(distance_travelled > length - c_2)//reached the edge first
-        distance_travelled -= (length - c_2);
-    double distance_in_domain_after_periodicity = fmod(distance_travelled / length, 1.0) * length;
+//    if(distance_travelled > length - c_2)//reached the edge first
+//        distance_travelled -= (length - c_2);
+//    double distance_in_domain_after_periodicity = fmod(distance_travelled / length, 1.0) * length;
+    double distance_in_domain_after_periodicity = distance_travelled;
     //location
     const double x = point[0];
     const double y = point[1];
