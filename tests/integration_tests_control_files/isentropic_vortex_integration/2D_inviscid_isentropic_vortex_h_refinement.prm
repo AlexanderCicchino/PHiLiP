@@ -57,7 +57,7 @@ subsection flow_solver
   set unsteady_data_table_filename = isentropic_vortex_time_table
  # set adaptive_time_step = true
   subsection grid
-    set grid_degree = 3
+    set grid_degree = 1
    # set grid_left_bound = -10.0
    # set grid_right_bound = 10.0
     set grid_left_bound = 0.0

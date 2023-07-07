@@ -568,7 +568,7 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
     double left = 0.0;
     double right = 2 * dealii::numbers::PI;
-    const int n_refinements = 2;
+    const int n_refinements = 4;
     unsigned int poly_degree = 3;
 
     const unsigned int grid_degree = all_parameters->use_curvilinear_grid ? poly_degree : 1;

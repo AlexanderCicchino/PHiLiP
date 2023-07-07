@@ -410,10 +410,14 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
     return soln_conservative[istate];
 #endif
 
+//#if 0
     //Jesse Chan isentropic vortex
     const double Pi_max = 0.4;
-    const double c_1 = 5.0;
-    const double c_2 = 5.0;
+ //   const double c_1 = 5.0;
+ //   const double c_2 = 5.0;
+    const double c_1 = 0.0;
+    const double c_2 = 0.0;
+ //   const double c_2 = -2.5;
     const double gamma = 1.4;
     const double P_0 = 1.0/gamma;
     //location
@@ -460,6 +464,7 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
 //        return rho_e;
 //    }
 //    else return 0;
+//#endif
 
 }
 

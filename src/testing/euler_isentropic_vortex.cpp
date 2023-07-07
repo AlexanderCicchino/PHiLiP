@@ -110,7 +110,8 @@ double EulerIsentropicVortex<dim, nstate>::get_timestep(std::shared_ptr < DGBase
         }
         const double max_eig = *(std::max_element(convective_eigenvalues.begin(), convective_eigenvalues.end()));
 
-        double cfl = 0.1 * delta_x/max_eig;
+       // double cfl = 0.1 * delta_x/max_eig;
+        double cfl = dg->all_parameters->flow_solver_param.courant_friedrichs_lewy_number * delta_x/max_eig;
         if(cfl < cfl_min)
             cfl_min = cfl;
 
@@ -154,6 +155,8 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
 
         while(ode_solver->current_time < finalTime){
             const double time_step =  get_timestep(dg,poly_degree, delta_x);
+       //         const double M_infty_temp = sqrt(2.0/1.4);
+       //         double time_step = 0.1 * delta_x / M_infty_temp;
             const double dt = dealii::Utilities::MPI::min(time_step, mpi_communicator);
             if(ode_solver->current_iteration%all_parameters_new.ode_solver_param.print_iteration_modulo==0)
                 pcout<<"time step "<<time_step<<" current time "<<ode_solver->current_time<<std::endl;
@@ -292,7 +295,8 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
         if(all_parameters->use_curvilinear_grid){
             //if curvilinear
            // PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, n_refinements);
-           // PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid, true, left, right);
+       //     PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid, true, left, right);
+            //PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, log(n_cells_per_dim)/log(2.0), true, left, right);
             PHiLiP::Grids::nonsymmetric_curved_grid_chan<dim,Triangulation>(*grid, n_cells_per_dim);
         }
         else{
@@ -315,7 +319,14 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
                 if(idim==2)
                     point2[idim] = z_right;
             }
+            pcout<<"making grid"<<std::endl;
             dealii::GridGenerator::subdivided_hyper_rectangle (*grid, repititions, point1, point2, colorize);
+            pcout<<"made grid"<<std::endl;
+            std::vector<dealii::GridTools::PeriodicFacePair<typename dealii::parallel::distributed::Triangulation<PHILIP_DIM>::cell_iterator> > matched_pairs;
+            dealii::GridTools::collect_periodic_faces(*grid,0,1,0,matched_pairs);
+            if(dim>=2) dealii::GridTools::collect_periodic_faces(*grid,2,3,1,matched_pairs);
+            if(dim>=3) dealii::GridTools::collect_periodic_faces(*grid,4,5,2,matched_pairs);
+            grid->add_periodicity(matched_pairs);
         }
         pcout<<"did warping"<<std::endl;
        // dealii::GridGenerator::hyper_cube(*grid, left, right, true);

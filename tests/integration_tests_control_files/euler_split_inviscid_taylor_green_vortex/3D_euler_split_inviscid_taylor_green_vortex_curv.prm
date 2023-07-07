@@ -73,7 +73,8 @@ subsection flow_solver
     set poly_degree = 3
     set final_time = 14.0
     subsection grid
-        set number_of_grid_elements_per_dimension = 2
+       # set number_of_grid_elements_per_dimension = 2
+        set number_of_grid_elements_per_dimension = 8
     end
 end
 
