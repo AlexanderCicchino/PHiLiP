@@ -62,9 +62,10 @@ template <int dim, int nstate, typename real>
 inline real ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
 ::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
 {
-#if 0
+//#if 0
     // Setting constants
-    const double L = 10.0; // half-width of domain
+   // const double L = 10.0; // half-width of domain
+    const double L = 5.0; // half-width of domain
     const double pi = dealii::numbers::PI;
     const double gam = 1.4;
     const double M_infty = sqrt(2/gam);
@@ -75,9 +76,11 @@ inline real ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
 
     // Centre of the vortex  at t
     const double x_travel = M_infty * t * cos(alpha);
-    const double x0 = 0.0 + x_travel;
+   // const double x0 = 0.0 + x_travel;
+    const double x0 = 5.0 + x_travel;
     const double y_travel = M_infty * t * sin(alpha);
-    const double y0 = 0.0 + y_travel;
+   // const double y0 = 0.0 + y_travel;
+    const double y0 = 5.0 + y_travel;
     const double x = std::fmod(point[0] - x0-L, 2*L)+L;
     const double y = std::fmod(point[1] - y0-L, 2*L)+L;
 
@@ -100,18 +103,20 @@ inline real ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
     else if (istate == 2) return rho * Uy;  //y-momentum
     else if (istate == 3) return rho * Uz;  //z-momentum
     else return 0;
-#endif
+//#endif
 
-//#if 0
+#if 0
     //Jesse Chan isentropic vortex
     const double Pi_max = 0.4;
-  //  const double c_1 = 5.0;
-  //  const double c_2 = 5.0;
-    const double c_1 = 0.0;
-    const double c_2 = 0.0;
+    const double c_1 = 5.0;
+    const double c_2 = 5.0;
+ //   const double c_1 = 0.0;
+ //   const double c_2 = 0.0;
   //  const double c_2 = -2.5;
     const double gamma = 1.4;
     const double P_0 = 1.0/gamma;
+    const real u0 = 1.0;
+    const real v0 = 1.0;
 
 //    const double pi = dealii::numbers::PI;
    // const double length = 4.0 * pi;
@@ -125,16 +130,16 @@ inline real ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
     const double x = point[0];
     const double y = point[1];
    // const double r_square = (y - c_2 - t)*(y - c_2 - t) + (x - c_1)*(x - c_1);
-    const double r_square = (y - c_2 - distance_in_domain_after_periodicity)*(y - c_2 - distance_in_domain_after_periodicity) + (x - c_1)*(x - c_1);
+    const double r_square = (y - c_2 - v0 * distance_in_domain_after_periodicity)*(y - c_2 - v0 * distance_in_domain_after_periodicity) + (x - c_1 - u0 * distance_in_domain_after_periodicity)*(x - c_1 - u0 * distance_in_domain_after_periodicity);
    // const double r_square = (y - c_2 - t)*(y - c_2 - t) + (x - c_1 - t)*(x - c_1 - t);
     const double Pi = Pi_max * exp(0.5 * (1.0 - r_square));
 
     //conservative variables
     const real density = pow(1.0 - 0.4 / 2.0 * Pi * Pi, 1.0 / (0.4) );
-    const real u = Pi * ( - (y - c_2 - distance_in_domain_after_periodicity));
+    const real u = u0 + Pi * ( - (y - c_2 - v0 * distance_in_domain_after_periodicity));
   //  const real u = Pi * ( - (y - c_2 - t));
    // const real v = Pi * ( (x - c_1));
-    const real v = 1.0 + Pi * ( (x - c_1));
+    const real v = v0 + Pi * ( (x - c_1 - u0 * distance_in_domain_after_periodicity));
    // const real v = Pi * ( (x - c_1 - t));
     const real pressure = P_0 * pow(density, gamma);
     // Primitive
@@ -168,7 +173,7 @@ inline real ExactSolutionFunction_IsentropicVortex<dim,nstate,real>
 //        return rho_e;
 //    }
 //    else return 0;
-//#endif
+#endif
 
 }
 

@@ -276,7 +276,7 @@ int EulerIsentropicVortex<dim, nstate>::run_test() const
     std::array<double,2> soln_error;
     const unsigned int n_cells_start = all_parameters->flow_solver_param.number_of_grid_elements_per_dimension;
     const unsigned int igrid_start = 0;
-    const unsigned int n_grids = 3;
+    const unsigned int n_grids = 4;
 
 pcout<<"igrd start is "<<igrid_start<<std::endl;
 
@@ -296,7 +296,8 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
             //if curvilinear
            // PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, n_refinements);
        //     PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid, true, left, right);
-            //PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, log(n_cells_per_dim)/log(2.0), true, left, right);
+
+          //  PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, log(n_cells_per_dim)/log(2.0), true, left, right);
             PHiLiP::Grids::nonsymmetric_curved_grid_chan<dim,Triangulation>(*grid, n_cells_per_dim);
         }
         else{
@@ -304,14 +305,16 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
            // PHiLiP::Grids::straight_periodic_cube<dim,Triangulation>(grid, left, right, pow(2.0, igrid));
             const double x_right = 10.0;
             const double z_right = 10.0;
-            const double y_right = 20.0;
+           // const double y_right = 20.0;
+            const double y_right = 10.0;
             const bool colorize = true;
             std::vector<unsigned int> repititions(dim);
             dealii::Point<dim> point1;
             dealii::Point<dim> point2;
             for(int idim=0; idim<dim; idim++){
                 repititions[idim] = n_cells_per_dim;
-                point1[idim] = 0.0;
+               // point1[idim] = 0.0;
+                point1[idim] = -10.0;
                 if(idim==0)
                     point2[idim] = x_right;
                 if(idim==1)

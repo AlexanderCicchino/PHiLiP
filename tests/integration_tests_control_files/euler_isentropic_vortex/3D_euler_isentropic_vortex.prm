@@ -85,11 +85,12 @@ subsection flow_solver
    # set final_time = 0.3
    # set final_time = 0.1
   #  set final_time = 11.83215957
- #   set final_time = 0.0
-    set final_time = 0.035
+    set final_time = 0.0
+ #   set final_time = 0.035
    # set final_time = 0.01
     subsection grid
-        set grid_left_bound = -10.0
+       # set grid_left_bound = -10.0
+        set grid_left_bound = 0.0
         set grid_right_bound = 10.0
       #  set grid_left_bound = -5.0
       #  set grid_right_bound = 5.0
@@ -101,6 +102,7 @@ subsection flow_solver
        # set number_of_grid_elements_per_dimension = 11
        # set number_of_grid_elements_per_dimension = 4
         set number_of_grid_elements_per_dimension = 10
+   #     set number_of_grid_elements_per_dimension = 40
      #   set number_of_grid_elements_per_dimension = 50
     end
 end

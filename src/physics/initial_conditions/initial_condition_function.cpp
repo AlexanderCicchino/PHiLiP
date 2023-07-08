@@ -375,7 +375,7 @@ template <int dim, int nstate, typename real>
 inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
 ::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
 {
-#if 0
+//#if 0
     // Setting constants
     const double pi = dealii::numbers::PI;
     const double gam = 1.4;
@@ -386,8 +386,10 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
     const double alpha = pi/4.0; //rad
 
     // Centre of the vortex  at t=0
-    const double x0 = 0.0;
-    const double y0 = 0.0;
+   // const double x0 = 0.0;
+   // const double y0 = 0.0;
+    const double x0 = 5.0;
+    const double y0 = 5.0;
     const double x = point[0] - x0;
     const double y = point[1] - y0;
 
@@ -408,15 +410,15 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
 
     const std::array<real,nstate> soln_conservative = this->euler_physics->convert_primitive_to_conservative(soln_primitive);
     return soln_conservative[istate];
-#endif
+//#endif
 
-//#if 0
+#if 0
     //Jesse Chan isentropic vortex
     const double Pi_max = 0.4;
- //   const double c_1 = 5.0;
- //   const double c_2 = 5.0;
-    const double c_1 = 0.0;
-    const double c_2 = 0.0;
+    const double c_1 = 5.0;
+    const double c_2 = 5.0;
+//    const double c_1 = 0.0;
+//    const double c_2 = 0.0;
  //   const double c_2 = -2.5;
     const double gamma = 1.4;
     const double P_0 = 1.0/gamma;
@@ -428,9 +430,11 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
 
     //conservative variables
     const real density = pow(1.0 - 0.4 / 2.0 * Pi * Pi, 1.0 / (0.4) );
-    const real u = Pi * ( - (y - c_2));
+    const real u0 = 1.0;
+    const real v0 = 1.0;
+    const real u = u0 + Pi * ( - (y - c_2));
    // const real v = Pi * ( (x - c_1));
-    const real v = 1.0 + Pi * ( (x - c_1));
+    const real v = v0 + Pi * ( (x - c_1));
     const real pressure = P_0 * pow(density, gamma);
     // Primitive
     std::array<real,nstate> soln_primitive;
@@ -464,7 +468,7 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
 //        return rho_e;
 //    }
 //    else return 0;
-//#endif
+#endif
 
 }
 
