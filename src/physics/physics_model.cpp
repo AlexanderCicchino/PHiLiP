@@ -185,6 +185,18 @@ std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim,nstate,real,nstat
 }
 
 template <int dim, int nstate, typename real, int nstate_baseline_physics>
+std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
+::vanishing_viscosity (
+    const real /*vvisc_coeff*/,
+    const std::array<real,nstate> &/*solution*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const
+{
+    std::cout<<"Vanishing viscosity for physics model hasn't been done yet."<<std::endl;
+    std::abort();
+    return solution_gradient;
+}
+
+template <int dim, int nstate, typename real, int nstate_baseline_physics>
 std::array<real,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
 ::compute_entropy_variables (
     const std::array<real,nstate> &conservative_soln) const

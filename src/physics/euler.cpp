@@ -717,6 +717,36 @@ std::array<real,nstate> Euler<dim, nstate, real>
     return conservative_var;
 }
 
+//template <int dim, int nstate, typename real>
+//std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim, nstate, real>
+//::compute_entropy_potential_dot_n (
+//    const std::array<real,nstate> &conservative_soln,
+//    const dealii::Tensor<1,dim,real> &normal) const
+//{
+//    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_potential = compute_entropy_potential(conservative_soln);
+//    std::array<nstate> entropy_potential_dot_n;
+//    for(int s=0; s<nstate; s++){
+//        entropy_potential_dot_n[s] = 0.0;
+//        for(int idim=0; idim<dim; idim++){
+//            entropy_potential_dot_n[s] += entropy_potential[s][idim] * normal[idim];
+//        }
+//    }
+//    return entropy_potential_dot_n;
+//}
+//template <int dim, int nstate, typename real>
+//std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim, nstate, real>
+//::compute_entropy_potential (
+//    const std::array<real,nstate> &conservative_soln) const
+//{
+//    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_potential;
+//    for(int s=0; s<nstate; s++){
+//        for(int idim=0; idim<dim; idim++){
+//            entropy_potential[s][idim] = conservative_soln[1+idim];
+//        }
+//    }
+//    return entropy_potential;
+//}
+
 template <int dim, int nstate, typename real>
 std::array<real,nstate> Euler<dim, nstate, real>
 ::compute_kinetic_energy_variables (
@@ -953,6 +983,28 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim,nstate,real>
     // No dissipation for Euler
     for (int i=0; i<nstate; i++) {
         diss_flux[i] = 0;
+    }
+    return diss_flux;
+}
+
+template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim,nstate,real>
+::vanishing_viscosity (
+    const real vvisc_coeff,
+    const std::array<real,nstate> &/*solution*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> diss_flux;
+    for (int i=0; i<nstate; i++) {
+        for (int d1=0; d1<dim; d1++) {
+            diss_flux[i][d1] = -vvisc_coeff 
+                              * solution_gradient[i][d1];
+           // diss_flux[i][d1] = 0.0;
+           // for (int d2=0; d2<dim; d2++) {
+           //     diss_flux[i][d1] += -vvisc_coeff 
+           //                       * solution_gradient[i][d2];
+           // }
+        }
     }
     return diss_flux;
 }

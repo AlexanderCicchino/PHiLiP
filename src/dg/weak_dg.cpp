@@ -4575,6 +4575,12 @@ void DGWeak<dim,nstate,real,MeshType>::assemble_auxiliary_residual ()
 }
 
 template <int dim, int nstate, typename real, typename MeshType>
+void DGWeak<dim,nstate,real,MeshType>::apply_entropy_production_correction ()
+{
+    //Do Nothing.
+}
+
+template <int dim, int nstate, typename real, typename MeshType>
 void DGWeak<dim,nstate,real,MeshType>::allocate_dual_vector ()
 {
     this->dual.reinit(this->locally_owned_dofs, this->ghost_dofs, this->mpi_communicator);

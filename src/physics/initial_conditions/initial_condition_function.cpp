@@ -228,6 +228,35 @@ inline real InitialConditionFunction_BurgersInviscidEnergy<dim,nstate,real>
 }
 
 // ========================================================
+// 1D BURGERS Inviscid Energy-- Initial Condition
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_BurgersInviscidLinearStability<dim,nstate,real>
+::InitialConditionFunction_BurgersInviscidLinearStability ()
+        : InitialConditionFunction<dim,nstate,real>()
+{
+    // Nothing to do here yet
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_BurgersInviscidLinearStability<dim,nstate,real>
+::value(const dealii::Point<dim,real> &point, const unsigned int /*istate*/) const
+{
+    real value = 1.0;
+    if constexpr(dim >= 1)
+        value *= sin(dealii::numbers::PI*point[0] - 0.7);
+      //  value *= sin(4.0*dealii::numbers::PI*point[0] - 0.7);
+       // value *= sin(8.0*dealii::numbers::PI*point[0] - 0.7);
+    if constexpr(dim >= 2)
+        value *= sin(dealii::numbers::PI*point[1] - 0.7);
+    if constexpr(dim == 3)
+        value *= sin(dealii::numbers::PI*point[2] - 0.7);
+
+    value += 2.0;
+    return value;
+}
+
+// ========================================================
 // Advection -- Initial Condition
 // ========================================================
 template <int dim, int nstate, typename real>
@@ -449,6 +478,47 @@ inline real InitialConditionFunction_KHI<dim,nstate,real>
     const std::array<real,nstate> soln_conservative = this->euler_physics->convert_primitive_to_conservative(soln_primitive);
     return soln_conservative[istate];
 }
+// ========================================================
+// Euler Density Wave -- Initial Condition
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_EulerDensityWave<dim,nstate,real>
+::InitialConditionFunction_EulerDensityWave()
+        : InitialConditionFunction<dim,nstate,real>()
+{
+    // Nothing to do here yet
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
+::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+    real value = 0.0;
+    real pi = dealii::numbers::PI;
+    real rho = 0.0;
+    if constexpr(dim==1)
+        rho = 1.0 + 0.98 * sin(2.0*pi*(point[0]));
+        //rho = 2.0 + sin(2*pi*(point[0]));//Jesse's
+    else
+        rho = 1.0 + 0.98 * sin(2.0*pi*(point[0] +point[1]));
+
+    if(istate==0)//rho
+        value = rho;
+    if(istate==1)//u
+        value = 0.1 * rho;
+      //  value = 1.0 * rho;//Jesse's
+    if(istate==2 && dim > 1)//v
+        value = 0.2 * rho;
+    if(istate==2 && dim==1)//E
+        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
+       // value = 1.0/(0.4) + 0.5*rho;//Jesse's
+    if(istate==3 && dim==3)//w
+        value = 0.0;
+    if((istate==3 && dim==2) || istate==4)//E
+        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1 + 0.2*0.2);
+
+    return value;
+}
 
 // ========================================================
 // ZERO INITIAL CONDITION
@@ -476,6 +546,7 @@ std::shared_ptr<InitialConditionFunction<dim, nstate, real>>
 InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
     Parameters::AllParameters const *const param)
 {
+    using Test_enum = Parameters::AllParameters::TestType;
     // Get the flow case type
     const FlowCaseEnum flow_type = param->flow_solver_param.flow_case_type;
     if (flow_type == FlowCaseEnum::taylor_green_vortex) {
@@ -507,9 +578,14 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
                     param->euler_param.side_slip_angle);
             return std::make_shared<FreeStreamInitialConditions<dim,nstate,real>>(euler_physics_double);
         }
+    } else if (flow_type==FlowCaseEnum::euler_density_wave){
+        if constexpr (nstate==dim+2) return std::make_shared<InitialConditionFunction_EulerDensityWave<dim,nstate,real> > ();
+    } else if (param->test_type==Test_enum::burgers_linear_stability) {
+        if constexpr (dim==1 && nstate==1) return std::make_shared<InitialConditionFunction_BurgersInviscidLinearStability<dim,nstate,real> > ();
     } else if (flow_type == FlowCaseEnum::burgers_inviscid && param->use_energy==false) {
         if constexpr (dim==1 && nstate==1) return std::make_shared<InitialConditionFunction_BurgersInviscid<dim,nstate,real> > ();
     } else if (flow_type == FlowCaseEnum::burgers_inviscid && param->use_energy==true) {
+      //  if constexpr (dim==1 && nstate==1) return std::make_shared<InitialConditionFunction_BurgersInviscid<dim,nstate,real> > ();
         if constexpr (dim==1 && nstate==1) return std::make_shared<InitialConditionFunction_BurgersInviscidEnergy<dim,nstate,real> > ();
     } else if (flow_type == FlowCaseEnum::advection && param->use_energy==true) {
         if constexpr (nstate==1) return std::make_shared<InitialConditionFunction_AdvectionEnergy<dim,nstate,real> > ();

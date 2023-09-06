@@ -208,6 +208,18 @@ std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim,nstate,rea
 }
 
 template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim,nstate,real>
+::vanishing_viscosity (
+    const real /*vvisc_coeff*/,
+    const std::array<real,nstate> &/*solution*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const
+{
+    std::cout<<"Vanishing viscosity for convection diffusion hasn't been done yet."<<std::endl;
+    std::abort();
+    return solution_gradient;
+}
+
+template <int dim, int nstate, typename real>
 std::array<real,nstate> ConvectionDiffusion<dim,nstate,real>
 ::source_term (
     const dealii::Point<dim,real> &pos,

@@ -43,6 +43,8 @@
 #include "euler_entropy_conserving_split_forms_check.h"
 #include "homogeneous_isotropic_turbulence_initialization_check.h"
 #include "khi_robustness.h"
+#include "burgers_linear_stability.h"
+#include "euler_density_wave.h"
 
 namespace PHiLiP {
 namespace Tests {
@@ -301,6 +303,10 @@ std::unique_ptr< TestsBase > TestsFactory<dim,nstate,MeshType>
         if constexpr (dim==3 && nstate==dim+2)  return std::make_unique<EulerSplitEntropyCheck<dim, nstate>>(parameters_input, parameter_handler_input);
     } else if(test_type == Test_enum::khi_robustness) {
         if constexpr (dim==2 && nstate==dim+2)  return std::make_unique<KHIRobustness<dim, nstate>>(parameters_input, parameter_handler_input);
+    } else if(test_type == Test_enum::burgers_linear_stability) {
+        if constexpr (dim==1 && nstate==1) return std::make_unique<BurgersLinearStability<dim,nstate>>(parameters_input);
+    } else if(test_type == Test_enum::euler_density_wave) {
+        if constexpr (nstate==dim+2)  return std::make_unique<EulerDensityWave<dim, nstate>>(parameters_input);
     } else {
         std::cout << "Invalid test. You probably forgot to add it to the list of tests in tests.cpp" << std::endl;
         std::abort();

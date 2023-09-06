@@ -403,6 +403,9 @@ public:
 
     ///The auxiliary equations' solution.
     std::array<dealii::LinearAlgebra::distributed::Vector<double>,dim> auxiliary_solution;
+
+    /// The entropy production per cell.
+    dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_production_coeff;
 private:
     /// Modal coefficients of the solution used to compute dRdW last
     /// Will be used to avoid recomputing dRdW.
@@ -899,6 +902,9 @@ public:
     /// Asembles the auxiliary equations' residuals and solves.
     virtual void assemble_auxiliary_residual () = 0;
 
+    /// Apply cell entropy production correction.
+    virtual void apply_entropy_production_correction() = 0;
+
     /// Allocate the dual vector for optimization.
     /** Currently only used in weak form.
     */
@@ -953,6 +959,9 @@ public:
     bool use_auxiliary_eq;
     /// Set use_auxiliary_eq flag
     virtual void set_use_auxiliary_eq() = 0;
+    /// Flag to use central flux as two point flux.
+    bool use_central_flux;
+
 }; // end of DGBase class
 
 /// Abstract class templated on the number of state variables
@@ -1045,7 +1054,6 @@ public:
 
     /// Set use_auxiliary_eq flag
     void set_use_auxiliary_eq();
-
 protected:
     /// Evaluate the time it takes for the maximum wavespeed to cross the cell domain.
     /** Currently only uses the convective eigenvalues. Future changes would take in account

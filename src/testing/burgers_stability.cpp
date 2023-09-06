@@ -22,6 +22,7 @@
 #include "ode_solver/ode_solver_factory.h"
 #include "physics/initial_conditions/set_initial_condition.h"
 #include "physics/initial_conditions/initial_condition_function.h"
+#include "physics/burgers.h"
 
 
 namespace PHiLiP {
@@ -32,6 +33,119 @@ BurgersEnergyStability<dim, nstate>::BurgersEnergyStability(const PHiLiP::Parame
 : TestsBase::TestsBase(parameters_input)
 {}
 
+template<int dim, int nstate>
+std::array<double,2> BurgersEnergyStability<dim, nstate>::compute_change_in_entropy(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const
+{
+    const unsigned int n_dofs_cell = dg->fe_collection[poly_degree].dofs_per_cell;
+    const unsigned int n_quad_pts = dg->volume_quadrature_collection[poly_degree].size();
+    const unsigned int n_shape_fns = n_dofs_cell / nstate;
+    //We have to project the vector of entropy variables because the mass matrix has an interpolation from solution nodes built into it.
+    OPERATOR::vol_projection_operator<dim,2*dim> vol_projection(1, poly_degree, dg->max_grid_degree);
+    vol_projection.build_1D_volume_operator(dg->oneD_fe_collection_1state[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
+
+    OPERATOR::basis_functions<dim,2*dim> soln_basis(1, poly_degree, dg->max_grid_degree);
+    soln_basis.build_1D_volume_operator(dg->oneD_fe_collection_1state[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
+
+    dealii::LinearAlgebra::distributed::Vector<double> entropy_var_hat_global(dg->right_hand_side);
+    dealii::LinearAlgebra::distributed::Vector<double> energy_var_hat_global(dg->right_hand_side);
+    std::vector<dealii::types::global_dof_index> dofs_indices (n_dofs_cell);
+
+    std::shared_ptr < Physics::Burgers<dim, nstate, double > > burgers_double  = std::dynamic_pointer_cast<Physics::Burgers<dim,dim,double>>(PHiLiP::Physics::PhysicsFactory<dim,nstate,double>::create_Physics(dg->all_parameters));
+
+    dg->assemble_residual();
+    for (auto cell = dg->dof_handler.begin_active(); cell!=dg->dof_handler.end(); ++cell) {
+        if (!cell->is_locally_owned()) continue;
+        cell->get_dof_indices (dofs_indices);
+
+        //get solution modal coeff
+        std::array<std::vector<double>,nstate> soln_coeff;
+        std::array<std::vector<double>,nstate> rhs_coeff;
+        for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+            const unsigned int istate = dg->fe_collection[poly_degree].system_to_component_index(idof).first;
+            const unsigned int ishape = dg->fe_collection[poly_degree].system_to_component_index(idof).second;
+            if(ishape == 0){
+                soln_coeff[istate].resize(n_shape_fns);
+                rhs_coeff[istate].resize(n_shape_fns);
+            }
+            soln_coeff[istate][ishape] = dg->solution(dofs_indices[idof]);
+            rhs_coeff[istate][ishape] = dg->right_hand_side(dofs_indices[idof]);
+        }
+
+        //interpolate solution to quadrature points
+        std::array<std::vector<double>,nstate> soln_at_q;
+        for(int istate=0; istate<nstate; istate++){
+            soln_at_q[istate].resize(n_quad_pts);
+            soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
+                                             soln_basis.oneD_vol_operator);
+        }
+        //compute entropy and kinetic energy "entropy" variables at quad points
+        std::array<std::vector<double>,nstate> entropy_var_at_q;
+        std::array<std::vector<double>,nstate> energy_var_at_q;
+        for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+            std::array<double,nstate> soln_state;
+            for(int istate=0; istate<nstate; istate++){
+                soln_state[istate] = soln_at_q[istate][iquad];
+            }
+            std::array<double,nstate> entropy_var_state = burgers_double->compute_entropy_variables(soln_state);
+            std::array<double,nstate> kin_energy_state = burgers_double->compute_entropy_variables(soln_state);
+            for(int istate=0; istate<nstate; istate++){
+                if(iquad==0){
+                    entropy_var_at_q[istate].resize(n_quad_pts);
+                    energy_var_at_q[istate].resize(n_quad_pts);
+                }
+                energy_var_at_q[istate][iquad] = kin_energy_state[istate];
+                entropy_var_at_q[istate][iquad] = entropy_var_state[istate];
+            }
+        }
+        //project the enrtopy and KE var to modal coefficients
+        //then write it into a global vector
+   //     double cell_entropy = 0.0;
+        for(int istate=0; istate<nstate; istate++){
+            //Projected vector of entropy variables.
+            std::vector<double> entropy_var_hat(n_shape_fns);
+            vol_projection.matrix_vector_mult_1D(entropy_var_at_q[istate], entropy_var_hat,
+                                                 vol_projection.oneD_vol_operator);
+            std::vector<double> energy_var_hat(n_shape_fns);
+            vol_projection.matrix_vector_mult_1D(energy_var_at_q[istate], energy_var_hat,
+                                                 vol_projection.oneD_vol_operator);
+
+            for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                const unsigned int idof = istate * n_shape_fns + ishape;
+                entropy_var_hat_global[dofs_indices[idof]] = entropy_var_hat[ishape];
+                energy_var_hat_global[dofs_indices[idof]] = energy_var_hat[ishape];
+
+    //            cell_entropy += entropy_var_hat[ishape] * rhs_coeff[istate][ishape];
+            }
+        }
+//        if(cell_entropy>0){
+    //        std::cout<<"cell entropy pos "<<cell_entropy<<std::endl;
+//        }
+    }
+
+    //evaluate the change in entropy and change in KE
+    std::array<double,2> change_entropy_and_energy;
+    change_entropy_and_energy[0] = entropy_var_hat_global * dg->right_hand_side;
+    change_entropy_and_energy[1] = energy_var_hat_global * dg->right_hand_side;
+
+//    if(dg->all_parameters->use_vanishing_viscosity){
+//        for (auto cell = dg->dof_handler.begin_active(); cell!=dg->dof_handler.end(); ++cell) {
+//            if (!cell->is_locally_owned()) continue;
+//            cell->get_dof_indices (dofs_indices);
+//            
+//            const double visc_coeff = dg->cell_entropy_production_coeff[dofs_indices[0]];
+//            for(int idim=0; idim<dim; idim++){
+//                for(unsigned int idof=0; idof<n_dofs_cell; idof++){
+//                    change_entropy_and_energy[0] += dg->auxiliary_solution[idim][dofs_indices[idof]]
+//                                                  * dg->auxiliary_right_hand_side[idim][dofs_indices[idof]]
+//                                                  * visc_coeff;
+//                }
+//            }
+//         
+//        }
+//    }
+
+    return change_entropy_and_energy;
+}
 template<int dim, int nstate>
 double BurgersEnergyStability<dim, nstate>::compute_energy(std::shared_ptr < PHiLiP::DGBase<dim, double> > &dg) const
 {
@@ -84,6 +198,27 @@ double BurgersEnergyStability<dim, nstate>::compute_conservation(std::shared_ptr
 
     return conservation;
 }
+template<int dim, int nstate>
+double BurgersEnergyStability<dim, nstate>::get_timestep(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree, const double delta_x) const
+{
+    dg->apply_entropy_production_correction();
+    double max_diff_coeff = 0.0;
+    std::vector<dealii::types::global_dof_index> dofs_indices (poly_degree + 1);
+    for (auto cell = dg->dof_handler.begin_active(); cell!=dg->dof_handler.end(); ++cell) {
+        if (!cell->is_locally_owned()) continue;
+
+        cell->get_dof_indices (dofs_indices);
+        double local_diff_coeff = dg->cell_entropy_production_coeff[dofs_indices[0]];
+        if(local_diff_coeff > max_diff_coeff)
+            max_diff_coeff = local_diff_coeff;
+    }
+    pcout<<"max diff coeff "<<max_diff_coeff<<std::endl;
+    double timestep = dg->all_parameters->flow_solver_param.courant_friedrichs_lewy_number 
+                    * delta_x*delta_x 
+                    / max_diff_coeff;
+
+    return timestep;
+}
 
 template <int dim, int nstate>
 int BurgersEnergyStability<dim, nstate>::run_test() const
@@ -93,7 +228,9 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
     double left = 0.0;
     double right = 2.0;
-    const unsigned int n_grids = (all_parameters_new.use_energy) ? 4 : 5;
+   // double left = -1.0;
+   // double right = 1.0;
+    const unsigned int n_grids = (all_parameters_new.use_energy) ? 4 : 6;
     std::vector<double> grid_size(n_grids);
     std::vector<double> soln_error(n_grids);
     unsigned int poly_degree = 4;
@@ -160,7 +297,7 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
 
         if (all_parameters_new.use_energy == true){//for split form get energy
 
-        double dt = all_parameters_new.ode_solver_param.initial_time_step;
+       // double dt = all_parameters_new.ode_solver_param.initial_time_step;
 
         // need to call ode_solver before calculating energy because mass matrix isn't allocated yet.
         ode_solver->current_iteration = 0;
@@ -175,15 +312,19 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         std::ofstream myfile ("energy_plot_burgers.gpl" , std::ios::trunc);
          
         ode_solver->current_iteration = 0;
-        for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
-        {
-                ode_solver->advance_solution_time(dt);
+      //  for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
+       // {
+        while(ode_solver->current_time < finalTime){
+        //        const double time_step =  get_timestep(dg,poly_degree, delta_x);
+         //       pcout<<"timstep "<<time_step<<std::endl;
+                const double time_step = 0.0001;
+                ode_solver->advance_solution_time(time_step);
                 //Energy
                 double current_energy = compute_energy(dg);
                 current_energy /=initial_energy;
                 std::cout << std::setprecision(16) << std::fixed;
-                pcout << "Energy at time " << i * dt << " is " << current_energy << std::endl;
-                myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_energy << std::endl;
+                pcout << "Energy at time " << ode_solver->current_time << " is " << current_energy << std::endl;
+                myfile << ode_solver->current_time << " " << std::fixed << std::setprecision(16) << current_energy << std::endl;
                 if (current_energy*initial_energy - initial_energy >= 1.0)
                 {
                     pcout<<"Energy not monotonicaly decreasing"<<std::endl;
@@ -200,14 +341,21 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
                 double current_conservation = compute_conservation(dg, poly_degree);
                 current_conservation /=initial_conservation;
                 std::cout << std::setprecision(16) << std::fixed;
-                pcout << "Normalized Conservation at time " << i * dt << " is " << current_conservation<< std::endl;
-                myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_conservation << std::endl;
+                pcout << "Normalized Conservation at time " << ode_solver->current_time << " is " << current_conservation<< std::endl;
+                myfile << ode_solver->current_time << " " << std::fixed << std::setprecision(16) << current_conservation << std::endl;
                 if (current_conservation*initial_conservation - initial_conservation >= 10.00)
                 {
                     pcout << "Not conserved" << std::endl;
                     return 1;
                     break;
                 }
+                const std::array<double,2> current_change_entropy = compute_change_in_entropy(dg, poly_degree);
+                const double current_change_entropy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[0], mpi_communicator);
+                const double current_change_energy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[1], mpi_communicator);
+                //write to the file the change in entropy mpi
+               // myfile<<ode_solver->current_time<<" "<< current_change_entropy_mpi <<std::endl;
+                pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy_mpi<< std::endl;
+                pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_energy_mpi<< std::endl;
             }
             myfile.close();
              
@@ -243,10 +391,19 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         }//end of energy
         else{//do OOA
             finalTime = 0.001;//This is sufficient for verification
+         //   finalTime = 0.5;
 
             ode_solver->current_iteration = 0;
+            ode_solver->allocate_ode_system();
 
-            ode_solver->advance_solution_time(finalTime);
+            while(ode_solver->current_time < finalTime){
+                const double time_step = 0.0001;
+                ode_solver->step_in_time(time_step,false);
+                ode_solver->current_iteration += 1;
+                if(ode_solver->current_iteration%all_parameters_new.ode_solver_param.print_iteration_modulo==0)
+                    pcout<<"time step "<<time_step<<" current time "<<ode_solver->current_time<<std::endl;
+            }
+           // ode_solver->advance_solution_time(finalTime);
             const unsigned int n_global_active_cells = grid->n_global_active_cells();
             const unsigned int n_dofs = dg->dof_handler.n_dofs();
             pcout << "Dimension: " << dim
@@ -289,7 +446,8 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
                     const dealii::Point<dim> qpoint = (fe_values_extra.quadrature_point(iquad));
                     double uexact = 0.0;
                     for(int idim=0; idim<dim; idim++){
-                        uexact += cos(pi*(qpoint[idim]-finalTime));//for grid 1-3
+                       // uexact += cos(pi*(qpoint[idim]-finalTime));//for grid 1-3
+                        uexact += cos(pi*(qpoint[idim]-ode_solver->current_time));//for grid 1-3
                     }
                         l2error += pow(soln_at_q[istate] - uexact, 2) * fe_values_extra.JxW(iquad);
                     }

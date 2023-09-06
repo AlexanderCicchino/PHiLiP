@@ -101,6 +101,9 @@ public:
     /// Flag to use split form.
     bool use_split_form;
 
+    /// Flag to use asymptotic stable form.
+    bool use_asymptotic_stable;
+
     /// Two point numerical flux type for split form
     enum TwoPointNumericalFlux { KG, IR, CH, Ra };
     /// Store selected TwoPointNumericalFlux from the input file
@@ -196,6 +199,8 @@ public:
         h_refinement_study_isentropic_vortex,
         khi_robustness,
         homogeneous_isotropic_turbulence_initialization_check,
+        burgers_linear_stability,
+        euler_density_wave,
     };
     /// Store selected TestType from the input file.
     TestType test_type;
@@ -244,6 +249,7 @@ public:
         roe, 
         l2roe, 
         central_flux,
+        asymptotic_stable_flux,
         two_point_flux,
         two_point_flux_with_lax_friedrichs_dissipation,
         two_point_flux_with_roe_dissipation,

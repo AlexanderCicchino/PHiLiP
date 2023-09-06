@@ -115,6 +115,37 @@ std::array<real,nstate> Burgers<dim, nstate, real>
     return entropy_var;
 }
 
+//template <int dim, int nstate, typename real>
+//std::array<real,nstate> Burgers<dim, nstate, real>
+//::compute_entropy_potential_dot_n (
+//    const std::array<real,nstate> &conservative_soln,
+//    const dealii::Tensor<1,dim,real> &normal) const
+//{
+//    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_potential = compute_entropy_potential(conservative_soln);
+//    std::array<real,nstate> entropy_potential_dot_n;
+//    for(int s=0; s<nstate; s++){
+//        entropy_potential_dot_n[s] = 0.0;
+//        for(int idim=0; idim<dim; idim++){
+//            entropy_potential_dot_n[s] += entropy_potential[s][idim] * normal[idim];
+//        }
+//    }
+//    return entropy_potential_dot_n;
+//}
+//template <int dim, int nstate, typename real>
+//std::array<dealii::Tensor<1,dim,real>,nstate> Burgers<dim, nstate, real>
+//::compute_entropy_potential (
+//    const std::array<real,nstate> &conservative_soln) const
+//{
+//    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_potential;
+//    for(int s=0; s<nstate; s++){
+//        for(int idim=0; idim<dim; idim++){
+//            if(s == idim)//not entirely sure about this if statement, only checked for 1D.
+//                entropy_potential[s][idim] = 1.0/6.0 * pow(conservative_soln[idim],3.0);
+//        }
+//    }
+//    return entropy_potential;
+//}
+
 template <int dim, int nstate, typename real>
 real Burgers<dim,nstate,real>
 ::diffusion_coefficient () const
@@ -169,10 +200,12 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Burgers<dim,nstate,real>
     const dealii::types::global_dof_index /*cell_index*/) const
 {
     std::array<dealii::Tensor<1,dim,real>,nstate> diss_flux;
-    if(this->all_parameters->use_vanishing_viscosity)
-        diss_flux = vanishing_viscosity(solution, solution_gradient);
-    if(this->has_nonzero_diffusion)//can't use vanishing viscosity with diffusion at the moment
+//    if(this->all_parameters->use_vanishing_viscosity){
+//        diss_flux = vanishing_viscosity(solution, solution_gradient);
+//    }
+//    if(this->has_nonzero_diffusion){//can't use vanishing viscosity with diffusion at the moment
         diss_flux = dissipative_flux(solution, solution_gradient);
+//    }
 
     return diss_flux;
 }
@@ -199,18 +232,35 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Burgers<dim,nstate,real>
 template <int dim, int nstate, typename real>
 std::array<dealii::Tensor<1,dim,real>,nstate> Burgers<dim,nstate,real>
 ::vanishing_viscosity (
+    const real vvisc_coeff,
     const std::array<real,nstate> &/*solution*/,
     const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const
 {
     std::array<dealii::Tensor<1,dim,real>,nstate> diss_flux;
     for (int i=0; i<nstate; i++) {
         for (int d1=0; d1<dim; d1++) {
+            diss_flux[i][d1] = -vvisc_coeff 
+                              * solution_gradient[i][d1];
+#if 0
             diss_flux[i][d1] = 0.0;
             for (int d2=0; d2<dim; d2++) {
               //  diss_flux[i][d1] += -0.5 * (abs(solution[i]) + 1.0 / 6.0 * abs(solution_gradient[i][d2]))
-                diss_flux[i][d1] += -0.5 * (1.0 / 6.0 * abs(solution_gradient[i][d2]))
+              //  diss_flux[i][d1] += -0.5 * (1.0 / 6.0 * abs(solution_gradient[i][d2]))
+              //  diss_flux[i][d1] += -0.001 * 0.5 * (0.5*abs(solution[i]) + 1.0 / 6.0 * abs(solution_gradient[i][d2]))
+              //  diss_flux[i][d1] += -0.0001 *0.5 * (1.0 / 6.0 * abs(solution_gradient[i][d2]))
+             //   diss_flux[i][d1] += -0.001 *0.5 * (1.0 / 6.0 * abs(solution_gradient[i][d2]))
+               // diss_flux[i][d1] += -0.01 *0.5 * (1.0 / 6.0 * abs(solution_gradient[i][d2]))
+             //   diss_flux[i][d1] += -0.1 *0.5 * (1.0 / 6.0 * abs(solution_gradient[i][d2]))
+               // diss_flux[i][d1] += -vvisc_coeff *(1.0 / 12.0 * abs(solution_gradient[i][d2]))
+
+              //  diss_flux[i][d1] += -vvisc_coeff *(abs(solution_gradient[i][d2]))
+              //                    * solution_gradient[i][d2];
+
+               // diss_flux[i][d1] += -vvisc_coeff * (0.5*abs(solution[i]) + 1.0 / 6.0 * abs(solution_gradient[i][d2]))
+                diss_flux[i][d1] += -vvisc_coeff 
                                   * solution_gradient[i][d2];
             }
+#endif
         }
     }
     return diss_flux;

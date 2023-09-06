@@ -190,7 +190,24 @@ public:
     real value (const dealii::Point<dim,real> &point, const unsigned int istate) const override;
 };
 
-/// Initial Condition Function: 1D Burgers Inviscid
+/// Initial Condition Function: 1D Burgers Inviscid Linear Stability
+template <int dim, int nstate, typename real>
+class InitialConditionFunction_BurgersInviscidLinearStability
+        : public InitialConditionFunction<dim,nstate,real>
+{
+protected:
+    using dealii::Function<dim,real>::value; ///< dealii::Function we are templating on
+
+public:
+    /// Constructor for InitialConditionFunction_BurgersInviscidLinearStability
+    /** Calls the Function(const unsigned int n_components) constructor in deal.II*/
+    InitialConditionFunction_BurgersInviscidLinearStability ();
+
+    /// Value of initial condition
+    real value (const dealii::Point<dim,real> &point, const unsigned int istate) const override;
+};
+
+/// Initial Condition Function: Advection Explicit
 template <int dim, int nstate, typename real>
 class InitialConditionFunction_Advection
         : public InitialConditionFunction<dim,nstate,real>
@@ -333,6 +350,23 @@ protected:
     // Euler physics pointer. Used to convert primitive to conservative.
     std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_physics;
 
+};
+
+/// Initial Condition Function: Euler Density Wave
+template <int dim, int nstate, typename real>
+class InitialConditionFunction_EulerDensityWave
+        : public InitialConditionFunction<dim,nstate,real>
+{
+protected:
+    using dealii::Function<dim,real>::value; ///< dealii::Function we are templating on
+
+public:
+    /// Constructor for InitialConditionFunction_EulerDensityWave.
+    /** Calls the Function(const unsigned int n_components) constructor in deal.II*/
+    InitialConditionFunction_EulerDensityWave ();
+
+    /// Value of initial condition
+    real value (const dealii::Point<dim,real> &point, const unsigned int istate) const override;
 };
 
 /// Initial condition 0.

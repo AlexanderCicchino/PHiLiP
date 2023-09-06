@@ -491,6 +491,18 @@ std::array<dealii::Tensor<1,dim,real>,nstate> MHD<dim,nstate,real>
 }
 
 template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> MHD<dim,nstate,real>
+::vanishing_viscosity (
+    const real /*vvisc_coeff*/,
+    const std::array<real,nstate> &/*solution*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const
+{
+    std::cout<<"Vanishing viscosity for MHD hasn't been done yet."<<std::endl;
+    std::abort();
+    return solution_gradient;
+}
+
+template <int dim, int nstate, typename real>
 void MHD<dim,nstate,real>
 ::boundary_face_values (
    const int /*boundary_type*/,

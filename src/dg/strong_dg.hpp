@@ -38,6 +38,9 @@ public:
      */
     void assemble_auxiliary_residual ();
 
+    /// Compute entropy prod vanishing visc coeff.
+    void apply_entropy_production_correction ();
+
     /// Allocate the dual vector for optimization.
     void allocate_dual_vector ();
 

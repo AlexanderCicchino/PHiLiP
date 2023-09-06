@@ -70,6 +70,29 @@ protected:
     const std::shared_ptr < Physics::PhysicsBase<dim, nstate, real> > pde_physics;
 };
 
+/// Asymptotically Stable Numerical Flux. Derived from BaselineNumericalFluxConvective.
+template<int dim, int nstate, typename real>
+class AsymptoticStableBaselineNumericalFluxConvective : public BaselineNumericalFluxConvective<dim, nstate, real>
+{
+public:
+    /// Constructor
+    AsymptoticStableBaselineNumericalFluxConvective(std::shared_ptr <Physics::PhysicsBase<dim, nstate, real>> physics_input)
+    : pde_physics(physics_input) {};
+
+    /// Destructor
+    ~AsymptoticStableBaselineNumericalFluxConvective() {};
+
+    /// Returns the convective numerical flux at an interface.
+    std::array<real, nstate> evaluate_flux (
+        const std::array<real, nstate> &soln_int,
+        const std::array<real, nstate> &soln_ext,
+        const dealii::Tensor<1,dim,real> &normal1) const;
+
+protected:
+    /// Numerical flux requires physics to evaluate split form convective flux.
+    const std::shared_ptr < Physics::PhysicsBase<dim, nstate, real> > pde_physics;
+};
+
 /// Base class of Riemann solver dissipation (i.e. upwind-term) for numerical flux associated with convection
 template<int dim, int nstate, typename real>
 class RiemannSolverDissipation
@@ -327,6 +350,18 @@ public:
 
     /// Destructor
     ~EntropyConserving() {};
+};
+
+/// Asymptotically Stable numerical flux. Derived from NumericalFluxConvective.
+template<int dim, int nstate, typename real>
+class AsymptoticStable : public NumericalFluxConvective<dim, nstate, real>
+{
+public:
+    /// Constructor
+    AsymptoticStable(std::shared_ptr<Physics::PhysicsBase<dim, nstate, real>> physics_input);
+
+    /// Destructor
+    ~AsymptoticStable() {};
 };
 
 /// Entropy conserving numerical flux with Lax Friedrichs dissipation. Derived from NumericalFluxConvective.

@@ -161,6 +161,9 @@ private:
     /// Assembles the auxiliary equations' residuals and solves for the auxiliary variables.
     void assemble_auxiliary_residual ();
 
+    /// Assembles entropy production correction.
+    void apply_entropy_production_correction ();
+
     /// Allocate the dual vector for optimization.
     void allocate_dual_vector ();
 

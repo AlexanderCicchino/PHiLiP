@@ -87,6 +87,15 @@ public:
     virtual std::array<real,nstate> compute_conservative_variables_from_entropy_variables (
                 const std::array<real,nstate> &entropy_var) const = 0;
 
+//    /// Computes the entropy potential dot normal.
+//    virtual std::array<dealii::Tensor<1,dim,real>,nstate> compute_entropy_potential_dot_n (
+//                const std::array<real,nstate> &conservative_soln,
+//                const dealii::Tensor<1,dim,real> &normal) const = 0;
+//
+//    /// Computes the entropy potential.
+//    virtual std::array<dealii::Tensor<1,dim,real>,nstate> compute_entropy_potential (
+//                const std::array<real,nstate> &conservative_soln) const = 0;
+
     /// Spectral radius of convective term Jacobian.
     /** Used for scalar dissipation
      */
@@ -115,6 +124,12 @@ public:
         const std::array<real,nstate> &solution,
         const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient,
         const dealii::types::global_dof_index cell_index) const = 0;
+
+    /// Vanishing viscosity
+    virtual std::array<dealii::Tensor<1,dim,real>,nstate> vanishing_viscosity (
+        const real vvisc_coeff,
+        const std::array<real,nstate> &solution,
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const = 0;
 
     /// Artificial dissipative fluxes that will be differentiated ONCE in space.
     /** Stems from the Persson2006 paper on subcell shock capturing */

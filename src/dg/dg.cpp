@@ -434,6 +434,8 @@ template <int dim, int nstate, typename real, typename MeshType>
 void DGBaseState<dim,nstate,real,MeshType>::set_use_auxiliary_eq()
 {
     if(pde_physics_double->has_nonzero_diffusion || this->all_parameters->use_vanishing_viscosity)
+   // if(pde_physics_double->has_nonzero_diffusion || this->all_parameters->use_vanishing_viscosity
+   //     || this->all_parameters->use_asymptotic_stable)
         this->use_auxiliary_eq = true;
    // this->use_auxiliary_eq = pde_physics_double->has_nonzero_diffusion;
 }
@@ -1304,7 +1306,7 @@ void DGBase<dim,real,MeshType>::reinit_operators_for_cell_residual_loop(
 
     //basis functions projection operator
     soln_basis_projection_oper_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
-    soln_basis_projection_oper_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+    soln_basis_projection_oper_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
 
     //We only need to compute the most recent mapping basis since we compute interior before looping faces
     mapping_basis.build_1D_shape_functions_at_grid_nodes(high_order_grid->oneD_fe_system, high_order_grid->oneD_grid_nodes);
@@ -1470,6 +1472,11 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
         // assembles and solves for auxiliary variable if necessary.
         assemble_auxiliary_residual();
 
+        // set vanishing visc coef to zero
+        this->cell_entropy_production_coeff = 0;
+        //Apply vanshing viscosity entropy correction to residual
+        apply_entropy_production_correction();
+
         dealii::Timer timer;
         if(all_parameters->store_residual_cpu_time){
             timer.start();
@@ -1514,6 +1521,7 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
                 auxiliary_right_hand_side);
         } // end of cell loop
 
+
         if(all_parameters->store_residual_cpu_time){
             timer.stop();
             assemble_residual_time += timer.cpu_time();
@@ -1547,6 +1555,7 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
 
     right_hand_side.compress(dealii::VectorOperation::add);
     right_hand_side.update_ghost_values();
+
     if ( compute_dRdW ) {
         system_matrix.compress(dealii::VectorOperation::add);
 
@@ -2191,6 +2200,9 @@ void DGBase<dim,real,MeshType>::allocate_system (
 
     // Set use_auxiliary_eq flag
     set_use_auxiliary_eq();
+
+    //only use idof=0 for it for now
+    cell_entropy_production_coeff.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
 
     // Allocate for auxiliary equation only.
     if(use_auxiliary_eq) allocate_auxiliary_equation ();
@@ -3337,6 +3349,9 @@ void DGBase<dim,real,MeshType>::set_current_time(const real current_time_input)
 {
     this->current_time = current_time_input;
 }
+
+
+
 // No support for anisotropic mesh refinement with parallel::distributed::Triangulation
 // template<int dim, typename real>
 // void DGBase<dim,real,MeshType>::set_anisotropic_flags()

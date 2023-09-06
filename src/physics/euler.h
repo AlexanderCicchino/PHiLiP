@@ -184,6 +184,13 @@ public:
         const std::array<real,nstate> &conservative_soln,
         const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const;
 
+    /// Vanishing viscosity
+    std::array<dealii::Tensor<1,dim,real>,nstate> vanishing_viscosity (
+        const real vvisc_coeff,
+        const std::array<real,nstate> &solution,
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const;
+
+
     /// Source term is zero or depends on manufactured solution
     std::array<real,nstate> source_term (
         const dealii::Point<dim,real> &pos,
@@ -316,6 +323,15 @@ public:
     /// Computes the kinetic energy variables.
     std::array<real,nstate> compute_kinetic_energy_variables (
                 const std::array<real,nstate> &conservative_soln) const;
+
+//    /// Computes the entropy potential dot normal.
+//    std::array<dealii::Tensor<1,dim,real>,nstate> compute_entropy_potential_dot_n (
+//                const std::array<real,nstate> &conservative_soln,
+//                const dealii::Tensor<1,dim,real> &normal) const;
+//
+//    /// Computes the entropy potential.
+//    std::array<dealii::Tensor<1,dim,real>,nstate> compute_entropy_potential (
+//                const std::array<real,nstate> &conservative_soln) const;
 
     /// Mean density given two sets of conservative solutions.
     /** Used in the implementation of the split form.

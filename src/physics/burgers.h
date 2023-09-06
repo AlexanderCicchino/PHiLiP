@@ -80,6 +80,15 @@ public:
     std::array<real,nstate> compute_conservative_variables_from_entropy_variables (
                 const std::array<real,nstate> &entropy_var) const;
 
+//    /// Computes the entropy potential dot normal.
+//    std::array<real,nstate> compute_entropy_potential_dot_n (
+//                const std::array<real,nstate> &conservative_soln,
+//                const dealii::Tensor<1,dim,real> &normal) const;
+//
+//    /// Computes the entropy potential.
+//    std::array<dealii::Tensor<1,dim,real>,nstate> compute_entropy_potential (
+//                const std::array<real,nstate> &conservative_soln) const;
+
     /// Spectral radius of convective term Jacobian is 'c'
     std::array<real,nstate> convective_eigenvalues (
         const std::array<real,nstate> &/*solution*/,
@@ -109,6 +118,7 @@ public:
 
     /// Vanishing viscosity
     std::array<dealii::Tensor<1,dim,real>,nstate> vanishing_viscosity (
+        const real vvisc_coeff,
         const std::array<real,nstate> &solution,
         const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient) const;
 
