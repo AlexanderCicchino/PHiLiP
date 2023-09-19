@@ -8,6 +8,8 @@ set use_weak_form = false
 
 set flux_nodes_type = GL
 
+set overintegration = 0
+
 set do_renumber_dofs = false
 
 set use_split_form = true
@@ -25,6 +27,7 @@ set pde_type = euler
 #set conv_num_flux = central_flux
 #set conv_num_flux = two_point_flux
 set conv_num_flux = two_point_flux_with_roe_dissipation
+#set conv_num_flux = roe
 #set conv_num_flux = lax_friedrichs
 
 set use_energy = false
@@ -76,7 +79,7 @@ subsection flow_solver
     set courant_friedrichs_lewy_number = 0.1
     #set flow_case_type = euler_isentropic_vortex
     set flow_case_type = isentropic_vortex
- #   set apply_initial_condition_method = interpolate_initial_condition_function
+  #  set apply_initial_condition_method = interpolate_initial_condition_function
     set apply_initial_condition_method = project_initial_condition_function
     set poly_degree = 4
   #  set final_time = 23.66431913239
@@ -84,25 +87,33 @@ subsection flow_solver
   #  set final_time = 5.0
    # set final_time = 0.3
    # set final_time = 0.1
-  #  set final_time = 11.83215957
-    set final_time = 0.0
+  #  set final_time = 11.83215957 #1/2 cycle
+    #set final_time = 0.0
    # set final_time = 0.035
  #   set final_time = 2.5 
    # set final_time = 0.01 
-    # set final_time = 5.9160797831 #1/4 cycle to make ctest faster. Full cycle is recommended for better results.
- # set final_time = 2.95803989155 #1/4 cycle to make ctest faster. Full cycle is recommended for better results.
+ #    set final_time = 5.9160797831 #1/4 cycle to make ctest faster. Full cycle is recommended for better results.
+ # set final_time = 2.95803989155 #1/8 cycle to make ctest faster. Full cycle is recommended for better results.
+ # set final_time = 0.73950997288
+ # set final_time = 0.36975498644
+ # set final_time = 0.09243874661
+ # set final_time = 0.01
+  set final_time = 2.0
     subsection grid
-      #  set grid_left_bound = -10.0
+        set grid_left_bound = -10.0
       #  set grid_right_bound = 10.0
      #   set grid_left_bound = -5.0
      #   set grid_right_bound = 5.0
-        set grid_left_bound = 0.0
+       # set grid_left_bound = 0.0
     #    set grid_right_bound = 20.0
         set grid_right_bound = 10.0
        # set number_of_grid_elements_per_dimension = 8
+       # set number_of_grid_elements_per_dimension = 16
+        set number_of_grid_elements_per_dimension = 256
        # set number_of_grid_elements_per_dimension = 32
+      #  set number_of_grid_elements_per_dimension = 64
      #   set number_of_grid_elements_per_dimension = 10
-        set number_of_grid_elements_per_dimension = 80
+       # set number_of_grid_elements_per_dimension = 80
        # set number_of_grid_elements_per_dimension = 11
      #   set number_of_grid_elements_per_dimension = 4
      #   set number_of_grid_elements_per_dimension = 16

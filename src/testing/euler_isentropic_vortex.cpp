@@ -70,8 +70,8 @@ template<int dim, int nstate>
 double EulerIsentropicVortex<dim, nstate>::get_timestep(std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree, const double delta_x) const
 {
      //get local CFL
-    const unsigned int n_dofs_cell = nstate*pow(poly_degree+1,dim);
-    const unsigned int n_quad_pts = pow(poly_degree+1,dim);
+    const unsigned int n_dofs_cell = dg->fe_collection[poly_degree].dofs_per_cell;
+    const unsigned int n_quad_pts = dg->volume_quadrature_collection[poly_degree].size();
     std::vector<dealii::types::global_dof_index> dofs_indices (n_dofs_cell);
 
     OPERATOR::basis_functions<dim,2*dim> soln_basis(1, poly_degree, dg->max_grid_degree);
@@ -146,18 +146,23 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
          
         all_parameters_new.ode_solver_param.initial_time_step =  get_timestep(dg,poly_degree,delta_x);
          
+         pcout<<"got timestep"<<std::endl;
         std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
         const double finalTime = all_parameters_new.flow_solver_param.final_time;
 
         std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_double  = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(PHiLiP::Physics::PhysicsFactory<dim,nstate,double>::create_Physics(dg->all_parameters));
         ode_solver->current_iteration = 0;
         ode_solver->allocate_ode_system();
+        pcout<<"allocated ode system"<<std::endl;
 
         while(ode_solver->current_time < finalTime){
             const double time_step =  get_timestep(dg,poly_degree, delta_x);
-       //         const double M_infty_temp = sqrt(2.0/1.4);
-       //         double time_step = 0.1 * delta_x / M_infty_temp;
-            const double dt = dealii::Utilities::MPI::min(time_step, mpi_communicator);
+         //       const double M_infty_temp = sqrt(2.0/1.4);
+         //       double time_step = 0.1 * delta_x / M_infty_temp;
+            double dt = dealii::Utilities::MPI::min(time_step, mpi_communicator);
+            if(ode_solver->current_time + dt > finalTime){
+                dt = finalTime - ode_solver->current_time;
+            }
             if(ode_solver->current_iteration%all_parameters_new.ode_solver_param.print_iteration_modulo==0)
                 pcout<<"time step "<<time_step<<" current time "<<ode_solver->current_time<<std::endl;
             ode_solver->step_in_time(dt, false);

@@ -45,9 +45,10 @@ int EulerTaylorGreenScaling<dim, nstate>::run_test() const
     std::ofstream myfile (all_parameters_new.energy_file + ".gpl"  , std::ios::trunc);
     const unsigned int poly_degree_start= all_parameters->flow_solver_param.poly_degree;
 
-    const unsigned int poly_degree_end = 16;
-    std::array<double,poly_degree_end> time_to_run;
-    std::array<double,poly_degree_end> time_to_run_mpi;
+    const unsigned int poly_degree_end = all_parameters->flow_solver_param.max_poly_degree_for_adaptation;
+    const unsigned int max_p = 60;
+    std::array<double,max_p> time_to_run;
+    std::array<double,max_p> time_to_run_mpi;
 
     //poly degree loop
     for(unsigned int poly_degree = poly_degree_start; poly_degree<poly_degree_end; poly_degree++){
