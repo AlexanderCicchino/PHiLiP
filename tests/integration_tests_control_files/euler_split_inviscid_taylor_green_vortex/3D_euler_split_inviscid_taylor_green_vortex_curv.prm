@@ -6,11 +6,11 @@ set test_type = euler_split_taylor_green
 
 set use_weak_form = false
 
-set flux_nodes_type = GL
+set flux_nodes_type = GLL
 
 set do_renumber_dofs = false
 
-set overintegration = 2
+set overintegration = 0
 
 set use_split_form = true
 
