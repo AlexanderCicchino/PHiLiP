@@ -43,7 +43,7 @@ set enable_higher_order_vtk_output = true
 
 set use_curvilinear_grid = true
 
-set output_high_order_grid = true
+set output_high_order_grid = false
 
 subsection ODE solver
 
@@ -73,7 +73,7 @@ subsection euler
 end
 
 subsection flow_solver
-    set courant_friedrichs_lewy_number = 0.1
+    set courant_friedrichs_lewy_number = 0.2
     #set flow_case_type = euler_isentropic_vortex
     set flow_case_type = isentropic_vortex
  #   set apply_initial_condition_method = interpolate_initial_condition_function
@@ -83,26 +83,30 @@ subsection flow_solver
    # set final_time = 10.0
    # set final_time = 5.0
    # set final_time = 0.3
-   # set final_time = 0.1
+    set final_time = 0.1
   #  set final_time = 11.83215957
   #  set final_time = 0.0
  #   set final_time = 0.035
-    set final_time = 0.01
+   # set final_time = 1.0
     subsection grid
        # set grid_left_bound = -10.0
         set grid_left_bound = 0.0
         set grid_right_bound = 10.0
+       # set grid_right_bound = -12.5663706144
+      #  set grid_right_bound = 12.5663706144
       #  set grid_left_bound = -5.0
       #  set grid_right_bound = 5.0
        # set grid_left_bound = 0.0
        # set grid_right_bound = 10.0
        # set grid_right_bound = 10.0
-      #  set number_of_grid_elements_per_dimension = 8
+    #    set number_of_grid_elements_per_dimension = 8
+       # set number_of_grid_elements_per_dimension = 64
+        set number_of_grid_elements_per_dimension = 16
        # set number_of_grid_elements_per_dimension = 32
        # set number_of_grid_elements_per_dimension = 11
        # set number_of_grid_elements_per_dimension = 4
     #    set number_of_grid_elements_per_dimension = 10
-        set number_of_grid_elements_per_dimension = 40
+       # set number_of_grid_elements_per_dimension = 40
      #   set number_of_grid_elements_per_dimension = 50
     end
 end

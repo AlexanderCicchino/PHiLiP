@@ -386,10 +386,10 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
     const double alpha = pi/4.0; //rad
 
     // Centre of the vortex  at t=0
-    const double x0 = 0.0;
-    const double y0 = 0.0;
-  //  const double x0 = 5.0;
-  //  const double y0 = 5.0;
+  //  const double x0 = 0.0;
+  //  const double y0 = 0.0;
+    const double x0 = 5.0;
+    const double y0 = 5.0;
     const double x = point[0] - x0;
     const double y = point[1] - y0;
 

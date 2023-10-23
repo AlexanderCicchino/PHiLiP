@@ -128,6 +128,14 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
 {
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
 
+//    int CFL_flag = 1;
+    double CFL = 0.2;
+    CFL = 0.1;
+ //   while(CFL_flag != 0){
+       // CFL += 0.01;
+        all_parameters_new.flow_solver_param.courant_friedrichs_lewy_number = CFL;
+        pcout<<"CFL "<<CFL<<std::endl;
+
         // Create DG
         pcout<<"about to create DG"<<std::endl;
         std::shared_ptr < PHiLiP::DGBase<dim, double> > dg = PHiLiP::DGFactory<dim,double>::create_discontinuous_galerkin(&all_parameters_new, poly_degree, poly_degree, grid_degree, grid);
@@ -238,6 +246,7 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
             grid_size[igrid-igrid_start] = dx;
             soln_error[igrid-igrid_start] = l2error_mpi_sum;
 
+            std::cout << std::setprecision(16) << std::fixed;
             pcout << " Grid size h: " << dx 
                   << " L2-pressure_error: " << l2error_mpi_sum
                   << " L2-density_error: " << l2error_mpi_sum_density
@@ -264,6 +273,36 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
                     }
                 }
             }
+
+
+#if 0
+        pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.0011168725921635)<<std::endl;
+        if(abs(l2error_mpi_sum-0.0011168725921635)>=1e-3 ||abs(l2error_mpi_sum_density-0.0011162711985459)>=1e-3){
+            pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.0011168725921635)<<std::endl;
+            pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0011162711985459)<<std::endl;
+            CFL_flag = 0;
+            pcout<<"CFL max "<<CFL-0.01<<std::endl;
+        }
+#endif
+#if 0
+        //c+ 2D GL
+        pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.0069677942066219)<<std::endl;
+        if(abs(l2error_mpi_sum-0.0069677942066219)>=1e-3 ||abs(l2error_mpi_sum_density-0.0076676962109569)>=1e-3){
+            pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.0069677942066219)<<std::endl;
+            pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0076676962109569)<<std::endl;
+            CFL_flag = 0;
+            pcout<<"CFL max "<<CFL-0.01<<std::endl;
+        }
+#endif
+
+//        pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.7448712945470424)<<std::endl;
+//        if(abs(l2error_mpi_sum-0.7448712945470424)>=1e-3 ||abs(l2error_mpi_sum_density-0.5927959282730064)>=1e-3){
+//            pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.7448712945470424)<<std::endl;
+//            pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.5927959282730064)<<std::endl;
+//            CFL_flag = 0;
+//            pcout<<"CFL max "<<CFL-0.01<<std::endl;
+//        }
+   // }
         
 }
 
@@ -302,8 +341,8 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
            // PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, n_refinements);
        //     PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid, true, left, right);
 
-          //  PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, log(n_cells_per_dim)/log(2.0), true, left, right);
-            PHiLiP::Grids::nonsymmetric_curved_grid_chan<dim,Triangulation>(*grid, n_cells_per_dim);
+            PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, log(n_cells_per_dim)/log(2.0), true, left, right);
+          //  PHiLiP::Grids::nonsymmetric_curved_grid_chan<dim,Triangulation>(*grid, n_cells_per_dim);
         }
         else{
             //if straight

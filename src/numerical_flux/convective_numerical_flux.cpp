@@ -339,7 +339,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal_int) const
 {
-//#if 0
+#if 0
     //CUSP scheme
     const real pressure_int = euler_physics->compute_pressure(soln_int);
     const real pressure_ext = euler_physics->compute_pressure(soln_ext);
@@ -420,7 +420,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     return dissipation;
 
 
-//#endif
+#endif
 
 #if 0
     //entropy dissipative Roe scheme
@@ -544,7 +544,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     return dissipation;
 #endif
 
-#if 0
+//#if 0
     // See Blazek 2015, p.103-105
     // -- Note: Modified calculation of alpha_{3,4} to use 
     //          dVt (jump in tangential velocities);
@@ -687,7 +687,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     }
 
     return numerical_flux_dot_n;
-#endif
+//#endif
 }
 
 // Instantiation

@@ -25,13 +25,17 @@ template<int dim,int spacedim,int chartdim>
 class NonsymmetricCurvedGridManifold : public dealii::ChartManifold<dim,spacedim,chartdim> {
 protected:
     static constexpr double pi = atan(1) * 4.0; ///< PI.
-    const double beta = 1.0/10.0;
+    const double beta = 1.0/20.0;
 
 public:
     /// Constructor.
-    NonsymmetricCurvedGridManifold()
-    : dealii::ChartManifold<dim,spacedim,chartdim>() {};
+    NonsymmetricCurvedGridManifold(const double length_input)
+    : dealii::ChartManifold<dim,spacedim,chartdim>()
+    , length(length_input) {};
     
+    /// One-Dimensional length of domain for scaling.
+    const double length;
+
     /// Templated mapping from square to the nonsymmetric warping.
     template<typename real>
     dealii::Point<spacedim,real> mapping(const dealii::Point<chartdim,real> &chart_point) const;

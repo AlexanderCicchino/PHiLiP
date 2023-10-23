@@ -32,7 +32,7 @@ set conv_num_flux = two_point_flux_with_roe_dissipation
 
 set use_energy = false
 
-set flux_reconstruction = cPlus
+set flux_reconstruction = cDG
 
 set use_inverse_mass_on_the_fly = true
 
@@ -98,7 +98,8 @@ subsection flow_solver
  # set final_time = 0.36975498644
  # set final_time = 0.09243874661
  # set final_time = 0.01
-  set final_time = 2.0
+ # set final_time = 2.0
+  set final_time = 1.0
     subsection grid
         set grid_left_bound = -10.0
       #  set grid_right_bound = 10.0
@@ -108,8 +109,8 @@ subsection flow_solver
     #    set grid_right_bound = 20.0
         set grid_right_bound = 10.0
        # set number_of_grid_elements_per_dimension = 8
-       # set number_of_grid_elements_per_dimension = 16
-        set number_of_grid_elements_per_dimension = 256
+        set number_of_grid_elements_per_dimension = 16
+       # set number_of_grid_elements_per_dimension = 256
        # set number_of_grid_elements_per_dimension = 32
       #  set number_of_grid_elements_per_dimension = 64
      #   set number_of_grid_elements_per_dimension = 10
