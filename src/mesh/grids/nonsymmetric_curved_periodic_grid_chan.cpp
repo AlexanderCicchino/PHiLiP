@@ -45,8 +45,8 @@ void nonsymmetric_curved_grid_chan(
 ////    const double right = 10.0;
 ////    dealii::GridGenerator::hyper_cube (grid, left, right, colorize);
 
-    const double left = -10.0;
-   // const double left = 0.0;
+   // const double left = -10.0;
+    const double left = 0.0;
     const double right = 10.0;
     const unsigned int repititions = n_elements_per_dim;
     const bool colorize = true;
