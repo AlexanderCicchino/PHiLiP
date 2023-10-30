@@ -526,13 +526,61 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_auxiliary_equation
 
         soln_coeff[istate][ishape] = DGBase<dim,real,MeshType>::solution(current_dofs_indices[idof]);
     }
+
+    std::array<std::vector<real>,nstate> soln_at_q;
+    //write the soln at q at the projected entropy variables at q
+    if(this->all_parameters->use_auxiliary_grad_entropy_var){
+        std::array<std::vector<real>,nstate> entropy_var_at_q;
+        for(int istate=0; istate<nstate; istate++){
+            entropy_var_at_q[istate].resize(n_quad_pts);
+        }
+        for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+            std::array<real,nstate> soln_state;
+            for(int istate=0; istate<nstate; istate++){
+                soln_state[istate] = soln_at_q[istate][iquad];
+            }
+            std::array<real,nstate> entropy_var;
+            entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+            for(int istate=0; istate<nstate; istate++){
+                entropy_var_at_q[istate][iquad] = entropy_var[istate];
+            }
+        }
+        //project entropy var
+        std::array<std::vector<real>,nstate> projected_entropy_var;
+        OPERATOR::vol_projection_operator<dim,2*dim> soln_basis_projection_oper(1, poly_degree, this->max_grid_degree);
+        soln_basis_projection_oper.build_1D_volume_operator(this->oneD_fe_collection_1state[poly_degree], this->oneD_quadrature_collection[poly_degree]);
+        for(int istate=0; istate<nstate; ++istate){
+            //allocate
+            projected_entropy_var[istate].resize(n_shape_fns);
+            //solve
+            soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_at_q[istate],
+                                                             projected_entropy_var[istate],
+                                                             soln_basis_projection_oper.oneD_vol_operator);
+        }
+        for(int istate=0; istate<nstate; ++istate){
+            //allocate
+            soln_at_q[istate].resize(n_shape_fns);
+            //solve
+            soln_basis.matrix_vector_mult_1D(projected_entropy_var[istate],
+                                             soln_at_q[istate],
+                                             soln_basis.oneD_vol_operator);
+        }
+    }
+    else{
+        for(int istate=0; istate<nstate; istate++){
+            soln_at_q[istate].resize(n_quad_pts);
+            soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
+                                             soln_basis.oneD_vol_operator);
+        }
+    }
+
     //Interpolate each state to the quadrature points using sum-factorization
     //with the basis functions in each reference direction.
     for(int istate=0; istate<nstate; istate++){
-        std::vector<real> soln_at_q(n_quad_pts);
-        //interpolate soln coeff to volume cubature nodes
-        soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q,
-                                         soln_basis.oneD_vol_operator);
+//        std::vector<real> soln_at_q(n_quad_pts);
+//        //interpolate soln coeff to volume cubature nodes
+//        soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q,
+//                                         soln_basis.oneD_vol_operator);
         //the volume integral for the auxiliary equation is the physical integral of the physical gradient of the solution.
         //That is, we need to physically integrate (we have determinant of Jacobian cancel) the Eq. (12) (with u for chi) in
         //Cicchino, Alexander, et al. "Provably stable flux reconstruction high-order methods on curvilinear elements." Journal of Computational Physics 463 (2022): 111259.
@@ -542,7 +590,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_auxiliary_equation
         for(int idim=0; idim<dim; idim++){
             ref_gradient_basis_fns_times_soln[idim].resize(n_quad_pts);
         }
-        flux_basis.gradient_matrix_vector_mult_1D(soln_at_q, ref_gradient_basis_fns_times_soln,
+        flux_basis.gradient_matrix_vector_mult_1D(soln_at_q[istate], ref_gradient_basis_fns_times_soln,
                                                   flux_basis.oneD_vol_operator,
                                                   flux_basis.oneD_grad_operator);
         //transform the gradient into a physical gradient operator scaled by determinant of metric Jacobian
@@ -736,6 +784,8 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
     (void) neighbor_cell_index;
 
     const unsigned int n_face_quad_pts = this->face_quadrature_collection[poly_degree_int].size();//assume interior cell does the work
+    const unsigned int n_vol_quad_pts_int = this->volume_quadrature_collection[poly_degree_int].size();
+    const unsigned int n_vol_quad_pts_ext = this->volume_quadrature_collection[poly_degree_ext].size();
 
     const unsigned int n_dofs_int = this->fe_collection[poly_degree_int].dofs_per_cell;
     const unsigned int n_dofs_ext = this->fe_collection[poly_degree_ext].dofs_per_cell;
@@ -773,19 +823,102 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
     //Interpolate soln modal coefficients to the facet
     std::array<std::vector<real>,nstate> soln_at_surf_q_int;
     std::array<std::vector<real>,nstate> soln_at_surf_q_ext;
-    for(int istate=0; istate<nstate; ++istate){
-        //allocate
-        soln_at_surf_q_int[istate].resize(n_face_quad_pts);
-        soln_at_surf_q_ext[istate].resize(n_face_quad_pts);
-        //solve soln at facet cubature nodes
-        soln_basis_int.matrix_vector_mult_surface_1D(iface,
-                                                     soln_coeff_int[istate], soln_at_surf_q_int[istate],
-                                                     soln_basis_int.oneD_surf_operator,
-                                                     soln_basis_int.oneD_vol_operator);
-        soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
-                                                     soln_coeff_ext[istate], soln_at_surf_q_ext[istate],
-                                                     soln_basis_ext.oneD_surf_operator,
-                                                     soln_basis_ext.oneD_vol_operator);
+    if(!this->all_parameters->use_auxiliary_grad_entropy_var){
+        for(int istate=0; istate<nstate; ++istate){
+            //allocate
+            soln_at_surf_q_int[istate].resize(n_face_quad_pts);
+            soln_at_surf_q_ext[istate].resize(n_face_quad_pts);
+            //solve soln at facet cubature nodes
+            soln_basis_int.matrix_vector_mult_surface_1D(iface,
+                                                         soln_coeff_int[istate], soln_at_surf_q_int[istate],
+                                                         soln_basis_int.oneD_surf_operator,
+                                                         soln_basis_int.oneD_vol_operator);
+            soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
+                                                         soln_coeff_ext[istate], soln_at_surf_q_ext[istate],
+                                                         soln_basis_ext.oneD_surf_operator,
+                                                         soln_basis_ext.oneD_vol_operator);
+        }
+    }
+    //write the soln at surf q at the projected entropy variables at q
+    else{
+        //get the soln at q in the volume
+        std::array<std::vector<real>,nstate> soln_at_q_int;
+        std::array<std::vector<real>,nstate> soln_at_q_ext;
+        for(int istate=0; istate<nstate; ++istate){
+            //allocate
+            soln_at_q_int[istate].resize(n_vol_quad_pts_int);
+            soln_at_q_ext[istate].resize(n_vol_quad_pts_ext);
+            //solve
+            soln_basis_int.matrix_vector_mult_1D(soln_coeff_int[istate],
+                                                 soln_at_q_int[istate],
+                                                 soln_basis_int.oneD_vol_operator);
+            soln_basis_ext.matrix_vector_mult_1D(soln_coeff_ext[istate],
+                                                 soln_at_q_ext[istate],
+                                                 soln_basis_ext.oneD_vol_operator);
+        }
+        //get the entropy var at q in the volume
+        std::array<std::vector<real>,nstate> entropy_var_at_q_int;
+        std::array<std::vector<real>,nstate> entropy_var_at_q_ext;
+        for(int istate=0; istate<nstate; istate++){
+            entropy_var_at_q_int[istate].resize(n_vol_quad_pts_int);
+            entropy_var_at_q_ext[istate].resize(n_vol_quad_pts_ext);
+        }
+        for(unsigned int iquad=0; iquad<n_vol_quad_pts_int; iquad++){
+            std::array<real,nstate> soln_state;
+            for(int istate=0; istate<nstate; istate++){
+                soln_state[istate] = soln_at_q_int[istate][iquad];
+            }
+            std::array<real,nstate> entropy_var;
+            entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+            for(int istate=0; istate<nstate; istate++){
+                entropy_var_at_q_int[istate][iquad] = entropy_var[istate];
+            }
+        }
+        for(unsigned int iquad=0; iquad<n_vol_quad_pts_ext; iquad++){
+            std::array<real,nstate> soln_state;
+            for(int istate=0; istate<nstate; istate++){
+                soln_state[istate] = soln_at_q_ext[istate][iquad];
+            }
+            std::array<real,nstate> entropy_var;
+            entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+            for(int istate=0; istate<nstate; istate++){
+                entropy_var_at_q_ext[istate][iquad] = entropy_var[istate];
+            }
+        }
+        //project entropy var in the volume into modal coefficients
+        std::array<std::vector<real>,nstate> projected_entropy_var_int;
+        std::array<std::vector<real>,nstate> projected_entropy_var_ext;
+        OPERATOR::vol_projection_operator<dim,2*dim> soln_basis_projection_oper_int(1, poly_degree_int, this->max_grid_degree);
+        soln_basis_projection_oper_int.build_1D_volume_operator(this->oneD_fe_collection_1state[poly_degree_int], this->oneD_quadrature_collection[poly_degree_int]);
+        OPERATOR::vol_projection_operator<dim,2*dim> soln_basis_projection_oper_ext(1, poly_degree_ext, this->max_grid_degree);
+        soln_basis_projection_oper_ext.build_1D_volume_operator(this->oneD_fe_collection_1state[poly_degree_ext], this->oneD_quadrature_collection[poly_degree_ext]);
+        for(int istate=0; istate<nstate; ++istate){
+            //allocate
+            projected_entropy_var_int[istate].resize(n_shape_fns_int);
+            projected_entropy_var_ext[istate].resize(n_shape_fns_ext);
+            //solve
+            soln_basis_projection_oper_int.matrix_vector_mult_1D(entropy_var_at_q_int[istate],
+                                                                 projected_entropy_var_int[istate],
+                                                                 soln_basis_projection_oper_int.oneD_vol_operator);
+            soln_basis_projection_oper_ext.matrix_vector_mult_1D(entropy_var_at_q_ext[istate],
+                                                                 projected_entropy_var_ext[istate],
+                                                                 soln_basis_projection_oper_ext.oneD_vol_operator);
+        }
+        //interpolate the entropy projected modal coefficients to the surface and write as solution at surf q.
+        for(int istate=0; istate<nstate; ++istate){
+            //allocate
+            soln_at_surf_q_int[istate].resize(n_face_quad_pts);
+            soln_at_surf_q_ext[istate].resize(n_face_quad_pts);
+            //solve soln at facet cubature nodes
+            soln_basis_int.matrix_vector_mult_surface_1D(iface,
+                                                         projected_entropy_var_int[istate], soln_at_surf_q_int[istate],
+                                                         soln_basis_int.oneD_surf_operator,
+                                                         soln_basis_int.oneD_vol_operator);
+            soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
+                                                         projected_entropy_var_ext[istate], soln_at_surf_q_ext[istate],
+                                                         soln_basis_ext.oneD_surf_operator,
+                                                         soln_basis_ext.oneD_vol_operator);
+        }
     }
 
     //evaluate physical facet fluxes dot product with physical unit normal scaled by determinant of metric facet Jacobian
@@ -1120,6 +1253,9 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
 
         //Diffusion
         std::array<dealii::Tensor<1,dim,real>,nstate> diffusive_phys_flux;
+        //convert the soln and aux soln from the projected entropy variables
+        if(this->all_parameters->use_auxiliary_grad_entropy_var){
+        }
         //Compute the physical dissipative flux
         diffusive_phys_flux = this->pde_physics_double->dissipative_flux(soln_state, aux_soln_state, current_cell_index);
 

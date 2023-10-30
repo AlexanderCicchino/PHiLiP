@@ -110,6 +110,10 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       dealii::Patterns::Bool(),
                       "Not calculate L2 norm by default (M+K). Otherwise, get L2 norm per iteration.");
 
+    prm.declare_entry("use_auxiliary_grad_entropy_var", "false",
+                      dealii::Patterns::Bool(),
+                      "Auxiliary solution is the gradient of the conservative variables by defualt. If true, then use the gradient of the entropy projected variables.");
+
     prm.declare_entry("use_classical_FR", "false",
                       dealii::Patterns::Bool(),
                       "Not use Classical Flux Reconstruction by default. Otherwise, use Classical Flux Reconstruction.");
@@ -424,6 +428,7 @@ void AllParameters::parse_parameters (dealii::ParameterHandler &prm)
     use_periodic_bc = prm.get_bool("use_periodic_bc");
     use_energy = prm.get_bool("use_energy");
     use_L2_norm = prm.get_bool("use_L2_norm");
+    use_auxiliary_grad_entropy_var = prm.get_bool("use_auxiliary_grad_entropy_var");
     use_classical_FR = prm.get_bool("use_classical_FR");
     sipg_penalty_factor = prm.get_double("sipg_penalty_factor");
     use_invariant_curl_form = prm.get_bool("use_invariant_curl_form");

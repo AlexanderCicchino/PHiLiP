@@ -129,6 +129,9 @@ public:
     ///Flag to use an L2 energy monotonicity test (for FR)
     bool use_L2_norm;
 
+    /// Flag to use the gradient of the entropy projected variables for the auxiliary solution.
+    bool use_auxiliary_grad_entropy_var;
+
     ///Flag to use a Classical ESFR scheme where only the surface is reconstructed
     //The default ESFR scheme is the Nonlinearly Stable FR where the volume is also reconstructed
     bool use_classical_FR;
