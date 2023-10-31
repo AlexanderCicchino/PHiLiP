@@ -129,12 +129,12 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
 
 //    int CFL_flag = 1;
-    double CFL = 0.2;
-    CFL = 0.1;
+//    double CFL = 0.2;
+//    CFL = 0.1;
  //   while(CFL_flag != 0){
        // CFL += 0.01;
-        all_parameters_new.flow_solver_param.courant_friedrichs_lewy_number = CFL;
-        pcout<<"CFL "<<CFL<<std::endl;
+//        all_parameters_new.flow_solver_param.courant_friedrichs_lewy_number = CFL;
+//        pcout<<"CFL "<<CFL<<std::endl;
 
         // Create DG
         pcout<<"about to create DG"<<std::endl;
@@ -357,8 +357,8 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
             dealii::Point<dim> point2;
             for(int idim=0; idim<dim; idim++){
                 repititions[idim] = n_cells_per_dim;
-               // point1[idim] = 0.0;
-                point1[idim] = -10.0;
+                point1[idim] = 0.0;
+               // point1[idim] = -10.0;
                 if(idim==0)
                     point2[idim] = x_right;
                 if(idim==1)

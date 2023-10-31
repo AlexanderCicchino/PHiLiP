@@ -205,11 +205,13 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           dealii::Patterns::Selection(
                           " interpolate_initial_condition_function | "
                           " project_initial_condition_function | "
+                          " set_initial_condition_function_on_solution_nodes | "
                           " read_values_from_file_and_project "),
                           "The method used for applying the initial condition. "
                           "Choices are "
                           " <interpolate_initial_condition_function | "
                           " project_initial_condition_function | " 
+                          " set_initial_condition_function_on_solution_nodes | "
                           " read_values_from_file_and_project>.");
 
         prm.declare_entry("input_flow_setup_filename_prefix", "setup",
@@ -335,6 +337,7 @@ void FlowSolverParam::parse_parameters(dealii::ParameterHandler &prm)
         const std::string apply_initial_condition_method_string = prm.get("apply_initial_condition_method");
         if      (apply_initial_condition_method_string == "interpolate_initial_condition_function") {apply_initial_condition_method = interpolate_initial_condition_function;}
         else if (apply_initial_condition_method_string == "project_initial_condition_function")     {apply_initial_condition_method = project_initial_condition_function;}
+        else if (apply_initial_condition_method_string == "set_initial_condition_function_on_solution_nodes")     {apply_initial_condition_method = set_initial_condition_function_on_solution_nodes;}
         else if (apply_initial_condition_method_string == "read_values_from_file_and_project")      {apply_initial_condition_method = read_values_from_file_and_project;}
         
         input_flow_setup_filename_prefix = prm.get("input_flow_setup_filename_prefix");

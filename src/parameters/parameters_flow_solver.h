@@ -101,6 +101,7 @@ public:
     enum ApplyInitialConditionMethod{
         interpolate_initial_condition_function,
         project_initial_condition_function,
+        set_initial_condition_function_on_solution_nodes,
         read_values_from_file_and_project
         };
     ApplyInitialConditionMethod apply_initial_condition_method; ///< Selected ApplyInitialConditionMethod from the input file

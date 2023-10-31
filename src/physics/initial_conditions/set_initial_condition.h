@@ -38,6 +38,11 @@ private:
         std::shared_ptr< InitialConditionFunction<dim,nstate,double> > &initial_condition_function,
         std::shared_ptr < PHiLiP::DGBase<dim,real> > &dg); 
 
+    /// Write the initial condition directly on Gauss-Legednre-Lobatto nodes.
+    static void set_initial_condition_on_solution_nodes(
+        std::shared_ptr< InitialConditionFunction<dim,nstate,double> > &initial_condition_function,
+        std::shared_ptr < PHiLiP::DGBase<dim,real> > &dg); 
+
     /// Reads values from file and projects
     static void read_values_from_file_and_project(
         std::shared_ptr < PHiLiP::DGBase<dim,real> > &dg,

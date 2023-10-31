@@ -31,6 +31,10 @@ void SetInitialCondition<dim,nstate,real>::set_initial_condition(
         pcout << "projecting the initial condition function... " << std::flush;
         // for curvilinear
         SetInitialCondition<dim,nstate,real>::project_initial_condition(initial_condition_function_input, dg_input);
+    } else if(apply_initial_condition_method == ApplyInitialConditionMethodEnum::set_initial_condition_function_on_solution_nodes) {
+        pcout << "writing the initial condition directly on the solution nodes... " << std::flush;
+        // for curvilinear
+        SetInitialCondition<dim,nstate,real>::set_initial_condition_on_solution_nodes(initial_condition_function_input, dg_input);
     } else if(apply_initial_condition_method == ApplyInitialConditionMethodEnum::read_values_from_file_and_project) {
         const std::string input_filename_prefix = parameters_input->flow_solver_param.input_flow_setup_filename_prefix;
         pcout << "reading values from file prefix  " << input_filename_prefix << " and projecting... " << std::flush;
@@ -96,6 +100,73 @@ void SetInitialCondition<dim,nstate,real>::project_initial_condition(
             vol_projection.matrix_vector_mult_1D(exact_value, sol, vol_projection.oneD_vol_operator);
             for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
                 dg->solution[current_dofs_indices[ishape+istate*n_shape_fns]] = sol[ishape];
+            }
+        }
+    }
+}
+
+template<int dim, int nstate, typename real>
+void SetInitialCondition<dim,nstate,real>::set_initial_condition_on_solution_nodes(
+        std::shared_ptr< InitialConditionFunction<dim,nstate,double> > &initial_condition_function,
+        std::shared_ptr < PHiLiP::DGBase<dim,real> > &dg) 
+{
+    //set the flux nodes as the solution nodes
+    dealii::QGaussLobatto<1> oneD_Gauss_Lobatto (dg->max_degree+1);
+    const unsigned int init_grid_degree = dg->high_order_grid->fe_system.tensor_degree();
+    OPERATOR::mapping_shape_functions<dim,2*dim> mapping_basis(1, init_grid_degree, init_grid_degree);
+    mapping_basis.build_1D_shape_functions_at_grid_nodes(dg->high_order_grid->oneD_fe_system, dg->high_order_grid->oneD_grid_nodes);
+    mapping_basis.build_1D_shape_functions_at_flux_nodes(dg->high_order_grid->oneD_fe_system, oneD_Gauss_Lobatto, dg->oneD_face_quadrature);
+
+    const unsigned int max_dofs_per_cell = dg->dof_handler.get_fe_collection().max_dofs_per_cell();
+    std::vector<dealii::types::global_dof_index> current_dofs_indices(max_dofs_per_cell);
+    auto metric_cell = dg->high_order_grid->dof_handler_grid.begin_active();
+    for (auto current_cell = dg->dof_handler.begin_active(); current_cell!=dg->dof_handler.end(); ++current_cell, ++metric_cell) {
+        if (!current_cell->is_locally_owned()) continue;
+
+        const unsigned int poly_degree = current_cell->active_fe_index();
+        const unsigned int grid_degree = dg->high_order_grid->fe_system.tensor_degree();
+        const dealii::FESystem<dim> &fe_metric = dg->high_order_grid->fe_system;
+        const unsigned int n_metric_dofs = fe_metric.dofs_per_cell;
+        const unsigned int n_grid_nodes  = n_metric_dofs / dim;
+        //Rewrite the high_order_grid->volume_nodes in a way we can use sum-factorization on.
+        //That is, splitting up the vector by the dimension.
+        std::array<std::vector<real>,dim> mapping_support_points;
+        for(int idim=0; idim<dim; idim++){
+            mapping_support_points[idim].resize(n_grid_nodes);
+        }
+        const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<dim>(grid_degree);
+        std::vector<dealii::types::global_dof_index> metric_dof_indices(n_metric_dofs);
+        metric_cell->get_dof_indices (metric_dof_indices);
+        for (unsigned int idof = 0; idof< n_metric_dofs; ++idof) {
+            const real val = (dg->high_order_grid->volume_nodes[metric_dof_indices[idof]]);
+            const unsigned int istate = fe_metric.system_to_component_index(idof).first; 
+            const unsigned int ishape = fe_metric.system_to_component_index(idof).second; 
+            const unsigned int igrid_node = index_renumbering[ishape];
+            mapping_support_points[istate][igrid_node] = val; 
+        }
+        const unsigned int n_dofs_cell = dg->fe_collection[poly_degree].dofs_per_cell;
+        const unsigned int n_shape_fns = n_dofs_cell/nstate;
+        std::array<std::vector<real>,dim> soln_nodes_vol;
+        for(int idim=0; idim<dim; idim++){
+            soln_nodes_vol[idim].resize(n_shape_fns);
+            mapping_basis.matrix_vector_mult_1D(mapping_support_points[idim],
+                                        soln_nodes_vol[idim],
+                                        mapping_basis.mapping_shape_functions_flux_nodes.oneD_vol_operator);
+        }
+
+    
+        current_dofs_indices.resize(n_dofs_cell);
+        current_cell->get_dof_indices (current_dofs_indices);
+        current_dofs_indices.resize(n_dofs_cell);
+        current_cell->get_dof_indices (current_dofs_indices);
+        for(int istate=0; istate<nstate; istate++){
+            for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                dealii::Point<dim,real> soln_node;
+                for(int idim=0; idim<dim; idim++){
+                    soln_node[idim] = soln_nodes_vol[idim][ishape];
+                }
+                double exact_value = initial_condition_function->value(soln_node, istate);
+                dg->solution[current_dofs_indices[ishape+istate*n_shape_fns]] = exact_value;
             }
         }
     }
