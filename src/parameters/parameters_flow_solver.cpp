@@ -246,6 +246,20 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           dealii::Patterns::Bool(),
                           "Flag to adjust the last timestep such that the simulation "
                           "ends exactly at final_time. True by default.");
+
+        prm.enter_subsection("isentropic_vortex");
+        {
+            prm.declare_entry("isentropic_vortex_strength", "0.67255238657",
+                              dealii::Patterns::Double(-dealii::Patterns::Double::max_double_value, dealii::Patterns::Double::max_double_value),
+                              "Strength of Isentropic Vortex.");
+            prm.declare_entry("isentropic_vortex_vel_x", "0.84515425472",
+                              dealii::Patterns::Double(-dealii::Patterns::Double::max_double_value, dealii::Patterns::Double::max_double_value),
+                              "Initial velocity in x-direction of Isentropic Vortex.");
+            prm.declare_entry("isentropic_vortex_vel_y", "0.84515425472",
+                              dealii::Patterns::Double(-dealii::Patterns::Double::max_double_value, dealii::Patterns::Double::max_double_value),
+                              "Initial velocity in y-direction of Isentropic Vortex.");
+        }
+        prm.leave_subsection();
     }
     prm.leave_subsection();
 }
@@ -353,6 +367,14 @@ void FlowSolverParam::parse_parameters(dealii::ParameterHandler &prm)
         prm.leave_subsection();
 
         end_exactly_at_final_time = prm.get_bool("end_exactly_at_final_time");
+
+        prm.enter_subsection("isentropic_vortex");
+        {
+            isentropic_vortex_strength = prm.get_double("isentropic_vortex_strength");
+            isentropic_vortex_vel_x = prm.get_double("isentropic_vortex_vel_x");
+            isentropic_vortex_vel_y = prm.get_double("isentropic_vortex_vel_y");
+        }
+        prm.leave_subsection();
     }
     prm.leave_subsection();
 }

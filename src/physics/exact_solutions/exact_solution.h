@@ -75,10 +75,29 @@ protected:
 public:
     /// Constructor for ExactSolutionFunction_IsentropicVortex
     /** Calls the Function(const unsigned int n_components) constructor in deal.II*/
-    ExactSolutionFunction_IsentropicVortex (double time_compare);
+    ExactSolutionFunction_IsentropicVortex (double time_compare,
+        const Parameters::FlowSolverParam& flow_solver_parameters);
 
     /// Time at which to compute the exact solution
     const double t; 
+
+    /// X starting location of the center of the vortex.
+    const double x_center;
+
+    /// y starting location of the center of the vortex.
+    const double y_center;
+
+    /// Length of the domain.
+    const double length;
+
+    /// Strength of the vortex.
+    const double vortex_strength;
+
+    /// Initial velocity in x-direction.
+    const double u0;
+
+    /// Initial velocity in y-direction.
+    const double v0;
 
     /// Value of the exact solution at a point 
     real value (const dealii::Point<dim,real> &point, const unsigned int istate = 0) const override;

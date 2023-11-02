@@ -293,6 +293,24 @@ public:
     InitialConditionFunction_IsentropicVortex (
             Parameters::AllParameters const *const param);
 
+    /// X starting location of the center of the vortex.
+    const double x_center;
+
+    /// y starting location of the center of the vortex.
+    const double y_center;
+
+    /// Length of the domain.
+    const double length;
+
+    /// Strength of the vortex.
+    const double vortex_strength;
+
+    /// Initial velocity in x-direction.
+    const double u0;
+
+    /// Initial velocity in y-direction.
+    const double v0;
+
     /// Value of initial condition
     real value (const dealii::Point<dim,real> &point, const unsigned int istate = 0) const override;
 

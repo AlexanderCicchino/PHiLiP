@@ -235,10 +235,12 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
                     const double pressure = euler_double->compute_pressure(soln_at_q);
                     const double density = exact_soln_at_q[0];
                     l2error += pow(pressure - pressure_exact, 2) * fe_values_extra.JxW(iquad);
+                   // l2error += abs(pressure - pressure_exact) * fe_values_extra.JxW(iquad);
                     l2error_density += pow(density - soln_at_q[0], 2) * fe_values_extra.JxW(iquad);
                 }
             }
             const double l2error_mpi_sum = std::sqrt(dealii::Utilities::MPI::sum(l2error, mpi_communicator));
+          //  const double l2error_mpi_sum = dealii::Utilities::MPI::sum(l2error, mpi_communicator);
             const double l2error_mpi_sum_density = std::sqrt(dealii::Utilities::MPI::sum(l2error_density, mpi_communicator));
 
             // Convergence table
@@ -341,24 +343,26 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
            // PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, n_refinements);
        //     PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, igrid, true, left, right);
 
-            PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, log(n_cells_per_dim)/log(2.0), true, left, right);
-          //  PHiLiP::Grids::nonsymmetric_curved_grid_chan<dim,Triangulation>(*grid, n_cells_per_dim);
+        //    if(dim==3){
+                PHiLiP::Grids::nonsymmetric_curved_grid<dim,Triangulation>(*grid, log(n_cells_per_dim)/log(2.0), true, left, right);
+         //   }
+         //   else{
+         //       PHiLiP::Grids::nonsymmetric_curved_grid_chan<dim,Triangulation>(*grid, n_cells_per_dim);
+         //   }
         }
         else{
             //if straight
            // PHiLiP::Grids::straight_periodic_cube<dim,Triangulation>(grid, left, right, pow(2.0, igrid));
-            const double x_right = 10.0;
-            const double z_right = 10.0;
-           // const double y_right = 20.0;
-            const double y_right = 10.0;
+            const double x_right = right;
+            const double y_right = right;
+            const double z_right = right;
             const bool colorize = true;
             std::vector<unsigned int> repititions(dim);
             dealii::Point<dim> point1;
             dealii::Point<dim> point2;
             for(int idim=0; idim<dim; idim++){
                 repititions[idim] = n_cells_per_dim;
-                point1[idim] = 0.0;
-               // point1[idim] = -10.0;
+                point1[idim] = left;
                 if(idim==0)
                     point2[idim] = x_right;
                 if(idim==1)

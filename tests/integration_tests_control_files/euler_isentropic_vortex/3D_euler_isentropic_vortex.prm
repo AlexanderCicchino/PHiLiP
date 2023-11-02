@@ -22,10 +22,7 @@ set energy_file = CF_cDG_4x4
 set pde_type = euler
 
 #set conv_num_flux = two_point_flux_with_lax_friedrichs_dissipation
-#set conv_num_flux = central_flux
-#set conv_num_flux = two_point_flux
 set conv_num_flux = two_point_flux_with_roe_dissipation
-#set conv_num_flux = lax_friedrichs
 
 set use_energy = false
 
@@ -74,42 +71,22 @@ end
 
 subsection flow_solver
     set courant_friedrichs_lewy_number = 0.2
-    #set flow_case_type = euler_isentropic_vortex
     set flow_case_type = isentropic_vortex
    # set apply_initial_condition_method = interpolate_initial_condition_function
    # set apply_initial_condition_method = project_initial_condition_function
     set apply_initial_condition_method = set_initial_condition_function_on_solution_nodes
-    set poly_degree = 3
-  #  set final_time = 23.66431913239
-   # set final_time = 10.0
- #   set final_time = 5.0
-   # set final_time = 0.3
+    set poly_degree = 4
     set final_time = 0.1
-   # set final_time = 0.01
-  #  set final_time = 11.83215957
-    #set final_time = 0.0
- #   set final_time = 0.035
-   # set final_time = 1.0
     subsection grid
-       # set grid_left_bound = -10.0
+        set grid_degree = 4.0
         set grid_left_bound = 0.0
         set grid_right_bound = 10.0
-       # set grid_right_bound = -12.5663706144
-      #  set grid_right_bound = 12.5663706144
-      #  set grid_left_bound = -5.0
-      #  set grid_right_bound = 5.0
-       # set grid_left_bound = 0.0
-       # set grid_right_bound = 10.0
-       # set grid_right_bound = 10.0
-        set number_of_grid_elements_per_dimension = 16
-       # set number_of_grid_elements_per_dimension = 64
-     #   set number_of_grid_elements_per_dimension = 16
-       # set number_of_grid_elements_per_dimension = 32
-       # set number_of_grid_elements_per_dimension = 11
-       # set number_of_grid_elements_per_dimension = 4
-    #    set number_of_grid_elements_per_dimension = 10
-       # set number_of_grid_elements_per_dimension = 40
-     #   set number_of_grid_elements_per_dimension = 50
+        set number_of_grid_elements_per_dimension = 8
+    end
+    subsection isentropic_vortex
+        set isentropic_vortex_strength = 0.4
+        set isentropic_vortex_vel_x = 0.0
+        set isentropic_vortex_vel_y = 1.0
     end
 end
 

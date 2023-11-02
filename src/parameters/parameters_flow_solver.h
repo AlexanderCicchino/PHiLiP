@@ -125,6 +125,15 @@ public:
 
     /// Parses input file and sets the variables.
     void parse_parameters (dealii::ParameterHandler &prm);
+
+    /// Vortex strength for isentropic vortex.
+    double isentropic_vortex_strength;
+
+    /// Velocity in x-direction for isentropic vortex.
+    double isentropic_vortex_vel_x;
+
+    /// Velocity in y-direction for isentropic vortex.
+    double isentropic_vortex_vel_y;
 };
 
 } // Parameters namespace
