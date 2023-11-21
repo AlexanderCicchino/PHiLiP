@@ -386,16 +386,19 @@ inline real InitialConditionFunction_IsentropicVortex<dim,nstate,real>
     const double c_1 = x_center;//taken from inputted grid
     const double c_2 = y_center;
     const double P_0 = 1.0/gamma;
+    const double rho_0 = 1.0;
+    const double radius = 1.0;
+   // const double radius = 0.5;
     //location
     const double x = point[0];
     const double y = point[1];
     const double r_square = (y - c_2)*(y - c_2) + (x - c_1)*(x - c_1);
-    const double Pi = Pi_max * exp(0.5 * (1.0 - r_square));
+    const double Pi = Pi_max * exp(0.5 * (1.0 - r_square/(radius*radius)));
 
     //conservative variables
     const real density = pow(1.0 - (gamma-1.0) / 2.0 * Pi * Pi, 1.0 / (gamma-1.0) );
-    const real u = u0 + Pi * ( - (y - c_2));
-    const real v = v0 + Pi * ( (x - c_1));
+    const real u = u0 + sqrt(gamma*P_0/rho_0) * Pi * ( - (y - c_2));
+    const real v = v0 + sqrt(gamma*P_0/rho_0) * Pi * ( (x - c_1));
     const real pressure = P_0 * pow(density, gamma);
     // Primitive
     std::array<real,nstate> soln_primitive;
@@ -470,6 +473,44 @@ real InitialConditionFunction_Zero<dim, nstate, real>
     return 0.0;
 }
 
+// ========================================================
+// Euler Sine Wave
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_EulerSineWave<dim,nstate,real>
+::InitialConditionFunction_EulerSineWave(
+        Parameters::AllParameters const *const param)
+        : InitialConditionFunction<dim,nstate,real>()
+{
+    // Euler object; create using dynamic_pointer_cast and the create_Physics factory
+    // This test should only be used for Euler
+    this->euler_physics = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(
+                Physics::PhysicsFactory<dim,dim+2,double>::create_Physics(param));
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_EulerSineWave<dim,nstate,real>
+::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+    real pi = dealii::numbers::PI;
+    
+    real density;
+    if constexpr(dim == 2){
+        density = 2.0 + 1.0/10.0*sin(pi*(point[0] + point[1]));
+    }
+    else{
+        density = 2.0 + 1.0/10.0*sin(pi*(point[0] + point[1] + point[2]));
+    }
+
+    if(istate == (nstate - 1)){
+        return density * density;
+    }
+    else{
+        return density;
+    }
+
+}
+
 // =========================================================
 // Initial Condition Factory
 // =========================================================
@@ -529,6 +570,8 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
         if constexpr (dim>1 && nstate==dim+2) return std::make_shared<InitialConditionFunction_KHI<dim,nstate,real> > (param);
     } else if (flow_type == FlowCaseEnum::non_periodic_cube_flow) {
         if constexpr (dim==2 && nstate==1)  return std::make_shared<InitialConditionFunction_Zero<dim,nstate,real> > ();
+    } else if (flow_type == FlowCaseEnum::euler_sine_wave) {
+        if constexpr (dim>1 && nstate==dim+2) return std::make_shared<InitialConditionFunction_EulerSineWave<dim,nstate,real> > (param);
     } else {
         std::cout << "Invalid Flow Case Type. You probably forgot to add it to the list of flow cases in initial_condition_function.cpp" << std::endl;
         std::abort();
@@ -560,6 +603,7 @@ template class InitialConditionFunction_TaylorGreenVortex_Isothermal <PHILIP_DIM
 #endif
 #if PHILIP_DIM>1
 template class InitialConditionFunction_IsentropicVortex <PHILIP_DIM, PHILIP_DIM+2, double>;
+template class InitialConditionFunction_EulerSineWave <PHILIP_DIM, PHILIP_DIM+2, double>;
 #endif
 #if PHILIP_DIM==2
 template class InitialConditionFunction_KHI <PHILIP_DIM, PHILIP_DIM+2, double>;

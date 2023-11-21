@@ -2,7 +2,7 @@
 # Number of dimensions
 set dimension = 2
 
-set test_type = euler_isentropic_vortex
+set test_type = euler_sine_wave
 
 set use_weak_form = false
 
@@ -12,11 +12,11 @@ set overintegration = 0
 
 set do_renumber_dofs = false
 
-set use_split_form = false
+set use_split_form = true
 
 set two_point_num_flux_type = Ra
 
-set use_curvilinear_split_form = false
+set use_curvilinear_split_form = true
 
 set energy_file = CF_cDG_4x4
 
@@ -24,12 +24,12 @@ set energy_file = CF_cDG_4x4
 set pde_type = euler
 
 #set conv_num_flux = two_point_flux_with_lax_friedrichs_dissipation
-#set conv_num_flux = two_point_flux_with_roe_dissipation
-set conv_num_flux = roe
+set conv_num_flux = two_point_flux_with_roe_dissipation
+#set conv_num_flux = roe
 
 set use_energy = false
 
-set flux_reconstruction = cSD
+set flux_reconstruction = cDG
 
 set use_inverse_mass_on_the_fly = true
 
@@ -75,24 +75,22 @@ end
 
 subsection flow_solver
     set courant_friedrichs_lewy_number = 0.1
-    set flow_case_type = isentropic_vortex
+    set flow_case_type = euler_sine_wave
 #    set apply_initial_condition_method = interpolate_initial_condition_function
     set apply_initial_condition_method = project_initial_condition_function
    # set apply_initial_condition_method = set_initial_condition_function_on_solution_nodes
     set poly_degree = 4
-  set final_time = 0.1
+  set final_time = 0.01
+ # set final_time = 0.0
  # set final_time = 10.0
     subsection grid
-#        set grid_degree = 4
-        set grid_left_bound = -5.0
-        set grid_right_bound = 5.0
+     #   set grid_degree = 4
+        set grid_left_bound = -1.0
+        set grid_right_bound = 1.0
         set number_of_grid_elements_per_dimension = 16
-    end
-    subsection isentropic_vortex
-        set isentropic_vortex_strength = 0.4
-        set isentropic_vortex_vel_x = 0.0
-        set isentropic_vortex_vel_y = 1.0
     end
 end
 
-
+subsection manufactured solution convergence study
+  set use_manufactured_source_term = true
+end

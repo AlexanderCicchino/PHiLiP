@@ -343,6 +343,9 @@ double EulerTaylorGreen<dim, nstate>::compute_entropy(const std::shared_ptr < DG
     mapping_basis.build_1D_shape_functions_at_grid_nodes(dg->high_order_grid->oneD_fe_system, dg->high_order_grid->oneD_grid_nodes);
     mapping_basis.build_1D_shape_functions_at_flux_nodes(dg->high_order_grid->oneD_fe_system, dg->oneD_quadrature_collection[poly_degree], dg->oneD_face_quadrature);
 
+//    OPERATOR::derivative_p<dim,2*dim> pth_deriv(1, poly_degree, dg->max_grid_degree);
+//    pth_deriv.build_1D_volume_operator(dg->oneD_fe_collection_1state[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
+
     std::vector<dealii::types::global_dof_index> dofs_indices (n_dofs_cell);
 
     std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_double  = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(PHiLiP::Physics::PhysicsFactory<dim,nstate,double>::create_Physics(dg->all_parameters));
@@ -401,15 +404,29 @@ double EulerTaylorGreen<dim, nstate>::compute_entropy(const std::shared_ptr < DG
             soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
                                              soln_basis.oneD_vol_operator);
         }
+//        std::array<std::vector<double>,nstate> pth_deriv_soln_at_q;
+//        for(int istate=0; istate<nstate; istate++){
+//            pth_deriv_soln_at_q[istate].resize(n_quad_pts);
+//            pth_deriv.matrix_vector_mult_1D(soln_coeff[istate], pth_deriv_soln_at_q[istate],
+//                                            pth_deriv.oneD_vol_operator);
+//        }
         for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
             std::array<double,nstate> soln_state;
+//            std::array<double,nstate> pth_deriv_soln_state;
             for(int istate=0; istate<nstate; istate++){
                 soln_state[istate] = soln_at_q[istate][iquad];
+//                pth_deriv_soln_state[istate] = pth_deriv_soln_at_q[istate][iquad];
+//                pcout<<"pth deriv "<<pth_deriv_soln_state[istate]<<std::endl;
             }
             const double density = soln_state[0];
             const double pressure = euler_double->compute_pressure(soln_state);
             const double entropy = log(pressure) - euler_double->gam * log(density);
             const double quadrature_entropy = -density*entropy/euler_double->gamm1;
+//            const double density_p = pth_deriv_soln_state[0];
+//            const double pressure_p = euler_double->compute_pressure(pth_deriv_soln_state);
+//            const double entropy_p = log(pressure_p) - euler_double->gam * log(density_p);
+//            const double quadrature_entropy = -density*entropy/euler_double->gamm1
+//                                            - (density_p>1e-13) ? density_p*entropy_p/euler_double->gamm1 : 0.0;
 
             entropy_fn += quadrature_entropy * quad_weights[iquad] * metric_oper.det_Jac_vol[iquad];
 
@@ -590,8 +607,9 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
                 InitialConditionFactory<dim,nstate,double>::create_InitialConditionFunction(&all_parameters_new);
     SetInitialCondition<dim,nstate,double>::set_initial_condition(initial_condition_function, dg, &all_parameters_new);
 
-    const unsigned int n_global_active_cells2 = grid->n_global_active_cells();
-    double delta_x = (right-left)/pow(n_global_active_cells2,1.0/dim)/(poly_degree+1.0);
+//    const unsigned int n_global_active_cells2 = grid->n_global_active_cells();
+//    double delta_x = (right-left)/pow(n_global_active_cells2,1.0/dim)/(poly_degree+1.0);
+    double delta_x = (right-left)/(pow(2.0,n_refinements)*(poly_degree+1.0));
     pcout<<" delta x "<<delta_x<<std::endl;
 
     all_parameters_new.ode_solver_param.initial_time_step =  get_timestep(dg,poly_degree,delta_x);
@@ -611,6 +629,7 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     const double initial_energy_mpi = (dealii::Utilities::MPI::sum(initial_energy, mpi_communicator));
     const double initial_entropy = compute_entropy(dg, poly_degree);
     const double initial_entropy_mpi = (dealii::Utilities::MPI::sum(initial_entropy, mpi_communicator));
+    pcout<<"initial entropy "<<initial_entropy_mpi<<std::endl;
     //create a file to wirte entorpy and energy results to
     std::ofstream myfile (all_parameters_new.energy_file + ".gpl"  , std::ios::trunc);
     //loop over time
@@ -637,6 +656,7 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
         const double current_change_energy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[1], mpi_communicator);
         //write to the file the change in entropy mpi
         myfile<<ode_solver->current_time<<" "<< current_change_entropy_mpi <<std::endl;
+        std::cout << std::setprecision(16) << std::fixed;
         pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy_mpi<< std::endl;
         pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_energy_mpi<< std::endl;
         //check if change in entropy is conserved at machine precision

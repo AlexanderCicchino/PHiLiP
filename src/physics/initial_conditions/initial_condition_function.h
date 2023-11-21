@@ -368,6 +368,31 @@ public:
     real value(const dealii::Point<dim,real> &point, const unsigned int istate = 0) const override;
 };
 
+/// Initial Condition Function: Euler Sine Wave 
+template <int dim, int nstate, typename real>
+class InitialConditionFunction_EulerSineWave
+        : public InitialConditionFunction<dim,nstate,real>
+{
+protected:
+    using dealii::Function<dim,real>::value; ///< dealii::Function we are templating on
+
+public:
+    /// Constructor for InitialConditionFunction_EulerSineWave
+    /** Setup from Gassner et al. 2016 section 4.1. 
+     */
+    InitialConditionFunction_EulerSineWave (
+            Parameters::AllParameters const *const param);
+
+    /// Value of initial condition
+    real value (const dealii::Point<dim,real> &point, const unsigned int istate = 0) const override;
+
+protected:
+
+    // Euler physics pointer. Used to convert primitive to conservative.
+    std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_physics;
+
+};
+
 /// Initial condition function factory
 template <int dim, int nstate, typename real>
 class InitialConditionFactory

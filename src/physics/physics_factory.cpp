@@ -110,7 +110,10 @@ PhysicsFactory<dim,nstate,real>
                 parameters_input->euler_param.angle_of_attack,
                 parameters_input->euler_param.side_slip_angle,
                 manufactured_solution_function,
-                parameters_input->two_point_num_flux_type);
+                parameters_input->two_point_num_flux_type,
+                false,
+                false,
+                parameters_input->test_type);
         }
     } else if (pde_type == PDE_enum::mhd) {
         if constexpr (nstate == 8) 

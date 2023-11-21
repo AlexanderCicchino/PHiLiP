@@ -42,7 +42,7 @@ std::shared_ptr<Triangulation> PeriodicCubeFlow<dim,nstate>::generate_grid() con
 template <int dim, int nstate>
 void PeriodicCubeFlow<dim,nstate>::display_grid_parameters() const
 {
-    const std::string grid_type_string = "straight_periodic_cube";
+    const std::string grid_type_string = use_curvilinear_grid ? "nonsymmetric_curvilinear_periodic_cube" : "straight_periodic_cube";
     // Display the information about the grid
     this->pcout << "- Grid type: " << grid_type_string << std::endl;
     this->pcout << "- - Grid degree: " << this->all_param.flow_solver_param.grid_degree << std::endl;

@@ -44,6 +44,7 @@
 #include "homogeneous_isotropic_turbulence_initialization_check.h"
 #include "khi_robustness.h"
 #include "euler_isentropic_vortex.h"
+#include "euler_sine_wave.h"
 
 namespace PHiLiP {
 namespace Tests {
@@ -304,6 +305,8 @@ std::unique_ptr< TestsBase > TestsFactory<dim,nstate,MeshType>
         if constexpr (dim==2 && nstate==dim+2)  return std::make_unique<KHIRobustness<dim, nstate>>(parameters_input, parameter_handler_input);
      } else if(test_type == Test_enum::euler_isentropic_vortex) {
         if constexpr (dim>1 && nstate==dim+2)  return std::make_unique<EulerIsentropicVortex<dim, nstate>>(parameters_input);
+     } else if(test_type == Test_enum::euler_sine_wave) {
+        if constexpr (dim>1 && nstate==dim+2)  return std::make_unique<EulerSineWave<dim, nstate>>(parameters_input);
     } else {
         std::cout << "Invalid test. You probably forgot to add it to the list of tests in tests.cpp" << std::endl;
         std::abort();

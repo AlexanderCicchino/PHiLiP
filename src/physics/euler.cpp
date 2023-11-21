@@ -20,7 +20,8 @@ Euler<dim,nstate,real>::Euler (
     std::shared_ptr< ManufacturedSolutionFunction<dim,real> > manufactured_solution_function,
     const two_point_num_flux_enum                             two_point_num_flux_type_input,
     const bool                                                has_nonzero_diffusion,
-    const bool                                                has_nonzero_physical_source)
+    const bool                                                has_nonzero_physical_source,
+    const Parameters::AllParameters::TestType                 parameters_test)
     : PhysicsBase<dim,nstate,real>(parameters_input, has_nonzero_diffusion,has_nonzero_physical_source,manufactured_solution_function)
     , ref_length(ref_length)
     , gam(gamma_gas)
@@ -34,6 +35,7 @@ Euler<dim,nstate,real>::Euler (
     , pressure_inf(1.0/(gam*mach_inf_sqr))
     , entropy_inf(pressure_inf*pow(density_inf,-gam))
     , two_point_num_flux_type(two_point_num_flux_type_input)
+    , test_type(parameters_test)
     //, internal_energy_inf(1.0/(gam*(gam-1.0)*mach_inf_sqr)) 
     // Note: Eq.(3.11.18) has a typo in internal_energy_inf expression, mach_inf_sqr should be in denominator. 
 {
@@ -81,9 +83,9 @@ std::array<real,nstate> Euler<dim,nstate,real>
 ::source_term (
     const dealii::Point<dim,real> &pos,
     const std::array<real,nstate> &/*conservative_soln*/,
-    const real /*current_time*/) const
+    const real current_time) const
 {
-    std::array<real,nstate> source_term = convective_source_term(pos);
+    std::array<real,nstate> source_term = convective_source_term(pos, current_time);
     return source_term;
 }
 
@@ -121,29 +123,57 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim,nstate,real>
 template <int dim, int nstate, typename real>
 std::array<real,nstate> Euler<dim,nstate,real>
 ::convective_source_term (
-    const dealii::Point<dim,real> &pos) const
+    const dealii::Point<dim,real> &pos,
+    const real current_time) const
 {
-    const std::array<real,nstate> manufactured_solution = get_manufactured_solution_value(pos);
-    const std::array<dealii::Tensor<1,dim,real>,nstate> manufactured_solution_gradient = get_manufactured_solution_gradient(pos);
-
-    dealii::Tensor<1,nstate,real> convective_flux_divergence;
-    for (int d=0;d<dim;d++) {
-        dealii::Tensor<1,dim,real> normal;
-        normal[d] = 1.0;
-        const dealii::Tensor<2,nstate,real> jacobian = convective_flux_directional_jacobian(manufactured_solution, normal);
-
-        //convective_flux_divergence += jacobian*manufactured_solution_gradient[d];
-        for (int sr = 0; sr < nstate; ++sr) {
-            real jac_grad_row = 0.0;
-            for (int sc = 0; sc < nstate; ++sc) {
-                jac_grad_row += jacobian[sr][sc]*manufactured_solution_gradient[sc][d];
-            }
-            convective_flux_divergence[sr] += jac_grad_row;
-        }
-    }
+    using TestType = Parameters::AllParameters::TestType;
     std::array<real,nstate> convective_source_term;
-    for (int s=0; s<nstate; s++) {
-        convective_source_term[s] = convective_flux_divergence[s];
+
+    if(this->test_type == TestType::euler_sine_wave){
+        const double pi = atan(1) * 4.0; ///< PI.
+        const double c1 = pi/10.0;
+        const double c2 = -pi/5.0 + 1.0/20.0*pi*(1.0+5.0*this->gam);
+        const double c3 = pi/100.0*(this->gam-1.0);
+        const double c4 = 1.0/20.0*(-16.0*pi+pi*(9.0+15.0*this->gam));
+        const double c5 = 1.0/100.0*(3.0*pi*this->gam-2.0*pi);
+        real position;
+        if(dim == 1)
+            position = pos[0]-2.0*current_time;
+        if(dim == 2)
+            position = pos[0]+pos[1]-2.0*current_time;
+        else
+            position = pos[0]+pos[1]+pos[2]-2.0*current_time;
+
+        convective_source_term[0] = c1 * cos(pi*position);
+        for(int idim=0; idim<dim; idim++){
+           // convective_source_term[idim+1] = c2*cos(pi*position) + c3 * cos(2.0*pi*position);
+            convective_source_term[idim+1] = c2*cos(pi*position) + c3 * sin(2.0*pi*position);
+        }
+       // convective_source_term[nstate-1] = c4*cos(pi*position) + c5 * cos(2.0*pi*position);
+        convective_source_term[nstate-1] = c4*cos(pi*position) + c5 * sin(2.0*pi*position);
+    }
+    else{
+        const std::array<real,nstate> manufactured_solution = get_manufactured_solution_value(pos);
+        const std::array<dealii::Tensor<1,dim,real>,nstate> manufactured_solution_gradient = get_manufactured_solution_gradient(pos);
+         
+        dealii::Tensor<1,nstate,real> convective_flux_divergence;
+        for (int d=0;d<dim;d++) {
+            dealii::Tensor<1,dim,real> normal;
+            normal[d] = 1.0;
+            const dealii::Tensor<2,nstate,real> jacobian = convective_flux_directional_jacobian(manufactured_solution, normal);
+         
+            //convective_flux_divergence += jacobian*manufactured_solution_gradient[d];
+            for (int sr = 0; sr < nstate; ++sr) {
+                real jac_grad_row = 0.0;
+                for (int sc = 0; sc < nstate; ++sc) {
+                    jac_grad_row += jacobian[sr][sc]*manufactured_solution_gradient[sc][d];
+                }
+                convective_flux_divergence[sr] += jac_grad_row;
+            }
+        }
+        for (int s=0; s<nstate; s++) {
+            convective_source_term[s] = convective_flux_divergence[s];
+        }
     }
 
     return convective_source_term;

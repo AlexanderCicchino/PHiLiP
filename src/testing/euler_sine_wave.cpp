@@ -1,6 +1,6 @@
 #include <fstream>
 #include "dg/dg_factory.hpp"
-#include "euler_isentropic_vortex.h"
+#include "euler_sine_wave.h"
 #include "physics/initial_conditions/set_initial_condition.h"
 #include "physics/initial_conditions/initial_condition_function.h"
 #include "mesh/grids/straight_periodic_cube.hpp"
@@ -17,13 +17,13 @@ namespace PHiLiP {
 namespace Tests {
 
 template <int dim, int nstate>
-EulerIsentropicVortex<dim, nstate>::EulerIsentropicVortex(const Parameters::AllParameters *const parameters_input)
+EulerSineWave<dim, nstate>::EulerSineWave(const Parameters::AllParameters *const parameters_input)
     : TestsBase::TestsBase(parameters_input)
 {}
 
 
 template<int dim, int nstate>
-double EulerIsentropicVortex<dim, nstate>::compute_kinetic_energy(std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const
+double EulerSineWave<dim, nstate>::compute_kinetic_energy(std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const
 {
     //returns the energy in the L2-norm (physically relevant)
     int overintegrate = 10 ;
@@ -67,7 +67,7 @@ double EulerIsentropicVortex<dim, nstate>::compute_kinetic_energy(std::shared_pt
 }
 
 template<int dim, int nstate>
-double EulerIsentropicVortex<dim, nstate>::get_timestep(std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree, const double delta_x) const
+double EulerSineWave<dim, nstate>::get_timestep(std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree, const double delta_x) const
 {
      //get local CFL
     const unsigned int n_dofs_cell = dg->fe_collection[poly_degree].dofs_per_cell;
@@ -120,7 +120,7 @@ double EulerIsentropicVortex<dim, nstate>::get_timestep(std::shared_ptr < DGBase
 }
 
 template <int dim, int nstate>
-void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel::distributed::Triangulation<dim>> &grid,
+void EulerSineWave<dim, nstate>::solve(std::shared_ptr<dealii::parallel::distributed::Triangulation<dim>> &grid,
                                                const unsigned int poly_degree, const unsigned int grid_degree,
                                                const double left, const double right,
                                                const unsigned int igrid, const unsigned int igrid_start, const unsigned int n_grids,
@@ -150,6 +150,8 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
         dg->solution.update_ghost_values();
         const unsigned int n_global_active_cells2 = grid->n_global_active_cells();
         double delta_x = (right-left)/pow(n_global_active_cells2,1.0/dim)/(poly_degree+1.0);
+        //const unsigned int n_cells_per_dim = pow(2.0,igrid)*n_cells_start;
+        //double delta_x = (right-left)/n_cells_per_dim/(poly_degree+1.0);
         pcout<<" delta x "<<delta_x<<std::endl;
          
         all_parameters_new.ode_solver_param.initial_time_step =  get_timestep(dg,poly_degree,delta_x);
@@ -157,11 +159,14 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
          pcout<<"got timestep"<<std::endl;
         std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
         const double finalTime = all_parameters_new.flow_solver_param.final_time;
+       // const double finalTime = 2.0*all_parameters_new.ode_solver_param.initial_time_step;
+        std::cout<<"Final time "<<finalTime<<std::endl;
 
         std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_double  = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(PHiLiP::Physics::PhysicsFactory<dim,nstate,double>::create_Physics(dg->all_parameters));
         ode_solver->current_iteration = 0;
         ode_solver->allocate_ode_system();
         pcout<<"allocated ode system"<<std::endl;
+
 
         while(ode_solver->current_time < finalTime){
             const double time_step =  get_timestep(dg,poly_degree, delta_x);
@@ -173,6 +178,7 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
             }
             if(ode_solver->current_iteration%all_parameters_new.ode_solver_param.print_iteration_modulo==0)
                 pcout<<"time step "<<time_step<<" current time "<<ode_solver->current_time<<std::endl;
+           // pcout<<"doing step "<<time_step<<" current time "<<ode_solver->current_time<<std::endl;
             ode_solver->step_in_time(dt, false);
             ode_solver->current_iteration += 1;
             const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
@@ -181,6 +187,7 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
                 dg->output_results_vtk(file_number);
             }
         }
+        pcout<<" current time end "<<ode_solver->current_time<<std::endl;
 
            // ode_solver->advance_solution_time(finalTime);
             const unsigned int n_global_active_cells = grid->n_global_active_cells();
@@ -225,21 +232,18 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
                         soln_at_q[istate] += dg->solution[dofs_indices[idof]] * fe_values_extra.shape_value_component(idof, iquad, istate);
                     }
                     const dealii::Point<dim> qpoint = (fe_values_extra.quadrature_point(iquad));
-                    if((qpoint[1] <= finalTime + 1.0 && qpoint[1]>=-1.0 + finalTime)
-                        && (qpoint[0] <=  1.0 && qpoint[0]>=-1.0)){
-                        //Compute Lp error for istate=0, which is density
-                        std::array<double,nstate> exact_soln_at_q;
-                        for (unsigned int istate = 0; istate < nstate; ++istate) { 
-                            exact_soln_at_q[istate] = exact_solution_function->value(qpoint, istate);
-                        }
-                        const double pressure_exact = euler_double->compute_pressure(exact_soln_at_q);
-                         
-                        const double pressure = euler_double->compute_pressure(soln_at_q);
-                        const double density = exact_soln_at_q[0];
-                        l2error += pow(pressure - pressure_exact, 2) * fe_values_extra.JxW(iquad);
-                        // l2error += abs(pressure - pressure_exact) * fe_values_extra.JxW(iquad);
-                        l2error_density += pow(density - soln_at_q[0], 2) * fe_values_extra.JxW(iquad);
+                    //Compute Lp error for istate=0, which is density
+                    std::array<double,nstate> exact_soln_at_q;
+                    for (unsigned int istate = 0; istate < nstate; ++istate) { 
+                        exact_soln_at_q[istate] = exact_solution_function->value(qpoint, istate);
                     }
+                    const double pressure_exact = euler_double->compute_pressure(exact_soln_at_q);
+                     
+                    const double pressure = euler_double->compute_pressure(soln_at_q);
+                    const double density = exact_soln_at_q[0];
+                    l2error += pow(pressure - pressure_exact, 2) * fe_values_extra.JxW(iquad);
+                    // l2error += abs(pressure - pressure_exact) * fe_values_extra.JxW(iquad);
+                    l2error_density += pow(density - soln_at_q[0], 2) * fe_values_extra.JxW(iquad);
                 }
             }
             const double l2error_mpi_sum = std::sqrt(dealii::Utilities::MPI::sum(l2error, mpi_communicator));
@@ -249,7 +253,7 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
             // Convergence table
             const double dx = 1.0/pow(n_dofs/nstate,(1.0/dim));
             grid_size[igrid-igrid_start] = dx;
-            soln_error[igrid-igrid_start] = l2error_mpi_sum;
+            soln_error[igrid-igrid_start] = l2error_mpi_sum_density;
 
             std::cout << std::setprecision(16) << std::fixed;
             pcout << " Grid size h: " << dx 
@@ -312,7 +316,7 @@ void EulerIsentropicVortex<dim, nstate>::solve(std::shared_ptr<dealii::parallel:
 }
 
 template <int dim, int nstate>
-int EulerIsentropicVortex<dim, nstate>::run_test() const
+int EulerSineWave<dim, nstate>::run_test() const
 {
 
     using real = double;
@@ -327,6 +331,7 @@ int EulerIsentropicVortex<dim, nstate>::run_test() const
     const unsigned int igrid_start = 0;
     const unsigned int n_grids = 4;
 
+pcout<<"left "<<left<<" right "<<right<<std::endl;
 pcout<<"igrd start is "<<igrid_start<<std::endl;
 
     for(unsigned int igrid = igrid_start; igrid<n_grids; igrid++){
@@ -339,6 +344,7 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
         pcout<<"got triangulation "<<std::endl;
 
         const unsigned int n_cells_per_dim = pow(2.0,igrid)*n_cells_start;
+       // const unsigned int n_cells_per_dim = 2.0*pow(2.0,igrid) + n_cells_start;
 
         const unsigned int grid_degree = all_parameters->use_curvilinear_grid ? poly_degree : 1;
         if(all_parameters->use_curvilinear_grid){
@@ -399,7 +405,7 @@ pcout<<"igrd start is "<<igrid_start<<std::endl;
 }
 
 #if PHILIP_DIM>1
-    template class EulerIsentropicVortex <PHILIP_DIM,PHILIP_DIM+2>;
+    template class EulerSineWave <PHILIP_DIM,PHILIP_DIM+2>;
 #endif
 
 } // Tests namespace

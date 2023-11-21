@@ -99,7 +99,8 @@ public:
         std::shared_ptr< ManufacturedSolutionFunction<dim,real> > manufactured_solution_function = nullptr,
         const two_point_num_flux_enum                             two_point_num_flux_type = two_point_num_flux_enum::KG,
         const bool                                                has_nonzero_diffusion = false,
-        const bool                                                has_nonzero_physical_source = false);
+        const bool                                                has_nonzero_physical_source = false,
+        const Parameters::AllParameters::TestType                 parameters_test = Parameters::AllParameters::TestType::run_control);
 
     /// Destructor
     // virtual ~Euler() =0;
@@ -139,6 +140,8 @@ public:
      */
     dealii::Tensor<1,dim,double> velocities_inf; // should be const
 
+    ///Allows Euler to distinguish between different unsteady test types.
+    const Parameters::AllParameters::TestType test_type; ///< Pointer to all parameters
 
     // dealii::Tensor<1,dim,double> compute_velocities_inf() const;
 
@@ -199,7 +202,8 @@ public:
 
     /// Convective flux contribution to the source term
     std::array<real,nstate> convective_source_term (
-        const dealii::Point<dim,real> &pos) const;
+        const dealii::Point<dim,real> &pos,
+        const real current_time) const;
 
 protected:
     /// Check positive quantity and modify it according to handle_non_physical_result()

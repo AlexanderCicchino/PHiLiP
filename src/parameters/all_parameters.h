@@ -194,6 +194,7 @@ public:
         khi_robustness,
         homogeneous_isotropic_turbulence_initialization_check,
         euler_isentropic_vortex,
+        euler_sine_wave,
     };
     /// Store selected TestType from the input file.
     TestType test_type;

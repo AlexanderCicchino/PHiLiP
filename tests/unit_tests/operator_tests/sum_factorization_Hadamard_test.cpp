@@ -67,7 +67,7 @@ int main (int argc, char * argv[])
 
     bool different = false;
     bool different_mass = false;
-    const unsigned int poly_max = 16;
+    const unsigned int poly_max = 20;
     const unsigned int poly_min = 2;
     std::array<clock_t,poly_max> time_diff;
     std::array<clock_t,poly_max> time_diff_sum;
@@ -92,7 +92,7 @@ int main (int argc, char * argv[])
 
         std::vector<double> ones(n_quad_pts_1D, 1.0);//to be used as the weights
 
-        for(unsigned int ielement=0; ielement<10; ielement++){//do several loops as if there were elements
+        for(unsigned int ielement=0; ielement<100; ielement++){//do several loops as if there were elements
 
             std::vector<real> sol_hat(n_dofs);
             for(unsigned int idof=0; idof<n_dofs; idof++){
@@ -111,7 +111,7 @@ int main (int argc, char * argv[])
             dealii::FullMatrix<real> basis_dim(n_quad_pts);//solution of A*u with sum-factorization
             basis_dim = basis.tensor_product(basis.oneD_grad_operator, basis.oneD_vol_operator, basis.oneD_vol_operator);
              
-            //Compute A*u normally
+            //Compute A \circ u normally
             clock_t tfirst;
             tfirst = clock();
             if(dim==2){
@@ -122,7 +122,6 @@ int main (int argc, char * argv[])
                     }
                 }
             }
-            std::cout<<std::endl<<std::endl;
             if(dim==3){
                 for(unsigned int idof=0; idof< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof++){
                     for(unsigned int idof2=0; idof2< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof2++){
@@ -136,7 +135,7 @@ int main (int argc, char * argv[])
             else
                 time_diff[poly_degree] += clock() - tfirst;
              
-            //compute A*u using sum-factorization
+            //compute A \circ u using sum-factorization
             time_t tsum;
             tsum = clock();
             basis.two_pt_flux_Hadamard_product(sol_hat_mat, sol_1D, basis.oneD_grad_operator, ones, 0);
@@ -159,6 +158,15 @@ int main (int argc, char * argv[])
             std::vector<real> sol_deriv_time(n_quad_pts);//solution of A*u with sum-factorization
             time_t tderiv_sum_cons;
             tderiv_sum_cons = clock();
+            //do it for all 3 directions
+            basis.matrix_vector_mult(sol_hat, sol_deriv_time, 
+                                     basis.oneD_grad_operator,
+                                     basis.oneD_vol_operator,
+                                     basis.oneD_vol_operator);
+            basis.matrix_vector_mult(sol_hat, sol_deriv_time, 
+                                     basis.oneD_vol_operator,
+                                     basis.oneD_grad_operator,
+                                     basis.oneD_vol_operator);
             basis.matrix_vector_mult(sol_hat, sol_deriv_time, 
                                      basis.oneD_vol_operator,
                                      basis.oneD_vol_operator,
@@ -182,7 +190,6 @@ int main (int argc, char * argv[])
                     }
                 }
             }
-            std::cout<<std::endl<<std::endl;
             if(dim==3){
                 for(unsigned int idof=0; idof< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof++){
                     for(unsigned int idof2=0; idof2< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof2++){
@@ -228,7 +235,6 @@ int main (int argc, char * argv[])
                         }
                     }
                 }
-                std::cout<<std::endl<<std::endl;
                 if(dim==3){
                     for(unsigned int idof=0; idof< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof++){
                         for(unsigned int idof2=0; idof2< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof2++){
@@ -237,7 +243,6 @@ int main (int argc, char * argv[])
                         }
                     }
                 }
-                std::cout<<std::endl<<std::endl;
                 if(ielement==0)
                     time_diff_dir3[poly_degree] = clock() - tfirst_dir3;
                 else
