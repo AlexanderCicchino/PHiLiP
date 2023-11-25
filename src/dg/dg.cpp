@@ -492,6 +492,7 @@ void DGBase<dim,real,MeshType>::time_scale_solution_update ( dealii::LinearAlgeb
         const dealii::types::global_dof_index cell_index = cell->active_cell_index();
 
         const real dt = CFL * max_dt_cell[cell_index];
+        this->pcout<<" pseudo time dt "<<dt<<std::endl;
         for (unsigned int idof = 0; idof < n_dofs_cell; ++idof) {
             const dealii::types::global_dof_index dof_index = dofs_indices[idof];
             solution_update[dof_index] *= dt;
@@ -1545,6 +1546,7 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
 
     right_hand_side.compress(dealii::VectorOperation::add);
     right_hand_side.update_ghost_values();
+
     if ( compute_dRdW ) {
         system_matrix.compress(dealii::VectorOperation::add);
 
