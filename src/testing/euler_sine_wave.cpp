@@ -128,13 +128,13 @@ void EulerSineWave<dim, nstate>::solve(std::shared_ptr<dealii::parallel::distrib
 {
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
 
-//    int CFL_flag = 1;
-//    double CFL = 0.2;
-//    CFL = 0.1;
- //   while(CFL_flag != 0){
-       // CFL += 0.01;
-//        all_parameters_new.flow_solver_param.courant_friedrichs_lewy_number = CFL;
-//        pcout<<"CFL "<<CFL<<std::endl;
+    int CFL_flag = 1;
+    double CFL = 0.2;
+    CFL = 0.1;
+    while(CFL_flag != 0){
+        CFL += 0.01;
+        all_parameters_new.flow_solver_param.courant_friedrichs_lewy_number = CFL;
+        pcout<<"CFL "<<CFL<<std::endl;
 
         // Create DG
         pcout<<"about to create DG"<<std::endl;
@@ -304,14 +304,27 @@ void EulerSineWave<dim, nstate>::solve(std::shared_ptr<dealii::parallel::distrib
         }
 #endif
 
-//        pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.7448712945470424)<<std::endl;
-//        if(abs(l2error_mpi_sum-0.7448712945470424)>=1e-3 ||abs(l2error_mpi_sum_density-0.5927959282730064)>=1e-3){
-//            pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.7448712945470424)<<std::endl;
-//            pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.5927959282730064)<<std::endl;
-//            CFL_flag = 0;
-//            pcout<<"CFL max "<<CFL-0.01<<std::endl;
-//        }
-   // }
+        //DG GL
+        using FR_enum = Parameters::AllParameters::Flux_Reconstruction;
+        if(all_parameters_new.flux_reconstruction_type == FR_enum::cPlus){
+            pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0001789131971733)<<std::endl;
+            if(abs(l2error_mpi_sum-0.0000791934625115)>=1e-9 ||abs(l2error_mpi_sum_density-0.0001789131971733)>=1e-9){
+                pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.0000791934625115)<<std::endl;
+                pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0001789131971733)<<std::endl;
+                CFL_flag = 0;
+                pcout<<"CFL max "<<CFL-0.01<<std::endl;
+            }
+        }
+        if(all_parameters_new.flux_reconstruction_type == FR_enum::cDG){
+            pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0000765073031185)<<std::endl;
+            if(abs(l2error_mpi_sum-0.0000260756338658 )>=1e-9 ||abs(l2error_mpi_sum_density-0.0000765073031185)>=1e-9){
+                pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.0000260756338658 )<<std::endl;
+                pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0000765073031185)<<std::endl;
+                CFL_flag = 0;
+                pcout<<"CFL max "<<CFL-0.01<<std::endl;
+            }
+        }
+    }
         
 }
 
