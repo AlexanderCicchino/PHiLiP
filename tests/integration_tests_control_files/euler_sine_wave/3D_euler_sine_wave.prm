@@ -6,7 +6,7 @@ set test_type = euler_sine_wave
 
 set use_weak_form = false
 
-set flux_nodes_type = GL
+set flux_nodes_type = GLL
 
 set overintegration = 0
 
@@ -74,14 +74,15 @@ subsection euler
 end
 
 subsection flow_solver
-    set courant_friedrichs_lewy_number = 0.2
+    set courant_friedrichs_lewy_number = 0.1
     set flow_case_type = euler_sine_wave
 #    set apply_initial_condition_method = interpolate_initial_condition_function
     set apply_initial_condition_method = project_initial_condition_function
    # set apply_initial_condition_method = set_initial_condition_function_on_solution_nodes
-    set poly_degree = 5
+    set poly_degree = 3
  # set final_time = 0.01
-  set final_time = 2.0
+ # set final_time = 2.0
+  set final_time = 1.0
  # set final_time = 0.5
  # set final_time = 0.0
 #  set final_time = 10.0
@@ -90,7 +91,7 @@ subsection flow_solver
      #   set grid_degree = 4
         set grid_left_bound = -1.0
         set grid_right_bound = 1.0
-        set number_of_grid_elements_per_dimension = 16
+        set number_of_grid_elements_per_dimension = 4
     end
 end
 

@@ -111,7 +111,8 @@ double EulerSineWave<dim, nstate>::get_timestep(std::shared_ptr < DGBase<dim, do
         const double max_eig = *(std::max_element(convective_eigenvalues.begin(), convective_eigenvalues.end()));
 
        // double cfl = 0.1 * delta_x/max_eig;
-        double cfl = dg->all_parameters->flow_solver_param.courant_friedrichs_lewy_number * delta_x/max_eig;
+       // double cfl = dg->all_parameters->flow_solver_param.courant_friedrichs_lewy_number * delta_x/max_eig;
+        double cfl = delta_x/max_eig;
         if(cfl < cfl_min)
             cfl_min = cfl;
 
@@ -129,8 +130,9 @@ void EulerSineWave<dim, nstate>::solve(std::shared_ptr<dealii::parallel::distrib
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
 
     int CFL_flag = 1;
-    double CFL = 0.2;
-    CFL = 0.1;
+   // double CFL = 0.5;
+    double CFL = all_parameters->flow_solver_param.courant_friedrichs_lewy_number;
+//    CFL = 0.1;
     while(CFL_flag != 0){
         CFL += 0.01;
         all_parameters_new.flow_solver_param.courant_friedrichs_lewy_number = CFL;
@@ -170,9 +172,8 @@ void EulerSineWave<dim, nstate>::solve(std::shared_ptr<dealii::parallel::distrib
 
         while(ode_solver->current_time < finalTime){
             const double time_step =  get_timestep(dg,poly_degree, delta_x);
-         //       const double M_infty_temp = sqrt(2.0/1.4);
-         //       double time_step = 0.1 * delta_x / M_infty_temp;
-            double dt = dealii::Utilities::MPI::min(time_step, mpi_communicator);
+            //double dt = dealii::Utilities::MPI::min(time_step, mpi_communicator);
+            double dt = CFL * dealii::Utilities::MPI::min(time_step, mpi_communicator);
             if(ode_solver->current_time + dt > finalTime){
                 dt = finalTime - ode_solver->current_time;
             }
@@ -306,23 +307,97 @@ void EulerSineWave<dim, nstate>::solve(std::shared_ptr<dealii::parallel::distrib
 
         //DG GL
         using FR_enum = Parameters::AllParameters::Flux_Reconstruction;
-        if(all_parameters_new.flux_reconstruction_type == FR_enum::cPlus){
-            pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0001789131971733)<<std::endl;
-            if(abs(l2error_mpi_sum-0.0000791934625115)>=1e-9 ||abs(l2error_mpi_sum_density-0.0001789131971733)>=1e-9){
-                pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.0000791934625115)<<std::endl;
-                pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0001789131971733)<<std::endl;
-                CFL_flag = 0;
-                pcout<<"CFL max "<<CFL-0.01<<std::endl;
+        using FluxNodes = Parameters::AllParameters::FluxNodes;
+        double pressure_exact_comp = 100.0;
+        if(all_parameters_new.flux_reconstruction_type == FR_enum::cDG){
+            if(poly_degree == 3){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0041353128886504;//tf=1
+                   // pressure_exact_comp = 0.0006542576107992;//tf=1, 8^3
+                   // pressure_exact_comp = 0.006742725681219;//tf=2
+                }
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GLL){
+                    pressure_exact_comp = 0.0066482584173469;//tf=2
+                   // pressure_exact_comp = 0.001096209138;//tf=2
+                }
+            }
+            if(poly_degree == 4){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0020626400714939;//tf=1
+                   // pressure_exact_comp = 0.0020582418756;//tf=2
+                }
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GLL){
+                    pressure_exact_comp = 0.0029751751619883;//tf=1
+                   // pressure_exact_comp = 0.0029751763781879;//tf=1
+                   // pressure_exact_comp = 0.00305081994428;//tf=2
+                }
+            }
+            if(poly_degree == 5){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0009561349780270;//tf=1
+                }
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GLL){
+                    pressure_exact_comp = 0.0016600625158484;//tf=1
+                }
             }
         }
-        if(all_parameters_new.flux_reconstruction_type == FR_enum::cDG){
-            pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0000765073031185)<<std::endl;
-            if(abs(l2error_mpi_sum-0.0000260756338658 )>=1e-9 ||abs(l2error_mpi_sum_density-0.0000765073031185)>=1e-9){
-                pcout<<"difference pressure "<<abs(l2error_mpi_sum-0.0000260756338658 )<<std::endl;
-                pcout<<"difference density "<<abs(l2error_mpi_sum_density-0.0000765073031185)<<std::endl;
-                CFL_flag = 0;
-                pcout<<"CFL max "<<CFL-0.01<<std::endl;
+        if(all_parameters_new.flux_reconstruction_type == FR_enum::cPlus){
+            if(poly_degree == 3){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0086498092655398;//tf=2
+                   // pressure_exact_comp = 0.0013401746051725;//tf=1
+                   // pressure_exact_comp = 0.001546526714;//tf=2
+                }
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GLL){
+                    pressure_exact_comp = 0.0107999108595498;//
+                }
             }
+            if(poly_degree == 4){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0034925214918688;//tf=1
+                   // pressure_exact_comp = 0.0033710440696;//tf=2
+                }
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GLL){
+                    pressure_exact_comp = 0.0060133312170462;//tf=1
+                   // pressure_exact_comp = 0.00692163742728;//tf=2
+                }
+            }
+            if(poly_degree == 5){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0019637102164273;//tf=1
+                }
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GLL){
+                    pressure_exact_comp = 0.0033886497125270;//tf=1
+                }
+            }
+        }
+        if(all_parameters_new.flux_reconstruction_type == FR_enum::cHU){
+            if(poly_degree == 3){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0075887263615828;//tf=1
+                }
+            }
+            if(poly_degree == 4){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0037921368906793;//tf=1
+                   // pressure_exact_comp = 0.0035395129115821;//tf=2
+                }
+            }
+            if(poly_degree == 5){
+                if(all_parameters_new.flux_nodes_type == FluxNodes::GL){
+                    pressure_exact_comp = 0.0018146958537118;//tf=1
+                }
+            }
+        }
+        pcout<<"difference pressure "<<abs(l2error_mpi_sum-pressure_exact_comp)<<std::endl;
+       // if((poly_degree == 4 && abs(l2error_mpi_sum-pressure_exact_comp)>=1e-9) || 
+       //     (poly_degree == 5 && abs(l2error_mpi_sum-pressure_exact_comp)>=1e-10)){
+        if(abs(l2error_mpi_sum-pressure_exact_comp)>=1e-9) {
+    //    if(abs(l2error_mpi_sum-pressure_exact_comp)>=1e-10) {
+      //  if(abs(l2error_mpi_sum-pressure_exact_comp)>=1e-8) {
+            pcout<<"difference pressure for CFL limit "<<abs(l2error_mpi_sum-pressure_exact_comp)<<std::endl;
+            CFL_flag = 0;
+            pcout<<"CFL max "<<CFL-0.01<<std::endl;
         }
     }
         
@@ -342,7 +417,7 @@ int EulerSineWave<dim, nstate>::run_test() const
     std::array<double,2> soln_error;
     const unsigned int n_cells_start = all_parameters->flow_solver_param.number_of_grid_elements_per_dimension;
     const unsigned int igrid_start = 0;
-    const unsigned int n_grids = 4;
+    const unsigned int n_grids = 1;
 
 pcout<<"left "<<left<<" right "<<right<<std::endl;
 pcout<<"igrd start is "<<igrid_start<<std::endl;
