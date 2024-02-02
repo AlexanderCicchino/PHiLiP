@@ -6,6 +6,9 @@
 #include "mesh/grids/nonsymmetric_curved_periodic_grid.hpp"
 #include "mesh/grids/straight_periodic_cube.hpp"
 
+#include <eigen/Eigen/Eigenvalues>
+#include <eigen/Eigen/Dense>
+
 namespace PHiLiP {
 namespace Tests {
 
@@ -553,6 +556,106 @@ double EulerTaylorGreen<dim, nstate>::get_timestep(const std::shared_ptr < DGBas
     return cfl_min;
 }
 
+template<int dim, int nstate>
+void EulerTaylorGreen<dim, nstate>::compute_system_matrix_eigenvalues(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const
+{
+    Eigen::EigenSolver<Eigen::MatrixXd> eigen_solver;
+    Eigen::MatrixXd dRdU(dg->solution.size(), dg->solution.size());
+    dealii::LinearAlgebra::distributed::Vector<double> col_dRdU1(dg->right_hand_side.size());
+    dealii::LinearAlgebra::distributed::Vector<double> col_dRdU2(dg->right_hand_side.size());
+    const double perturbation = 1e-8;
+    std::cout<<"doing perturbations"<<std::endl;
+    const unsigned int n_dofs_cell = dg->fe_collection[poly_degree].dofs_per_cell;
+    std::vector<dealii::types::global_dof_index> dofs_indices (n_dofs_cell);
+    auto metric_cell = dg->high_order_grid->dof_handler_grid.begin_active();
+    for (auto cell = dg->dof_handler.begin_active(); cell!= dg->dof_handler.end(); ++cell, ++metric_cell) {
+        if (!cell->is_locally_owned()) continue;
+        cell->get_dof_indices (dofs_indices);
+        for(unsigned int idof = 0; idof<n_dofs_cell; idof++){
+            const unsigned int eig_direction = dofs_indices[idof];
+
+            double solution_init_value = dg->solution[eig_direction];
+            dg->solution[eig_direction] += perturbation;
+            dg->assemble_residual();
+            
+            if(dg->all_parameters->use_inverse_mass_on_the_fly){
+                dg->apply_inverse_global_mass_matrix(dg->right_hand_side, col_dRdU1); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
+            } else{
+                dg->global_inverse_mass_matrix.vmult(col_dRdU1, dg->right_hand_side); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
+            }
+            dg->solution[eig_direction] = solution_init_value - perturbation;
+            dg->assemble_residual();
+            if(dg->all_parameters->use_inverse_mass_on_the_fly){
+                dg->apply_inverse_global_mass_matrix(dg->right_hand_side, col_dRdU2); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
+            } else{
+                dg->global_inverse_mass_matrix.vmult(col_dRdU2, dg->right_hand_side); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
+            }
+            std::vector<dealii::types::global_dof_index> dofs_indices2 (n_dofs_cell);
+            auto metric_cell2 = dg->high_order_grid->dof_handler_grid.begin_active();
+            for (auto cell2 = dg->dof_handler.begin_active(); cell2!= dg->dof_handler.end(); ++cell2, ++metric_cell2) {
+                if (!cell2->is_locally_owned()) continue;
+                cell2->get_dof_indices (dofs_indices2);
+                for(unsigned int idof2 = 0; idof2<n_dofs_cell; idof2++){
+                    const unsigned int eig_direction2 = dofs_indices2[idof2];
+                    dRdU(eig_direction2,eig_direction) = (col_dRdU1[eig_direction2] - col_dRdU2[eig_direction2])/(2.0 * perturbation);
+                }
+            }
+            dg->solution[eig_direction] = solution_init_value;//set back to the IC
+        }
+    }
+
+
+//        for(unsigned int eig_direction=0; eig_direction<dg->solution.size(); eig_direction++){
+//            double solution_init_value = dg->solution[eig_direction];
+//            dg->solution[eig_direction] += perturbation;
+//            dg->assemble_residual();
+//         
+//            if(dg->all_parameters->use_inverse_mass_on_the_fly){
+//                dg->apply_inverse_global_mass_matrix(dg->right_hand_side, col_dRdU); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
+//            } else{
+//                dg->global_inverse_mass_matrix.vmult(col_dRdU, dg->right_hand_side); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
+//            }
+//            for(unsigned int i=0; i<dg->solution.size(); i++){
+//                dRdU(i,eig_direction) = col_dRdU[i];
+//            }
+//            dg->solution[eig_direction] = solution_init_value - perturbation;
+//            dg->assemble_residual();
+//            if(dg->all_parameters->use_inverse_mass_on_the_fly){
+//                dg->apply_inverse_global_mass_matrix(dg->right_hand_side, col_dRdU); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
+//            } else{
+//                dg->global_inverse_mass_matrix.vmult(col_dRdU, dg->right_hand_side); //rk_stage[i] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
+//            }
+//            for(unsigned int i=0; i<dg->solution.size(); i++){
+//                dRdU(i,eig_direction) -= col_dRdU[i];
+//                dRdU(i,eig_direction) /= (2.0 * perturbation);
+//            }
+//            dg->solution[eig_direction] = solution_init_value;//set back to the IC
+//         
+//        }
+    std::cout<<"got perts"<<std::endl;
+    Eigen::MatrixXd dRdU_mpi(dg->solution.size(), dg->solution.size());
+    for(unsigned int i=0; i<dg->solution.size(); i++){
+        for(unsigned int j=0; j<dg->solution.size(); j++){
+            dRdU_mpi(i,j) = dealii::Utilities::MPI::sum(dRdU(i,j), this->mpi_communicator);
+        }
+    }
+    eigen_solver.compute(dRdU_mpi);
+
+        for(unsigned int i=0; i<eigen_solver.eigenvalues().size(); i++){
+            if(eigen_solver.eigenvalues()[i].real() > 1e-6){
+                pcout<<" eigenvalue "<<eigen_solver.eigenvalues()[i].real()<<std::endl;
+//                Eigen::VectorXcd eigen_vect = eigen_solver.eigenvectors().col(i);
+//                pcout<< "the eigenvector "<<std::endl<<std::fixed << std::setprecision(16) << eigen_vect<< std::fixed << std::endl;
+//        pcout<<"the DRDU"<<std::endl;
+//            for(unsigned int i=0; i<dg->solution.size(); i++){
+//            for(unsigned int j=0; j<dg->solution.size(); j++){
+//                pcout<<dRdU(i,j)<<" ";
+//            }
+//            pcout<<std::endl;
+//            }
+            }
+        }
+}
 template <int dim, int nstate>
 int EulerTaylorGreen<dim, nstate>::run_test() const
 {
@@ -615,6 +718,11 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     std::ofstream myfile (all_parameters_new.energy_file + ".gpl"  , std::ios::trunc);
     //loop over time
     while(ode_solver->current_time < finalTime){
+
+        //compute eigenvalues
+        if(ode_solver->current_time == 0.0)
+            compute_system_matrix_eigenvalues(dg, poly_degree);
+
         //get timestep
         const double time_step =  get_timestep(dg,poly_degree, delta_x);
         if(ode_solver->current_iteration%all_parameters_new.ode_solver_param.print_iteration_modulo==0)

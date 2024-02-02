@@ -70,6 +70,8 @@ private:
     double compute_volume_term(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const;
     /// Computes the timestep from max eignevector.
     double get_timestep(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree, const double delta_x) const;
+    /// Computes the system eigenvalues.
+    void compute_system_matrix_eigenvalues(const std::shared_ptr < DGBase<dim, double> > &dg, unsigned int poly_degree) const;
 };
 
 
