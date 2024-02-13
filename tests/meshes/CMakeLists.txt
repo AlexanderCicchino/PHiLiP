@@ -10,6 +10,7 @@ configure_file(3d_cube_periodic.msh 3d_cube_periodic.msh COPYONLY)
 configure_file(SD7003_1_cell_spanwise.msh SD7003_1_cell_spanwise.msh COPYONLY)
 configure_file(SD7003_4_cell_spanwise.msh SD7003_4_cell_spanwise.msh COPYONLY)
 configure_file(SD7003_12_cell_spanwise.msh SD7003_12_cell_spanwise.msh COPYONLY)
+configure_file(naca0012_3D_unstructured.msh naca0012_3D_unstructured.msh COPYONLY)
 
 set (filename "naca0012_hopw_ref0.msh")
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${filename})
@@ -86,4 +87,12 @@ if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${filename})
 and place them in
       ${CMAKE_CURRENT_SOURCE_DIR}, or simply run get_gmsh_mesh_files_local.sh"
       )
+endif()
+set (filename "naca0012_3D_unstructured.msh")
+if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${filename})
+    message(SEND_ERROR
+            "Missing NACA0012 files named ${filename}. Please download them from
+    https://drive.google.com/drive/folders/182JusbWV6NAA8ws1-TTg7M2GLc5jt6_r?usp=sharing
+and place them in /tests/meshes."
+            )
 endif()
