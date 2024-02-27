@@ -333,6 +333,130 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal_int) const
 {
+    //#if 0
+    //entropy dissipative Roe scheme
+    std::array<std::array<real,nstate>,nstate> eigenvector_matrix;
+    std::array<real,nstate> eigenvalues;
+    std::array<real,nstate> eigenvalue_scale;
+
+    const std::array<real,nstate> primitive_soln_int = euler_physics->convert_conservative_to_primitive(soln_int);
+    const std::array<real,nstate> primitive_soln_ext = euler_physics->convert_conservative_to_primitive(soln_ext);
+    const std::array<real,nstate> roe_var1 = euler_physics->compute_ismail_roe_parameter_vector_from_primitive(primitive_soln_int);
+    const std::array<real,nstate> roe_var2 = euler_physics->compute_ismail_roe_parameter_vector_from_primitive(primitive_soln_ext);
+
+    // Compute mean (average) parameter vector
+    std::array<real,nstate> avg_roe_var;
+    for(int s=0; s<nstate; ++s){
+        avg_roe_var[s] = 0.5*(roe_var1[s] + roe_var2[s]);
+    }
+
+    // Compute logarithmic mean parameter vector
+    std::array<real,nstate> log_mean_roe_var;
+    for(int s=0; s<nstate; ++s){
+        log_mean_roe_var[s] = euler_physics->compute_ismail_roe_logarithmic_mean(roe_var1[s], roe_var2[s]);
+    }
+
+    std::array<real,nstate> roe_avg_var;
+    roe_avg_var[0] = avg_roe_var[0] * log_mean_roe_var[nstate-1];
+    real roe_avg_vel_sqr = 0.0;
+    real roe_avg_vel_dot_n = 0.0;
+    for(int idim=0; idim<dim; idim++){
+        roe_avg_var[idim+1] = avg_roe_var[idim+1] / avg_roe_var[0];
+        roe_avg_vel_sqr += roe_avg_var[idim+1] * roe_avg_var[idim+1];
+        roe_avg_vel_dot_n += roe_avg_var[idim+1] * normal_int[idim];
+    }
+    real p1 = avg_roe_var[nstate-1] / avg_roe_var[0];
+    real p2 = (euler_physics->gam +1.0)/(euler_physics->gam*2.0) * log_mean_roe_var[nstate-1] / log_mean_roe_var[0] 
+            + (euler_physics->gamm1)/(euler_physics->gam * 2.0) * p1;
+    real a = sqrt(euler_physics->gam * p2 / roe_avg_var[0]);
+    roe_avg_var[nstate-1] = a * a / euler_physics->gamm1 + 0.5 * roe_avg_vel_sqr;
+
+    //build eigenvector matrices
+    //first column
+    eigenvector_matrix[0][0] = 1.0;
+    for(int jdim=0; jdim<dim; jdim++){
+        eigenvector_matrix[jdim+1][0] = roe_avg_var[jdim+1] - a * normal_int[jdim];
+    }
+    eigenvector_matrix[nstate-1][0] = roe_avg_var[nstate-1] - roe_avg_vel_dot_n * a;
+    //second column
+    eigenvector_matrix[0][1] = 1.0;
+    for(int jdim=0; jdim<dim; jdim++){
+        eigenvector_matrix[jdim+1][1] = roe_avg_var[jdim+1];
+    }
+    eigenvector_matrix[nstate-1][1] = 0.5 * roe_avg_vel_sqr;
+    //3-4 columns if 2D or 3D
+    if constexpr(dim>=2){
+        eigenvector_matrix[0][2] = 0.0;
+        eigenvector_matrix[1][2] = normal_int[1];
+        eigenvector_matrix[2][2] = - normal_int[0];
+        if constexpr(dim == 3) eigenvector_matrix[3][2] = 0.0;
+        eigenvector_matrix[nstate-1][2] = roe_avg_var[1] * normal_int[1] - roe_avg_var[2] * normal_int[0];
+    }
+    if constexpr(dim==3){
+        eigenvector_matrix[0][3] = 0.0;
+        eigenvector_matrix[1][3] = - normal_int[2];
+        eigenvector_matrix[2][3] = 0.0;
+        eigenvector_matrix[3][3] = - normal_int[0];
+        eigenvector_matrix[nstate-1][3] = roe_avg_var[2] * normal_int[0] - roe_avg_var[1] * normal_int[2];
+    }
+    //last column
+    eigenvector_matrix[0][nstate-1] = 1.0;
+    for(int jdim=0; jdim<dim; jdim++){
+        eigenvector_matrix[jdim+1][nstate-1] = roe_avg_var[jdim+1] + a * normal_int[jdim];
+    }
+    eigenvector_matrix[nstate-1][nstate-1] = roe_avg_var[nstate-1] + roe_avg_vel_dot_n * a;
+    //build eigenvalue vector
+    for(int idim=0; idim<dim; idim++){
+        eigenvalues[0] = abs(roe_avg_vel_dot_n - a);
+        eigenvalues[nstate-1] = abs(roe_avg_vel_dot_n + a);
+
+        eigenvalues[0] += 1.0/6.0 * abs(roe_avg_vel_dot_n - a);
+        eigenvalues[nstate-1] += 1.0/6.0 * abs(roe_avg_vel_dot_n + a);
+
+        for(int jdim=0; jdim<dim; jdim++){
+            eigenvalues[jdim+1] = abs(roe_avg_vel_dot_n);
+        }
+    }
+    //build eigenvalue scale vector
+    eigenvalue_scale[0] = roe_avg_var[0] / (2.0*euler_physics->gam);
+    eigenvalue_scale[1] = euler_physics->gamm1 * roe_avg_var[0] / euler_physics->gam;
+    eigenvalue_scale[nstate-1] = roe_avg_var[0] / (2.0*euler_physics->gam);
+    for(int idim=1; idim<dim; idim++){
+        eigenvalue_scale[idim+1] = p1;
+    }
+
+    std::array<std::array<real,nstate>,nstate> dissipation_matrix;
+    for(int istate=0; istate<nstate; istate++){
+        for(int jstate=0; jstate<nstate; jstate++){
+            dissipation_matrix[istate][jstate] = 0.0;
+            for(int kstate=0; kstate<nstate; kstate++){
+                dissipation_matrix[istate][jstate] += eigenvector_matrix[istate][kstate] //R
+                                                    * eigenvector_matrix[jstate][kstate] //R^T
+                                                    * eigenvalues[kstate]
+                                                    * eigenvalue_scale[kstate];
+            }
+        }
+    }
+
+    std::array<real,nstate> entropy_var_int = euler_physics->compute_entropy_variables(soln_int);
+    std::array<real,nstate> entropy_var_ext = euler_physics->compute_entropy_variables(soln_ext);
+
+    std::array<real,nstate> dissipation;
+    for(int istate=0;istate<nstate; istate++){
+        dissipation[istate] = 0.0;
+        for(int jstate=0; jstate<nstate; jstate++){
+            dissipation[istate] -= 0.5 * dissipation_matrix[istate][jstate]
+                                 * (entropy_var_ext[jstate] - entropy_var_int[jstate])
+                                 * euler_physics->gamm1;
+                               //  * (entropy_var_ext[jstate] - entropy_var_int[jstate]);
+        }                       
+    }
+
+    return dissipation;
+    //#endif
+
+
+    #if 0
     // See Blazek 2015, p.103-105
     // -- Note: Modified calculation of alpha_{3,4} to use 
     //          dVt (jump in tangential velocities);
@@ -475,6 +599,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     }
 
     return numerical_flux_dot_n;
+    #endif
 }
 
 // Instantiation
