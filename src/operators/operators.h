@@ -349,6 +349,15 @@ public:
         const dealii::FullMatrix<real> &input_mat2,
         dealii::FullMatrix<real> &output_mat);
 
+    ///Computes a basis transformation on a matrix representing the basis.
+    /* Given a basis \f$\phi\f$, a projection operator \f$P_\phi\f$ and the new basis \f$\chi\f$,
+    * it computes the transformation from \f$ \phi\to\chi\f$ by \f$\chi P_\phi \phi \f$.
+    */
+    dealii::FullMatrix<double> basis_transformation(
+        const dealii::FullMatrix<double> &previous_basis,
+        const dealii::FullMatrix<double> &previous_basis_projection,
+        const dealii::FullMatrix<double> &new_basis);
+
 //protected:
 public:
     ///Stores the one dimensional volume operator.

@@ -1060,6 +1060,19 @@ void SumFactorizedOperators<dim,n_faces,real>::sum_factorized_Hadamard_surface_b
     }
 }
 
+template <int dim, int n_faces, typename real>  
+dealii::FullMatrix<double> SumFactorizedOperators<dim,n_faces,real>::basis_transformation(
+    const dealii::FullMatrix<double> &previous_basis,
+    const dealii::FullMatrix<double> &previous_basis_projection,
+    const dealii::FullMatrix<double> &new_basis)
+{
+    dealii::FullMatrix<double> temp(previous_basis_projection.m(),previous_basis.n());
+    previous_basis_projection.mmult(temp, previous_basis);
+    dealii::FullMatrix<double> output(new_basis.m(),previous_basis.n());
+    new_basis.mmult(output, temp);
+    return output;
+}
+
 /*******************************************
  *
  *      VOLUME OPERATORS FUNCTIONS
