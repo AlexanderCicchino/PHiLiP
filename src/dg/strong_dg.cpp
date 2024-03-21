@@ -1016,6 +1016,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
 
     // The matrix of two-pt fluxes for Hadamard products
     std::array<std::array<dealii::FullMatrix<real>,dim>,nstate> conv_ref_2pt_flux_at_q;
+    std::array<std::array<dealii::FullMatrix<real>,dim>,nstate> svv_ref_2pt_flux_at_q;
     //Hadamard tensor-product sparsity pattern
     std::vector<std::array<unsigned int,dim>> Hadamard_rows_sparsity(n_quad_pts * n_quad_pts_1D);//size n^{d+1}
     std::vector<std::array<unsigned int,dim>> Hadamard_columns_sparsity(n_quad_pts * n_quad_pts_1D);
@@ -1024,6 +1025,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
         for(int istate=0; istate<nstate; istate++){
             for(int idim=0; idim<dim; idim++){
                 conv_ref_2pt_flux_at_q[istate][idim].reinit(n_quad_pts, n_quad_pts_1D);//size n^d x n
+                svv_ref_2pt_flux_at_q[istate][idim].reinit(n_quad_pts, n_quad_pts_1D);//size n^d x n
             }
         }
         //extract the dof pairs that give non-zero entries for each direction
@@ -1099,6 +1101,22 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                     //Compute the physical flux
                     std::array<dealii::Tensor<1,dim,real>,nstate> conv_phys_flux_2pt;
                     conv_phys_flux_2pt = this->pde_physics_double->convective_numerical_split_flux(soln_state, soln_state_flux_basis);
+
+                    //SVV A-stable upwinding
+                    std::array<dealii::Tensor<1,dim,real>,nstate> svv_phys_flux_2pt;
+                    for(int istate=0; istate<nstate; istate++){
+                       const real delu = (entropy_var_flux_basis[istate]-entropy_var[istate]);
+                       for(int idim=0; idim<dim; idim++){
+                           const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree].point(iquad);
+                           const dealii::Point<dim,real> jq_point = this->volume_quadrature_collection[poly_degree].point(flux_quad);
+                           const real delx = jq_point[idim] - iq_point[idim];
+
+                           if(iquad != flux_quad){
+                               svv_phys_flux_2pt[istate][idim] = 1.0/12.0 * abs(delu) * delu / delx;
+                              // svv_phys_flux_2pt[istate][idim] =  delu / delx;
+                           }
+                       }
+                    }
                      
                     for(int istate=0; istate<nstate; istate++){
                         dealii::Tensor<1,dim,real> conv_ref_flux_2pt;
@@ -1109,6 +1127,13 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                             conv_ref_flux_2pt);
                         //write into reference Hadamard flux matrix
                         conv_ref_2pt_flux_at_q[istate][ref_dim][iquad][column_index] = conv_ref_flux_2pt[ref_dim];
+                        dealii::Tensor<1,dim,real> svv_ref_flux_2pt;
+                        //For each state, transform the physical flux to a reference flux.
+                        metric_oper.transform_physical_to_reference(
+                            svv_phys_flux_2pt[istate],
+                            0.5*(metric_cofactor + metric_cofactor_flux_basis),
+                            svv_ref_flux_2pt);
+                        svv_ref_2pt_flux_at_q[istate][ref_dim][iquad][column_index] = svv_ref_flux_2pt[ref_dim];
                     }
                 }
             }
@@ -1204,6 +1229,41 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
         }
     }
 
+    //build 1D filtered stiffness for SVV
+    const dealii::FE_DGQLegendre<1> fe_dg_1D(poly_degree);
+    const dealii::FESystem<1,1> fe_system_Legendre_1D(fe_dg_1D, nstate);
+    dealii::FE_DGQLegendre<1,1> legendre_poly_1D(poly_degree);
+    // -- Projection operator for legendre basis
+    OPERATOR::vol_projection_operator<dim,2*dim,real> legendre_soln_basis_projection_oper(1, poly_degree, this->max_grid_degree);
+    legendre_soln_basis_projection_oper.build_1D_volume_operator(legendre_poly_1D, this->oneD_quadrature_collection[poly_degree]);
+    // -- Legendre basis functions
+    OPERATOR::basis_functions<dim,2*dim,real> legendre_soln_basis(1, poly_degree, this->max_grid_degree);
+   // legendre_soln_basis.build_1D_volume_operator(legendre_poly_1D, this->oneD_quadrature_collection[poly_degree]);
+    legendre_soln_basis.build_1D_gradient_operator(legendre_poly_1D, this->oneD_quadrature_collection[poly_degree]);
+    for(unsigned int idof=0; idof<n_quad_pts_1D-1; idof++){//truncate except highest mode
+        for(unsigned int iquad=0; iquad<n_quad_pts_1D; iquad++){
+            legendre_soln_basis.oneD_grad_operator[iquad][idof] = 0.0;
+        }
+    }
+
+    dealii::FullMatrix<real> svv_test_fn(n_quad_pts_1D,poly_degree+1);
+    dealii::FullMatrix<real> transformation_matrix(poly_degree+1,poly_degree+1);
+    legendre_soln_basis_projection_oper.oneD_vol_operator.mmult(transformation_matrix, soln_basis.oneD_vol_operator);
+    legendre_soln_basis.oneD_grad_operator.mmult(svv_test_fn, transformation_matrix);
+    dealii::FullMatrix<real> svv_stiffness(n_quad_pts_1D, n_quad_pts_1D);
+    for(unsigned int itest=0; itest<n_quad_pts_1D; itest++){
+        for(unsigned int idof=0; idof<n_quad_pts_1D; idof++){
+            double value = 0.0;
+            for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+                value += svv_test_fn[iquad][itest]
+                       * flux_basis.oneD_vol_operator[iquad][idof]
+                       * oneD_vol_quad_weights[iquad];
+            }
+            svv_stiffness[itest][idof] = value; 
+        }
+    }
+
+
     // Get a flux basis reference gradient operator in a sum-factorized Hadamard product sparse form. Then apply the divergence.
     std::array<dealii::FullMatrix<real>,dim> flux_basis_stiffness_skew_symm_oper_sparse;
     if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
@@ -1225,6 +1285,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
         //Compute reference divergence of the reference fluxes.
         std::vector<real> conv_flux_divergence(n_quad_pts); 
         std::vector<real> diffusive_flux_divergence(n_quad_pts); 
+
 
         if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
             //2pt flux Hadamard Product, and then multiply by vector of ones scaled by 1.
@@ -1299,6 +1360,14 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                 JxW[iquad] = vol_quad_weights[iquad] * metric_oper.det_Jac_vol[iquad];
             }
             soln_basis.inner_product_1D(physical_source_at_q[istate], JxW, rhs, soln_basis.oneD_vol_operator, true, 1.0);
+        }
+
+        //svv
+        for(unsigned int iquad=0; iquad<n_quad_pts_1D; iquad++){
+            for(unsigned int jquad=0; jquad<n_quad_pts_1D; jquad++){
+                rhs[iquad] -= 2.0 * svv_stiffness[iquad][jquad] * svv_ref_2pt_flux_at_q[0][0][iquad][jquad];
+               // rhs[iquad] -= 2.0 * flux_basis_stiffness.oneD_vol_operator[jquad][iquad] * svv_ref_2pt_flux_at_q[0][0][iquad][jquad];
+            }
         }
 
         for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){

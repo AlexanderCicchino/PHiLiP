@@ -178,7 +178,15 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         ode_solver->current_iteration = 0;
         for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
         {
-                ode_solver->advance_solution_time(dt);
+        //        ode_solver->advance_solution_time(dt);
+            ode_solver->step_in_time(dt, false);
+            ode_solver->current_iteration += 1;
+            //check if print solution
+            const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
+            if (is_output_iteration) {
+                const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
+                dg->output_results_vtk(file_number);
+            }
                 //Energy
                 double current_energy = compute_energy(dg);
                 current_energy /=initial_energy;
