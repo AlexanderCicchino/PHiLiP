@@ -502,10 +502,12 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
 
     std::array<std::vector<real>,dim> mapping_support_points;
     //if have source term need to store vol flux nodes.
-    const bool store_vol_flux_nodes = all_parameters->manufactured_convergence_study_param.manufactured_solution_param.use_manufactured_source_term;
+//    const bool store_vol_flux_nodes = all_parameters->manufactured_convergence_study_param.manufactured_solution_param.use_manufactured_source_term;
+    const bool store_vol_flux_nodes = true;
     //for boundary conditions not periodic we need surface flux nodes
     //should change this flag to something like if have face on boundary not periodic in the future
-    const bool store_surf_flux_nodes = (all_parameters->use_periodic_bc) ? false : true;
+//    const bool store_surf_flux_nodes = (all_parameters->use_periodic_bc) ? false : true;
+    const bool store_surf_flux_nodes = true;
     OPERATOR::metric_operators<real,dim,2*dim> metric_oper_int(nstate, poly_degree, grid_degree,
                                                                store_vol_flux_nodes,
                                                                store_surf_flux_nodes);

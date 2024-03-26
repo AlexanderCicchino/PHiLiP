@@ -343,6 +343,9 @@ double EulerTaylorGreen<dim, nstate>::compute_entropy(const std::shared_ptr < DG
     mapping_basis.build_1D_shape_functions_at_grid_nodes(dg->high_order_grid->oneD_fe_system, dg->high_order_grid->oneD_grid_nodes);
     mapping_basis.build_1D_shape_functions_at_flux_nodes(dg->high_order_grid->oneD_fe_system, dg->oneD_quadrature_collection[poly_degree], dg->oneD_face_quadrature);
 
+    OPERATOR::derivative_p<dim,2*dim,double> pth_deriv(1, poly_degree, dg->max_grid_degree);
+    pth_deriv.build_1D_volume_operator(dg->oneD_fe_collection_1state[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
+
     std::vector<dealii::types::global_dof_index> dofs_indices (n_dofs_cell);
 
     std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_double  = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(PHiLiP::Physics::PhysicsFactory<dim,nstate,double>::create_Physics(dg->all_parameters));
@@ -401,6 +404,12 @@ double EulerTaylorGreen<dim, nstate>::compute_entropy(const std::shared_ptr < DG
             soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
                                              soln_basis.oneD_vol_operator);
         }
+        std::array<std::vector<double>,nstate> pth_deriv_soln_at_q;
+        for(int istate=0; istate<nstate; istate++){
+            pth_deriv_soln_at_q[istate].resize(n_quad_pts);
+            pth_deriv.matrix_vector_mult_1D(soln_coeff[istate], pth_deriv_soln_at_q[istate],
+                                            pth_deriv.oneD_vol_operator);
+        }
         for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
             std::array<double,nstate> soln_state;
             for(int istate=0; istate<nstate; istate++){
@@ -412,6 +421,12 @@ double EulerTaylorGreen<dim, nstate>::compute_entropy(const std::shared_ptr < DG
             const double quadrature_entropy = -density*entropy/euler_double->gamm1;
 
             entropy_fn += quadrature_entropy * quad_weights[iquad] * metric_oper.det_Jac_vol[iquad];
+
+            double fr_entropy = 0.0;
+            for(int istate=0; istate<nstate; istate++){
+                fr_entropy += pth_deriv_soln_at_q[istate][iquad] *pth_deriv_soln_at_q[istate][iquad] * quad_weights[iquad] * metric_oper.det_Jac_vol[iquad];
+            }
+            entropy_fn += fr_entropy;
 
         }
     }
