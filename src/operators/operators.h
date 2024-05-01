@@ -252,6 +252,23 @@ public:
             const std::vector<real> &weights,//vector storing diagonal entries for case not identity
             const int direction);//direction for the derivative that corresponds to basis
 
+    ///Computes the divergence of the Hadamard product times a vector in a high-arithmetic intensity way.
+    /* This form does not require the sparsity pattern. Instead, it builds it on-the-fly so that there are no matrices of size \f$n^{d+1} \f$
+    *  in cache. Instead, the largest size in cache are the input and output vectors of size \f$ n^d\f$.
+    */
+    template<int nstate>
+    void two_pt_flux_Hadamard_product_sparsity_on_the_fly(
+            const std::vector<real> &input_vector,//vector the Hadamard product is multiplied to
+            const std::array<std::vector<real>,nstate> &hadamard_vector,//vector that the matrix in Hadamard product is built form
+    //        std::array<dealii::Tensor<1,dim,real>,nstate> (*two_pt_flux_function)(const std::array<real,nstate>, const std::array<real,nstate>),
+    std::function<std::array<dealii::Tensor<1,dim,real>,nstate> (const std::array<real,nstate>, const std::array<real,nstate>)> two_pt_flux_function,
+            std::array<std::vector<real>,nstate> &output_vector,//output solution
+            const dealii::FullMatrix<double> &basis,//the only direction that isn't identity
+           // const std::vector<std::vector<double>> &basis,//the only direction that isn't identity
+            const unsigned int size,
+            const std::vector<real> &weights,//vector storing diagonal entries for case not identity
+            const double scaling);
+
 
     /// Computes the rows and columns vectors with non-zero indices for sum-factorized Hadamard products.
     void sum_factorized_Hadamard_sparsity_pattern(

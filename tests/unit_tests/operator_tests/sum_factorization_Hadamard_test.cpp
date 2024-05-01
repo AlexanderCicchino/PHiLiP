@@ -67,8 +67,8 @@ int main (int argc, char * argv[])
 
     bool different = false;
     bool different_mass = false;
-    const unsigned int poly_max = 16;
-    const unsigned int poly_min = 2;
+    const unsigned int poly_max = 20;
+    const unsigned int poly_min = 1;
     std::array<clock_t,poly_max> time_diff;
     std::array<clock_t,poly_max> time_diff_sum;
     std::array<clock_t,poly_max> time_deriv_sum_cons;
@@ -92,7 +92,7 @@ int main (int argc, char * argv[])
 
         std::vector<double> ones(n_quad_pts_1D, 1.0);//to be used as the weights
 
-        for(unsigned int ielement=0; ielement<10; ielement++){//do several loops as if there were elements
+        for(unsigned int ielement=0; ielement<100; ielement++){//do several loops as if there were elements
 
             std::vector<real> sol_hat(n_dofs);
             for(unsigned int idof=0; idof<n_dofs; idof++){
@@ -122,7 +122,7 @@ int main (int argc, char * argv[])
                     }
                 }
             }
-            std::cout<<std::endl<<std::endl;
+//            std::cout<<std::endl<<std::endl;
             if(dim==3){
                 for(unsigned int idof=0; idof< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof++){
                     for(unsigned int idof2=0; idof2< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof2++){
@@ -182,7 +182,7 @@ int main (int argc, char * argv[])
                     }
                 }
             }
-            std::cout<<std::endl<<std::endl;
+//            std::cout<<std::endl<<std::endl;
             if(dim==3){
                 for(unsigned int idof=0; idof< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof++){
                     for(unsigned int idof2=0; idof2< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof2++){
@@ -228,7 +228,7 @@ int main (int argc, char * argv[])
                         }
                     }
                 }
-                std::cout<<std::endl<<std::endl;
+//                std::cout<<std::endl<<std::endl;
                 if(dim==3){
                     for(unsigned int idof=0; idof< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof++){
                         for(unsigned int idof2=0; idof2< n_dofs_1D * n_dofs_1D * n_dofs_1D; idof2++){
@@ -237,7 +237,7 @@ int main (int argc, char * argv[])
                         }
                     }
                 }
-                std::cout<<std::endl<<std::endl;
+//                std::cout<<std::endl<<std::endl;
                 if(ielement==0)
                     time_diff_dir3[poly_degree] = clock() - tfirst_dir3;
                 else
@@ -326,6 +326,17 @@ int main (int argc, char * argv[])
 
     }
     pcout<<"average slope 1 "<<avg_slope1<<" average slope 2 "<<avg_slope2<<" average slope 3 "<<avg_slope3<<std::endl;
+
+    if(dim==3){
+        pcout<<"Times for operation A*u in All Directions"<<std::endl;
+        pcout<<"Normal operation A*u  "<<" | Sum factorization"<<std::endl;
+        for(unsigned int i=poly_min+1; i<poly_max; i++){
+
+            pcout<<(double)(time_diff_dir3[i]+time_diff_dir2[i]+time_diff[i])/CLOCKS_PER_SEC<<" "<<
+            (double)(time_diff_sum_dir3[i]+time_diff_sum_dir2[i]+time_diff_sum[i])/CLOCKS_PER_SEC<<
+            std::endl;
+        }
+    }
 
     //output sum factorization derivative slope
     pcout<<"Sum factorization Direct Conservative A*u  | Slope "<<std::endl;

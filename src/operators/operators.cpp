@@ -792,6 +792,156 @@ void SumFactorizedOperators<dim,n_faces,real>::two_pt_flux_Hadamard_product(
 }
 
 template <int dim, int n_faces, typename real>  
+template<int nstate>
+void SumFactorizedOperators<dim,n_faces,real>::two_pt_flux_Hadamard_product_sparsity_on_the_fly(
+    const std::vector<real> &input_vector,
+    const std::array<std::vector<real>,nstate> &hadamard_vector,
+   // std::array<dealii::Tensor<1,dim,real>,nstate> (*two_pt_flux_function)(const std::array<real,nstate>, const std::array<real,nstate>),
+    std::function<std::array<dealii::Tensor<1,dim,real>,nstate> (const std::array<real,nstate>, const std::array<real,nstate>)> two_pt_flux_function,
+    std::array<std::vector<real>,nstate> &output_vector,
+    const dealii::FullMatrix<double> &basis,
+   // const std::vector<std::vector<double>> &basis,
+    const unsigned int size,
+    const std::vector<real> &weights,
+    const double scaling)
+{
+    assert(input_vector.size() == output_vector.size());
+//    const unsigned int size = basis.n();
+    assert(size == weights.size());
+
+    if constexpr (dim == 1){
+        for(unsigned int irow = 0; irow<size; irow++){
+            std::array<real,nstate> soln_int;
+            for(int istate=0; istate<nstate; istate++){
+                soln_int[istate] = hadamard_vector[istate][irow];
+            }
+            for(unsigned int jcol = 0; jcol<size; jcol++){
+                std::array<real,nstate> soln_ext;
+                for(int istate=0; istate<nstate; istate++){
+                    soln_ext[istate] = hadamard_vector[istate][jcol];
+                }
+                const std::array<dealii::Tensor<1,dim,real>,nstate> two_pt_flux = two_pt_flux_function(soln_int, soln_ext);
+                for(int istate=0; istate<nstate; istate++){
+                    output_vector[istate][irow] += scaling 
+                                                 * input_vector[jcol]
+                                                 * basis[irow][jcol]
+                                                 * two_pt_flux[istate][0];
+                }
+            }
+            
+        }
+
+    }
+    if constexpr (dim == 2){
+        for(unsigned int idiag=0; idiag<size; idiag++){
+            for(unsigned int jdiag=0; jdiag<size; jdiag++){
+                const unsigned int row_index = idiag * size + jdiag;
+                const unsigned int x_row_index = row_index % size;
+                const unsigned int y_row_index = row_index / size;
+                std::array<real,nstate> soln_int;
+                for(int istate=0; istate<nstate; istate++){
+                    soln_int[istate] = hadamard_vector[istate][row_index];
+                }
+                for(unsigned int kdiag=0; kdiag<size; kdiag++){//the index sums across
+                    const unsigned int col_index_x = idiag * size + kdiag;
+                    const unsigned int col_index_y = kdiag * size + jdiag;
+                    const unsigned int x_col_index = col_index_x % size;
+                    const unsigned int y_col_index = col_index_y / size;
+                    std::array<real,nstate> soln_ext_x;
+                    std::array<real,nstate> soln_ext_y;
+                    for(int istate=0; istate<nstate; istate++){
+                        soln_ext_x[istate] = hadamard_vector[istate][col_index_x];
+                        soln_ext_y[istate] = hadamard_vector[istate][col_index_y];
+                    }
+                    const std::array<dealii::Tensor<1,dim,real>,nstate> two_pt_flux_x = two_pt_flux_function(soln_int, soln_ext_x);
+                    const std::array<dealii::Tensor<1,dim,real>,nstate> two_pt_flux_y = two_pt_flux_function(soln_int, soln_ext_y);
+                    for(int istate=0; istate<nstate; istate++){
+                        //direction x
+                        output_vector[istate][row_index] += scaling 
+                                                          * input_vector[col_index_x]
+                                                          * basis[x_row_index][x_col_index]
+                                                          * weights[y_row_index]
+                                                          * two_pt_flux_x[istate][0];
+                        //directiony
+                        output_vector[istate][row_index] += scaling 
+                                                          * input_vector[col_index_y]
+                                                          * basis[y_row_index][y_col_index]
+                                                          * weights[x_row_index]
+                                                          * two_pt_flux_y[istate][1];
+                    }
+                }
+            }
+        }
+    }
+    if constexpr (dim == 3){
+        for(unsigned int idiag=0; idiag<size; idiag++){
+            for(unsigned int jdiag=0; jdiag<size; jdiag++){
+                for(unsigned int kdiag=0; kdiag<size; kdiag++){
+                    const unsigned int row_index = idiag * size * size
+                                                 + jdiag * size
+                                                 + kdiag;
+                    const unsigned int x_row_index = row_index % size;
+                    const unsigned int y_row_index = (row_index / size) % size;
+                    const unsigned int z_row_index = (row_index / size) / size;
+                    std::array<real,nstate> soln_int;
+                    for(int istate=0; istate<nstate; istate++){
+                        soln_int[istate] = hadamard_vector[istate][row_index];
+                    }
+                    for(unsigned int ldiag=0; ldiag<size; ldiag++){//the index it sums across
+                        const unsigned int col_index_x = idiag * size * size
+                                                       + jdiag * size
+                                                       + ldiag;
+                        const unsigned int col_index_y = ldiag * size
+                                                       + idiag * size * size
+                                                       + kdiag;
+                        const unsigned int col_index_z = ldiag * size * size
+                                                       + jdiag * size
+                                                       + kdiag;
+                        const unsigned int x_col_index = col_index_x % size;
+                        const unsigned int y_col_index = (col_index_y / size) % size;
+                        const unsigned int z_col_index = (col_index_z / size) / size;
+                        std::array<real,nstate> soln_ext_x;
+                        std::array<real,nstate> soln_ext_y;
+                        std::array<real,nstate> soln_ext_z;
+                        for(int istate=0; istate<nstate; istate++){
+                            soln_ext_x[istate] = hadamard_vector[istate][col_index_x];
+                            soln_ext_y[istate] = hadamard_vector[istate][col_index_y];
+                            soln_ext_z[istate] = hadamard_vector[istate][col_index_z];
+                        }
+                        const std::array<dealii::Tensor<1,dim,real>,nstate> two_pt_flux_x = two_pt_flux_function(soln_int, soln_ext_x);
+                        const std::array<dealii::Tensor<1,dim,real>,nstate> two_pt_flux_y = two_pt_flux_function(soln_int, soln_ext_y);
+                        const std::array<dealii::Tensor<1,dim,real>,nstate> two_pt_flux_z = two_pt_flux_function(soln_int, soln_ext_z);
+                        for(int istate=0; istate<nstate; istate++){
+                            //direction x
+                            output_vector[istate][row_index] += scaling 
+                                                              * input_vector[col_index_x]
+                                                              * basis[x_row_index][x_col_index]
+                                                              * weights[y_row_index]
+                                                              * weights[z_row_index]
+                                                              * two_pt_flux_x[istate][0];
+                            //direction y
+                            output_vector[istate][row_index] += scaling 
+                                                              * input_vector[col_index_y]
+                                                              * basis[y_row_index][y_col_index]
+                                                              * weights[x_row_index]
+                                                              * weights[z_row_index]
+                                                              * two_pt_flux_y[istate][1];
+                            //direction z
+                            output_vector[istate][row_index] += scaling 
+                                                              * input_vector[col_index_z]
+                                                              * basis[z_row_index][z_col_index]
+                                                              * weights[x_row_index]
+                                                              * weights[y_row_index]
+                                                              * two_pt_flux_z[istate][2];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+template <int dim, int n_faces, typename real>  
 void SumFactorizedOperators<dim,n_faces,real>::Hadamard_product(
     const dealii::FullMatrix<real> &input_mat1,
     const dealii::FullMatrix<real> &input_mat2,
@@ -2996,6 +3146,18 @@ template class local_flux_basis_stiffness <PHILIP_DIM, 2, 2*PHILIP_DIM, double>;
 template class local_flux_basis_stiffness <PHILIP_DIM, 3, 2*PHILIP_DIM, double>;
 template class local_flux_basis_stiffness <PHILIP_DIM, 4, 2*PHILIP_DIM, double>;
 template class local_flux_basis_stiffness <PHILIP_DIM, 5, 2*PHILIP_DIM, double>;
+
+template void SumFactorizedOperators<PHILIP_DIM,2*PHILIP_DIM,double>::two_pt_flux_Hadamard_product_sparsity_on_the_fly<1>(
+    const std::vector<double> &input_vector,
+    const std::array<std::vector<double>,1> &hadamard_vector,
+   // std::array<dealii::Tensor<1,dim,real>,nstate> (*two_pt_flux_function)(const std::array<real,nstate>, const std::array<real,nstate>),
+    std::function<std::array<dealii::Tensor<1,PHILIP_DIM,double>,1> (const std::array<double,1>, const std::array<double,1>)> two_pt_flux_function,
+    std::array<std::vector<double>,1> &output_vector,
+    const dealii::FullMatrix<double> &basis,
+   // const std::vector<std::vector<double>> &basis,
+    const unsigned int size,
+    const std::vector<double> &weights,
+    const double scaling);
 
 } // OPERATOR namespace
 } // PHiLiP namespace
