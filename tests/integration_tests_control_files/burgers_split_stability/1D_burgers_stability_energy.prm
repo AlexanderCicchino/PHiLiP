@@ -4,11 +4,11 @@ set dimension = 1
 
 set use_weak_form = false
 
-set overintegration = 2
+set overintegration = 0
 
 set do_renumber_dofs = false
 
-set flux_nodes_type = GL
+set flux_nodes_type = GLL
 
 set use_split_form = true
 
@@ -20,7 +20,7 @@ set use_classical_FR = false
 
 set use_periodic_bc = true
 
-set flux_reconstruction = cPlus
+set flux_reconstruction = cDG
 
 set use_inverse_mass_on_the_fly = true
 
@@ -47,6 +47,8 @@ subsection ODE solver
   #set initial_time_step = 0.00005
 
   set runge_kutta_method = rk4_ex
+
+  set output_solution_every_x_steps = 100
 
 end
 

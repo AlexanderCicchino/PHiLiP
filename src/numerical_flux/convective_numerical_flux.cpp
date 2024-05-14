@@ -166,7 +166,24 @@ std::array<real, nstate> EntropyConservingBaselineNumericalFluxConvective<dim,ns
             flux_dot_n += conv_phys_split_flux[s][d] * normal_int[d];
         }
         numerical_flux_dot_n[s] = flux_dot_n;
+
+        //IR diss
+        numerical_flux_dot_n[s] -= 0.25* abs(soln_int[0]+soln_ext[0]) * (soln_ext[0]-soln_int[0]);
+        numerical_flux_dot_n[s] -= 1.0/12.0* abs(soln_int[0]-soln_ext[0]) * (soln_ext[0]-soln_int[0]);
     }
+
+//    const real u_L = soln_int[0];
+//    const real u_R = soln_ext[0];
+//    if(u_L <= u_R){
+//        const real temp1 = (0.5*u_L*u_L<0.5*u_R*u_R) ? 0.5*u_L*u_L : 0.5*u_R*u_R;
+//        numerical_flux_dot_n[0] = (temp1< 0.5 *0.5*0.5*(u_L+u_R)*(u_L+u_R)) ? temp1: 0.5 *0.5*0.5*(u_L+u_R)*(u_L+u_R);
+//    }
+//    else{
+//        const real temp1 = (0.5*u_L*u_L>0.5*u_R*u_R) ? 0.5*u_L*u_L : 0.5*u_R*u_R;
+//        numerical_flux_dot_n[0] = (temp1> 0.5 *0.5*0.5*(u_L+u_R)*(u_L+u_R)) ? temp1: 0.5 *0.5*0.5*(u_L+u_R)*(u_L+u_R);
+//    }
+
+
     return numerical_flux_dot_n;
 }
 

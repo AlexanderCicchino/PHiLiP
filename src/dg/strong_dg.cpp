@@ -926,12 +926,17 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
     std::array<std::vector<real>,nstate> soln_at_q;
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_at_q; //auxiliary sol at flux nodes
     std::vector<std::array<real,nstate>> soln_at_q_for_max_CFL(n_quad_pts);//Need soln written in a different for to use pre-existing max CFL function
+    std::array<std::vector<real>,nstate> grad_soln_at_q;
     // Interpolate each state to the quadrature points using sum-factorization
     // with the basis functions in each reference direction.
     for(int istate=0; istate<nstate; istate++){
         soln_at_q[istate].resize(n_quad_pts);
         soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
                                          soln_basis.oneD_vol_operator);
+
+        grad_soln_at_q[istate].resize(n_quad_pts);
+        soln_basis.matrix_vector_mult_1D(soln_coeff[istate], grad_soln_at_q[istate],
+                                         soln_basis.oneD_grad_operator);
         for(int idim=0; idim<dim; idim++){
             aux_soln_at_q[istate][idim].resize(n_quad_pts);
             soln_basis.matrix_vector_mult_1D(aux_soln_coeff[istate][idim], aux_soln_at_q[istate][idim],
@@ -1099,6 +1104,160 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                     //Compute the physical flux
                     std::array<dealii::Tensor<1,dim,real>,nstate> conv_phys_flux_2pt;
                     conv_phys_flux_2pt = this->pde_physics_double->convective_numerical_split_flux(soln_state, soln_state_flux_basis);
+                    
+                    if(iquad != flux_quad){
+                        const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree].point(iquad);
+                        const dealii::Point<dim,real> jq_point = this->volume_quadrature_collection[poly_degree].point(flux_quad);
+                        const real jump_grad = grad_soln_at_q[0][flux_quad] - grad_soln_at_q[0][iquad];
+//                        const real delx = jq_point[0] - iq_point[0];
+                            const real delx = 0.5*(metric_oper.det_Jac_vol[iquad]+metric_oper.det_Jac_vol[flux_quad]) * (jq_point[0] - iq_point[0]);
+          //             // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*delx*jump_grad;
+          //              conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(soln_state_flux_basis[0]-soln_state[0])*abs(soln_basis.oneD_grad_operator[iquad][flux_quad])/soln_basis.oneD_grad_operator[iquad][flux_quad];
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(soln_state_flux_basis[0]-soln_state[0])*(soln_basis.oneD_grad_operator[iquad][flux_quad])*oneD_vol_quad_weights[iquad];
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(jump_grad)*(soln_basis.oneD_grad_operator[iquad][flux_quad])*oneD_vol_quad_weights[iquad];
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(jump_grad)*(soln_basis.oneD_grad_operator[iquad][flux_quad])/abs(soln_basis.oneD_grad_operator[iquad][flux_quad]);
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*(jump_grad)*(jump_grad);
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(soln_state_flux_basis[0]-soln_state[0])/(soln_basis.oneD_grad_operator[iquad][flux_quad]);///abs(soln_basis.oneD_grad_operator[iquad][flux_quad]);
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(soln_state_flux_basis[0]-soln_state[0])/(delx);
+
+                      //  conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(delx)*abs(jump_grad)*(soln_state_flux_basis[0]-soln_state[0])/(delx);
+                      //  conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(delx)*(jump_grad)*abs(soln_state_flux_basis[0]-soln_state[0])/(delx);
+                      //  conv_phys_flux_2pt[0][0] -= 1.0/4.0*abs(delx)*(jump_grad)*abs(soln_state_flux_basis[0]+soln_state[0])/(delx);
+                      //  conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(delx)*(jump_grad)*abs(jump_grad)/(delx);
+                      //  conv_phys_flux_2pt[0][0] -= 1.0/4.0*abs(delx)*(jump_grad)*abs(grad_soln_at_q[0][flux_quad] + grad_soln_at_q[0][iquad])/(delx);
+
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(delx)*abs(jump_grad)*(jump_grad)/(delx);
+                        const real avg_grad = 0.5*(grad_soln_at_q[0][flux_quad] + grad_soln_at_q[0][iquad]);
+                        conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(avg_grad)*abs(delx);
+                        conv_phys_flux_2pt[0][0] -= 1.0/2.0*abs(avg_grad)*(avg_grad)*abs(delx);
+
+                       // conv_phys_flux_2pt[0][0] -= 1.0/4.0*abs(delx)*abs(grad_soln_at_q[0][flux_quad] - grad_soln_at_q[0][iquad])*(jump_grad)/(delx);
+
+                      //  conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(delx)*abs(soln_state_flux_basis[0]-soln_state[0])*(soln_state_flux_basis[0]-soln_state[0])/(delx);
+
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(delx)*abs(jump_grad)*(jump_grad)/(delx);
+                   //     conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(soln_state_flux_basis[0]-soln_state[0])
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*(jump_grad)
+                   //                                 /flux_basis_stiffness.oneD_skew_symm_vol_oper[iquad][flux_quad]
+                  //                                  *abs(flux_basis_stiffness.oneD_skew_symm_vol_oper[iquad][flux_quad]) * abs(delx)*abs(delx);
+
+
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*abs(delx)*(soln_state_flux_basis[0]-soln_state[0])/delx;
+                       // conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(soln_state_flux_basis[0]-soln_state[0])*delx*jump_grad;
+                      //  conv_phys_flux_2pt[0][0] -= 1.0/12.0*abs(jump_grad)*jump_grad;
+
+                    }
+                    //Godunov flux
+                    //should be for all quad points between i and j then min or max
+//                        const real u_L = (jq_point[0] > iq_point[0]) ? entropy_var[0] : entropy_var_flux_basis[0];
+//                        const real u_R = (jq_point[0] > iq_point[0]) ? entropy_var_flux_basis[0] : entropy_var[0];
+//                        if(u_L <= u_R){
+//                            real min_f = 0.5 * u_L * u_L;
+//                            if(0.5*u_R*u_R<min_f){
+//                                min_f = 0.5*u_R*u_R;
+//                            }
+//                            for(unsigned int qpt=std::min(iquad,flux_quad);qpt<std::max(iquad,flux_quad);qpt++){
+//                                std::array<real,nstate> entropy_var_pt;
+//                                for(int istate=0; istate<nstate; istate++){
+//                                    entropy_var_pt[istate] = projected_entropy_var_at_q[istate][qpt];
+//                                }
+//                                std::array<real,nstate> soln_state_pt;
+//                                soln_state_pt = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var_pt);
+//                                if(0.5*soln_state_pt[0]*soln_state_pt[0]<min_f){
+//                                    min_f = 0.5*soln_state_pt[0]*soln_state_pt[0];
+//                                }
+//                            }
+//                            conv_phys_flux_2pt[0][0] = min_f;
+//                        }
+//                        else{
+//                            real max_f = 0.5 * u_L * u_L;
+//                            if(0.5*u_R*u_R>max_f){
+//                                max_f = 0.5*u_R*u_R;
+//                            }
+//                            for(unsigned int qpt=std::min(iquad,flux_quad);qpt<std::max(iquad,flux_quad);qpt++){
+//                                std::array<real,nstate> entropy_var_pt;
+//                                for(int istate=0; istate<nstate; istate++){
+//                                    entropy_var_pt[istate] = projected_entropy_var_at_q[istate][qpt];
+//                                }
+//                                std::array<real,nstate> soln_state_pt;
+//                                soln_state_pt = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var_pt);
+//                                if(0.5*soln_state_pt[0]*soln_state_pt[0]>max_f){
+//                                    max_f = 0.5*soln_state_pt[0]*soln_state_pt[0];
+//                                }
+//                            }
+//                            conv_phys_flux_2pt[0][0] = max_f;
+//                        }
+//                        const real shock_speed = 0.5 * (u_L + u_R);
+//                        const real u_s = 0.0;
+//                        if(u_L>=0.0 && u_R>= 0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_L*u_L;
+//                        }
+//                        if(u_L<=0.0 && u_R<= 0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_R*u_R;
+//                        }
+//                        if(u_L >= 0.0 && 0.0>= u_R){
+//                            if(shock_speed>0){
+//                                conv_phys_flux_2pt[0][0] = 0.5*u_L*u_L;
+//                            }
+//                            else{
+//                                conv_phys_flux_2pt[0][0] = 0.5*u_R*u_R;
+//                            }
+//                        }
+//                        if(u_L<0.0 && u_R>0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_s*u_s;
+//                        }
+
+//                        if(u_L <= u_R){
+//                            const real temp1 = std::min(0.5*entropy_var[0]*entropy_var[0],0.5*entropy_var_flux_basis[0]*entropy_var_flux_basis[0]);
+//                            conv_phys_flux_2pt[0][0] = std::min(temp1, 0.5 *0.5*0.5*(entropy_var[0]+entropy_var_flux_basis[0])*(entropy_var[0]+entropy_var_flux_basis[0]));
+//                        }
+//                        else{
+//                            const real temp1 = std::max(0.5*entropy_var[0]*entropy_var[0],0.5*entropy_var_flux_basis[0]*entropy_var_flux_basis[0]);
+//                            conv_phys_flux_2pt[0][0] = std::max(temp1, 0.5 *0.5*0.5*(entropy_var[0]+entropy_var_flux_basis[0])*(entropy_var[0]+entropy_var_flux_basis[0]));
+//                        }
+//                    }
+
+                    
+//                    //Add upwinding
+//                    const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree].point(iquad);
+//                    const dealii::Point<dim,real> jq_point = this->volume_quadrature_collection[poly_degree].point(flux_quad);
+//                    for(int istate=0; istate<nstate; istate++){
+//                        const real delu = (entropy_var_flux_basis[istate]-entropy_var[istate]);
+//                        for(int idim=0; idim<dim; idim++){
+//                           // const real delx = jq_point[idim] - iq_point[idim];
+//                           // const real delx = metric_oper.det_Jac_vol[0] * (jq_point[idim] - iq_point[idim]);
+//                            const real delx = 0.5*(metric_oper.det_Jac_vol[iquad]+metric_oper.det_Jac_vol[flux_quad]) * (jq_point[idim] - iq_point[idim]);
+//                            if(iquad != flux_quad){
+//                            const double scaling = (flux_basis_stiffness.oneD_skew_symm_vol_oper[iquad][flux_quad]/delx > 0 ) ? 1.0 : -1.0;
+//                            //const double scaling = (flux_basis_stiffness.oneD_skew_symm_vol_oper[iquad][flux_quad]/delx > 0 ) ? 1.0 : 1.0;
+//                         //       conv_phys_flux_2pt[istate][idim] -= 0.25 * abs(entropy_var_flux_basis[istate]+entropy_var[istate])
+//                         //      // conv_phys_flux_2pt[istate][idim] -= 0.5 * abs(entropy_var_flux_basis[istate]+entropy_var[istate])
+//                         //                                         * pow(abs(delx),poly_degree+1) 
+//                         //                                        // * pow(abs(delx),poly_degree+2) 
+//                         //                                        // * pow(abs(delx),2) 
+//                         //                                        // * pow(abs(delx),poly_degree-1) 
+//                         //                                        // * pow(abs(delx),poly_degree) 
+//                         //                                      //   / abs(flux_basis_stiffness.oneD_skew_symm_vol_oper[iquad][flux_quad]+1e-20)
+//                         //                                         * scaling
+//                         //                                         / (delx)
+//                         //                                         * delu;
+//                         //                                     //    /metric_oper.det_Jac_vol[0];
+//                                conv_phys_flux_2pt[istate][idim] -= 1.0 / 12.0 * abs(entropy_var_flux_basis[istate]-entropy_var[istate])
+//                               // conv_phys_flux_2pt[istate][idim] -= 1.0 / 6.0 * abs(entropy_var_flux_basis[istate]-entropy_var[istate])
+//                                                //                  * pow(abs(delx),poly_degree+1) 
+//                                                                 // * pow(abs(delx),poly_degree+2) 
+//                                                                 // * pow(abs(delx),2) 
+//                                                                  //* pow(abs(delx),poly_degree-1) 
+//                                                                 // * pow(abs(delx),poly_degree) 
+//                                                               //   / abs(flux_basis_stiffness.oneD_skew_symm_vol_oper[iquad][flux_quad]+1e-20)
+//                                                                  * abs(delx) 
+//                                                                  * scaling
+//                                                                  / (delx)
+//                                                                  * delu;
+//                                                              //    /metric_oper.det_Jac_vol[0];
+//                            }
+//                        }
+//                    }
                      
                     for(int istate=0; istate<nstate; istate++){
                         dealii::Tensor<1,dim,real> conv_ref_flux_2pt;
@@ -1900,6 +2059,11 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
     std::array<std::vector<real>,nstate> soln_at_surf_q_ext;
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_at_surf_q_int;
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_at_surf_q_ext;
+
+    std::array<std::vector<real>,nstate> grad_soln_at_vol_q_int;
+    std::array<std::vector<real>,nstate> grad_soln_at_vol_q_ext;
+    std::array<std::vector<real>,nstate> grad_soln_at_surf_q_int;
+    std::array<std::vector<real>,nstate> grad_soln_at_surf_q_ext;
     for(int istate=0; istate<nstate; ++istate){
         // allocate
         soln_at_vol_q_int[istate].resize(n_quad_pts_vol_int);
@@ -1921,6 +2085,28 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
         soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
                                                      soln_coeff_ext[istate], soln_at_surf_q_ext[istate],
                                                      soln_basis_ext.oneD_surf_operator,
+                                                     soln_basis_ext.oneD_vol_operator);
+
+        // allocate
+        grad_soln_at_vol_q_int[istate].resize(n_quad_pts_vol_int);
+        grad_soln_at_vol_q_ext[istate].resize(n_quad_pts_vol_ext);
+        // solve soln at volume cubature nodes
+        soln_basis_int.matrix_vector_mult_1D(soln_coeff_int[istate], grad_soln_at_vol_q_int[istate],
+                                             soln_basis_int.oneD_grad_operator);
+        soln_basis_ext.matrix_vector_mult_1D(soln_coeff_ext[istate], grad_soln_at_vol_q_ext[istate],
+                                             soln_basis_ext.oneD_grad_operator);
+
+        // allocate
+        grad_soln_at_surf_q_int[istate].resize(n_face_quad_pts);
+        grad_soln_at_surf_q_ext[istate].resize(n_face_quad_pts);
+        // solve soln at facet cubature nodes
+        soln_basis_int.matrix_vector_mult_surface_1D(iface,
+                                                     soln_coeff_int[istate], grad_soln_at_surf_q_int[istate],
+                                                     soln_basis_int.oneD_surf_grad_operator,
+                                                     soln_basis_int.oneD_vol_operator);
+        soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
+                                                     soln_coeff_ext[istate], grad_soln_at_surf_q_ext[istate],
+                                                     soln_basis_ext.oneD_surf_grad_operator,
                                                      soln_basis_ext.oneD_vol_operator);
 
         for(int idim=0; idim<dim; idim++){
@@ -2307,6 +2493,88 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                 //Compute the physical flux
                 std::array<dealii::Tensor<1,dim,real>,nstate> conv_phys_flux_2pt;
                 conv_phys_flux_2pt = this->pde_physics_double->convective_numerical_split_flux(soln_state, soln_state_face_int);
+
+                    if(!(unit_ref_normal_int[dim_not_zero_int]>0 && iquad_vol == n_quad_pts_vol_int-1) && !(unit_ref_normal_int[dim_not_zero_int]<0 && iquad_vol == 0) ){
+                        const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree_int].point(iquad_vol);
+                        const real jq_point = (unit_ref_normal_int[dim_not_zero_int] >0)?1.0 : 0.0;
+                        const real delx =0.5*( metric_oper_int.det_Jac_vol[0] + metric_oper_int.det_Jac_surf[0]) * (jq_point - iq_point[0]);
+                        const real jump_grad = (grad_soln_at_surf_q_int[0][iquad_face]-grad_soln_at_vol_q_int[0][iquad_vol]);
+                        const real avg_grad = 0.5*(grad_soln_at_surf_q_int[0][iquad_face]+grad_soln_at_vol_q_int[0][iquad_vol]);
+                        conv_phys_flux_2pt[0][0] -= 1.0 / 12.0 * abs(jump_grad)
+                                                  * abs(delx) 
+                      //                            / (delx)
+                                                 // * jump_grad;
+                                                  * avg_grad;
+      
+                    }
+                    //Godunov flux
+//                    if(!(unit_ref_normal_int[dim_not_zero_int]>0 && iquad_vol == n_quad_pts_vol_int-1) && !(unit_ref_normal_int[dim_not_zero_int]<0 && iquad_vol == 0) ){
+//                        const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree_int].point(iquad_vol);
+//                        const real jq_point = (unit_ref_normal_int[dim_not_zero_int] >0)?1.0 : 0.0;
+//                        const real u_L = (jq_point > iq_point[0]) ? entropy_var[0] : entropy_var_face_int[0];
+//                        const real u_R = (jq_point > iq_point[0]) ? entropy_var_face_int[0] : entropy_var[0];
+//                        const real shock_speed = 0.5 * (u_L + u_R);
+//                        const real u_s = 0.0;
+//                        if(u_L>=0.0 && u_R>= 0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_L*u_L;
+//                        }
+//                        if(u_L<=0.0 && u_R<= 0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_R*u_R;
+//                        }
+//                        if(u_L >= 0.0 && 0.0>= u_R){
+//                            if(shock_speed>0){
+//                                conv_phys_flux_2pt[0][0] = 0.5*u_L*u_L;
+//                            }
+//                            else{
+//                                conv_phys_flux_2pt[0][0] = 0.5*u_R*u_R;
+//                            }
+//                        }
+//                        if(u_L<0.0 && u_R>0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_s*u_s;
+//                        }
+//                        if(u_L <= u_R){
+//                            const real temp1 = std::min(0.5*entropy_var[0]*entropy_var[0],0.5*entropy_var_face_int[0]*entropy_var_face_int[0]);
+//                            conv_phys_flux_2pt[0][0] = std::min(temp1, 0.5 *0.5*0.5*(entropy_var[0]+entropy_var_face_int[0])*(entropy_var[0]+entropy_var_face_int[0]));
+//                        }
+//                        else{
+//                            const real temp1 = std::max(0.5*entropy_var[0]*entropy_var[0],0.5*entropy_var_face_int[0]*entropy_var_face_int[0]);
+//                            conv_phys_flux_2pt[0][0] = std::max(temp1, 0.5 *0.5*0.5*(entropy_var[0]+entropy_var_face_int[0])*(entropy_var[0]+entropy_var_face_int[0]));
+//                        }
+//                    }
+
+                    //Add upwinding
+//                    const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree_int].point(iquad_vol);
+//                   // const dealii::Point<dim,real> jq_point = (unit_ref_normal_int[dim_not_zero_int] >0)?1.0 : 0.0;
+//                    const real jq_point = (unit_ref_normal_int[dim_not_zero_int] >0)?1.0 : 0.0;
+//                    for(int istate=0; istate<nstate; istate++){
+//                        const real delu = (entropy_var_face_int[istate]-entropy_var[istate]);
+//                        for(int idim=0; idim<dim; idim++){
+//                           // const real delx = jq_point - iq_point[idim];
+//                            const real delx =0.5*( metric_oper_int.det_Jac_vol[0] + metric_oper_int.det_Jac_surf[0]) * (jq_point - iq_point[idim]);
+//                           // if(iquad_vol != iquad_face){
+//                            if(!(unit_ref_normal_int[dim_not_zero_int]>0 && iquad_vol == n_quad_pts_vol_int-1) && !(unit_ref_normal_int[dim_not_zero_int]<0 && iquad_vol == 0) ){
+//                         //       conv_phys_flux_2pt[istate][idim] -= 0.25 * abs(entropy_var_face_int[istate]+entropy_var[istate])
+//                         //                                         * pow(abs(delx),poly_degree_int+1) 
+//                         //                                        // * pow(abs(delx),poly_degree_int+2) 
+//                         //                                       //  * pow(abs(delx),poly_degree_int-1) 
+//                         //                                        // * pow(abs(delx),2) 
+//                         //                                       //  * pow(abs(delx),poly_degree_int) 
+//                         //                                         / (delx)
+//                         //                                         * delu;
+//                                conv_phys_flux_2pt[istate][idim] -= 1.0 / 12.0 * abs(entropy_var_face_int[istate]-entropy_var[istate])
+//                           //                                       * pow(abs(delx),poly_degree_int+1) 
+//                                                                 // * pow(abs(delx),poly_degree_int+2) 
+//                                                                 // * pow(abs(delx),poly_degree_int-1) 
+//                                                                 // * pow(abs(delx),2) 
+//                                                                 // * pow(abs(delx),poly_degree_int) 
+//                                                                  * abs(delx) 
+//                                                                  / (delx)
+//                                                                  * delu;
+//                            }
+//                        }
+//                    }
+
+
                 for(int istate=0; istate<nstate; istate++){
                     dealii::Tensor<1,dim,real> conv_ref_flux_2pt;
                     //For each state, transform the physical flux to a reference flux.
@@ -2346,6 +2614,86 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                 //Compute the physical flux
                 std::array<dealii::Tensor<1,dim,real>,nstate> conv_phys_flux_2pt;
                 conv_phys_flux_2pt = this->pde_physics_double->convective_numerical_split_flux(soln_state, soln_state_face_ext);
+
+                if(!(unit_ref_normal_ext[dim_not_zero_ext]>0 && iquad_vol == n_quad_pts_vol_ext-1) && !(unit_ref_normal_ext[dim_not_zero_ext]<0 && iquad_vol == 0) ){
+                    const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree_ext].point(iquad_vol);
+                    const real jq_point = (unit_ref_normal_ext[dim_not_zero_ext] >0)?1.0 : 0.0;
+                    const real delx =0.5*( metric_oper_int.det_Jac_vol[0] + metric_oper_int.det_Jac_surf[0]) * (jq_point - iq_point[0]);
+                    const real jump_grad = (grad_soln_at_surf_q_ext[0][iquad_face]-grad_soln_at_vol_q_ext[0][iquad_vol]);
+                    const real avg_grad = 0.5*(grad_soln_at_surf_q_ext[0][iquad_face]+grad_soln_at_vol_q_ext[0][iquad_vol]);
+                    conv_phys_flux_2pt[0][0] -= 1.0 / 12.0 * abs(jump_grad)
+                                              * abs(delx) 
+                      //                        / (delx)
+                                             // * jump_grad;
+                                              * avg_grad;
+      
+                }
+
+                    //Godunov flux
+//                    if(!(unit_ref_normal_ext[dim_not_zero_ext]>0 && iquad_vol == n_quad_pts_vol_ext-1) && !(unit_ref_normal_ext[dim_not_zero_ext]<0 && iquad_vol == 0) ){
+//                        const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree_ext].point(iquad_vol);
+//                        const real jq_point = (unit_ref_normal_ext[dim_not_zero_ext] >0)?1.0 : 0.0;
+//                        const real u_L = (jq_point > iq_point[0]) ? entropy_var[0] : entropy_var_face_ext[0];
+//                        const real u_R = (jq_point > iq_point[0]) ? entropy_var_face_ext[0] : entropy_var[0];
+//                        const real shock_speed = 0.5 * (u_L + u_R);
+//                        const real u_s = 0.0;
+//                        if(u_L>=0.0 && u_R>= 0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_L*u_L;
+//                        }
+//                        if(u_L<=0.0 && u_R<= 0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_R*u_R;
+//                        }
+//                        if(u_L >= 0.0 && 0.0>= u_R){
+//                            if(shock_speed>0){
+//                                conv_phys_flux_2pt[0][0] = 0.5*u_L*u_L;
+//                            }
+//                            else{
+//                                conv_phys_flux_2pt[0][0] = 0.5*u_R*u_R;
+//                            }
+//                        }
+//                        if(u_L<0.0 && u_R>0.0){
+//                            conv_phys_flux_2pt[0][0] = 0.5*u_s*u_s;
+//                        }
+//                        if(u_L <= u_R){
+//                            const real temp1 = std::min(0.5*entropy_var[0]*entropy_var[0],0.5*entropy_var_face_ext[0]*entropy_var_face_ext[0]);
+//                            conv_phys_flux_2pt[0][0] = std::min(temp1, 0.5 *0.5*0.5*(entropy_var[0]+entropy_var_face_ext[0])*(entropy_var[0]+entropy_var_face_ext[0]));
+//                        }
+//                        else{
+//                            const real temp1 = std::max(0.5*entropy_var[0]*entropy_var[0],0.5*entropy_var_face_ext[0]*entropy_var_face_ext[0]);
+//                            conv_phys_flux_2pt[0][0] = std::max(temp1, 0.5 *0.5*0.5*(entropy_var[0]+entropy_var_face_ext[0])*(entropy_var[0]+entropy_var_face_ext[0]));
+//                        }
+//                    }
+
+//                    //Add upwinding
+//                    const dealii::Point<dim,real> iq_point = this->volume_quadrature_collection[poly_degree_ext].point(iquad_vol);
+//                   // const dealii::Point<dim,real> jq_point = (unit_ref_normal_ext[dim_not_zero_ext] >0)?1.0 : 0.0;
+//                    const real jq_point = (unit_ref_normal_ext[dim_not_zero_ext] >0)?1.0 : 0.0;
+//                    for(int istate=0; istate<nstate; istate++){
+//                        const real delu = (entropy_var_face_ext[istate]-entropy_var[istate]);
+//                        for(int idim=0; idim<dim; idim++){
+//                           // const real delx = jq_point - iq_point[idim];
+//                            const real delx = 0.5*( metric_oper_int.det_Jac_vol[0] + metric_oper_int.det_Jac_surf[0]) * (jq_point - iq_point[idim]);
+//                           // if(iquad_vol != iquad_face){
+//                            if(!(unit_ref_normal_ext[dim_not_zero_ext]>0 && iquad_vol == n_quad_pts_vol_ext-1) && !(unit_ref_normal_ext[dim_not_zero_ext]<0 && iquad_vol == 0) ){
+//                          //      conv_phys_flux_2pt[istate][idim] -= 0.25 * abs(entropy_var_face_ext[istate]+entropy_var[istate])
+//                          //                                        * pow(abs(delx),poly_degree_ext+1) 
+//                          //                                       // * pow(abs(delx),poly_degree_ext+2) 
+//                          //                                       // * pow(abs(delx),poly_degree_ext-1) 
+//                          //                                       // * pow(abs(delx),poly_degree_ext) 
+//                          //                                       // * pow(abs(delx),2) 
+//                          //                                        / (delx)
+//                          //                                        * delu; 
+//                                conv_phys_flux_2pt[istate][idim] -= 1.0 / 12.0 * abs(delu)
+//                            //                                      * pow(abs(delx),poly_degree_ext+1) 
+//                                                                 // * pow(abs(delx),poly_degree_ext+2) 
+//                                                                 // * pow(abs(delx),poly_degree_ext-1) 
+//                                                                 // * pow(abs(delx),poly_degree_ext) 
+//                                                                  * abs(delx) 
+//                                                                  / (delx)
+//                                                                  * delu; 
+//                            }
+//                        }
+//                    }
                 for(int istate=0; istate<nstate; istate++){
                     dealii::Tensor<1,dim,real> conv_ref_flux_2pt;
                     //For each state, transform the physical flux to a reference flux.

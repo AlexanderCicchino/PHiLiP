@@ -94,12 +94,12 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
     double left = 0.0;
     double right = 2.0;
-    const unsigned int n_grids = (all_parameters_new.use_energy) ? 4 : 5;
+    const unsigned int n_grids = (all_parameters_new.use_energy) ? 5 : 6;
     std::vector<double> grid_size(n_grids);
     std::vector<double> soln_error(n_grids);
     unsigned int poly_degree = 4;
     dealii::ConvergenceTable convergence_table;
-    const unsigned int igrid_start = 3;
+    const unsigned int igrid_start = 4;
     const unsigned int grid_degree = 1;
 
     for(unsigned int igrid = igrid_start; igrid<n_grids; igrid++){
@@ -176,9 +176,17 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         std::ofstream myfile ("energy_plot_burgers.gpl" , std::ios::trunc);
          
         ode_solver->current_iteration = 0;
+        ode_solver->allocate_ode_system();
         for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
         {
-                ode_solver->advance_solution_time(dt);
+        //        ode_solver->advance_solution_time(dt);
+            ode_solver->step_in_time(dt, false);
+            ode_solver->current_iteration += 1;
+            const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
+            if (is_output_iteration) {
+                const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
+                dg->output_results_vtk(file_number);
+            }
                 //Energy
                 double current_energy = compute_energy(dg);
                 current_energy /=initial_energy;
@@ -211,23 +219,23 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
                 }
             }
             myfile.close();
-             
+
             //Print to a file the final solution vs x to plot
             std::ofstream myfile2 ("solution_burgers.gpl" , std::ios::trunc);
-             
+
             dealii::QGaussLobatto<dim> quad_extra(dg->max_degree+1);
-            dealii::FEValues<dim,dim> fe_values_extra(*(dg->high_order_grid->mapping_fe_field), dg->fe_collection[poly_degree], quad_extra, 
+            dealii::FEValues<dim,dim> fe_values_extra(*(dg->high_order_grid->mapping_fe_field), dg->fe_collection[poly_degree], quad_extra,
                     dealii::update_values | dealii::update_JxW_values | dealii::update_quadrature_points);
             const unsigned int n_quad_pts = fe_values_extra.n_quadrature_points;
             std::array<double,nstate> soln_at_q;
             std::vector<dealii::types::global_dof_index> dofs_indices (fe_values_extra.dofs_per_cell);
-            
+
             for (auto cell = dg->dof_handler.begin_active(); cell!=dg->dof_handler.end(); ++cell) {
                 if (!cell->is_locally_owned()) continue;
-            
+
                 fe_values_extra.reinit (cell);
                 cell->get_dof_indices (dofs_indices);
-            
+
                 for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
                     std::fill(soln_at_q.begin(), soln_at_q.end(), 0.0);
                     for (unsigned int idof=0; idof<fe_values_extra.dofs_per_cell; ++idof) {
@@ -242,6 +250,72 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
             }
             myfile2.close();
         }//end of energy
+//        for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
+//        {
+//                ode_solver->advance_solution_time(dt);
+//                //Energy
+//                double current_energy = compute_energy(dg);
+//                current_energy /=initial_energy;
+//                std::cout << std::setprecision(16) << std::fixed;
+//                pcout << "Energy at time " << i * dt << " is " << current_energy << std::endl;
+//                myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_energy << std::endl;
+//                if (current_energy*initial_energy - initial_energy >= 1.0)
+//                {
+//                    pcout<<"Energy not monotonicaly decreasing"<<std::endl;
+//                    return 1;
+//                    break;
+//                }
+//                if ( (current_energy*initial_energy - initial_energy >= 1.0e-11)&&(all_parameters_new.conv_num_flux_type == Parameters::AllParameters::ConvectiveNumericalFlux::two_point_flux) )
+//                {
+//                    pcout<<"Energy not conserved"<<std::endl;
+//                    return 1;
+//                    break;
+//                }
+//                //Conservation
+//                double current_conservation = compute_conservation(dg, poly_degree);
+//                current_conservation /=initial_conservation;
+//                std::cout << std::setprecision(16) << std::fixed;
+//                pcout << "Normalized Conservation at time " << i * dt << " is " << current_conservation<< std::endl;
+//                myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_conservation << std::endl;
+//                if (current_conservation*initial_conservation - initial_conservation >= 10.00)
+//                {
+//                    pcout << "Not conserved" << std::endl;
+//                    return 1;
+//                    break;
+//                }
+//            }
+//            myfile.close();
+//             
+//            //Print to a file the final solution vs x to plot
+//            std::ofstream myfile2 ("solution_burgers.gpl" , std::ios::trunc);
+//             
+//            dealii::QGaussLobatto<dim> quad_extra(dg->max_degree+1);
+//            dealii::FEValues<dim,dim> fe_values_extra(*(dg->high_order_grid->mapping_fe_field), dg->fe_collection[poly_degree], quad_extra, 
+//                    dealii::update_values | dealii::update_JxW_values | dealii::update_quadrature_points);
+//            const unsigned int n_quad_pts = fe_values_extra.n_quadrature_points;
+//            std::array<double,nstate> soln_at_q;
+//            std::vector<dealii::types::global_dof_index> dofs_indices (fe_values_extra.dofs_per_cell);
+//            
+//            for (auto cell = dg->dof_handler.begin_active(); cell!=dg->dof_handler.end(); ++cell) {
+//                if (!cell->is_locally_owned()) continue;
+//            
+//                fe_values_extra.reinit (cell);
+//                cell->get_dof_indices (dofs_indices);
+//            
+//                for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+//                    std::fill(soln_at_q.begin(), soln_at_q.end(), 0.0);
+//                    for (unsigned int idof=0; idof<fe_values_extra.dofs_per_cell; ++idof) {
+//                        const unsigned int istate = fe_values_extra.get_fe().system_to_component_index(idof).first;
+//                        soln_at_q[istate] += dg->solution[dofs_indices[idof]] * fe_values_extra.shape_value_component(idof, iquad, istate);
+//                    }
+//                    const dealii::Point<dim> qpoint = (fe_values_extra.quadrature_point(iquad));
+//
+//                    std::cout << std::setprecision(16) << std::fixed;
+//                    myfile2<< std::fixed << std::setprecision(16) << qpoint[0] << std::fixed << std::setprecision(16) <<" " << soln_at_q[0]<< std::endl;
+//                }
+//            }
+//            myfile2.close();
+//        }//end of energy
         else{//do OOA
             finalTime = 0.001;//This is sufficient for verification
 
