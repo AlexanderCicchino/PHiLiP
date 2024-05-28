@@ -1219,8 +1219,10 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
     OPERATOR::basis_functions<dim,2*dim,real> flux_basis_int(1, max_degree, init_grid_degree); 
     OPERATOR::basis_functions<dim,2*dim,real> flux_basis_ext(1, max_degree, init_grid_degree); 
     OPERATOR::local_basis_stiffness<dim,2*dim,real> flux_basis_stiffness(1, max_degree, init_grid_degree, true); 
-    OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_int(1, max_degree, init_grid_degree); 
-    OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_ext(1, max_degree, init_grid_degree); 
+   // OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_int(1, max_degree, init_grid_degree); 
+   // OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_ext(1, max_degree, init_grid_degree); 
+    OPERATOR::vol_projection_operator_FR<dim,2*dim,real> soln_basis_projection_oper_int(1, max_degree, init_grid_degree,this->all_parameters->flux_reconstruction_type); 
+    OPERATOR::vol_projection_operator_FR<dim,2*dim,real> soln_basis_projection_oper_ext(1, max_degree, init_grid_degree,this->all_parameters->flux_reconstruction_type); 
     OPERATOR::mapping_shape_functions<dim,2*dim,real> mapping_basis(1, init_grid_degree, init_grid_degree);
 
     reinit_operators_for_cell_residual_loop(

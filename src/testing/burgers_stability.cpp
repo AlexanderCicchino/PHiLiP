@@ -175,6 +175,51 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         // but it works. I'll keep it for now and need to modify the output functions later to account for this.
         std::ofstream myfile ("energy_plot_burgers.gpl" , std::ios::trunc);
          
+         ode_solver->current_iteration = 0;
+        ode_solver->allocate_ode_system();
+        for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
+        {
+        //        ode_solver->advance_solution_time(dt);
+            ode_solver->step_in_time(dt, false);
+            ode_solver->current_iteration += 1;
+            const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
+            if (is_output_iteration) {
+                const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
+                dg->output_results_vtk(file_number);
+            }
+                //Energy
+                double current_energy = compute_energy(dg);
+                current_energy /=initial_energy;
+                std::cout << std::setprecision(16) << std::fixed;
+                pcout << "Energy at time " << i * dt << " is " << current_energy << std::endl;
+                myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_energy << std::endl;
+                if (current_energy*initial_energy - initial_energy >= 1.0)
+                {
+                    pcout<<"Energy not monotonicaly decreasing"<<std::endl;
+                    return 1;
+                    break;
+                }
+                if ( (current_energy*initial_energy - initial_energy >= 1.0e-11)&&(all_parameters_new.conv_num_flux_type == Parameters::AllParameters::ConvectiveNumericalFlux::two_point_flux) )
+                {
+                    pcout<<"Energy not conserved"<<std::endl;
+                    return 1;
+                    break;
+                }
+                //Conservation
+                double current_conservation = compute_conservation(dg, poly_degree);
+                current_conservation /=initial_conservation;
+                std::cout << std::setprecision(16) << std::fixed;
+                pcout << "Normalized Conservation at time " << i * dt << " is " << current_conservation<< std::endl;
+                myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_conservation << std::endl;
+                if (current_conservation*initial_conservation - initial_conservation >= 10.00)
+                {
+                    pcout << "Not conserved" << std::endl;
+                    return 1;
+                    break;
+                }
+            }
+            myfile.close();
+#if 0
         ode_solver->current_iteration = 0;
         for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
         {
@@ -211,6 +256,7 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
                 }
             }
             myfile.close();
+#endif
              
             //Print to a file the final solution vs x to plot
             std::ofstream myfile2 ("solution_burgers.gpl" , std::ios::trunc);
