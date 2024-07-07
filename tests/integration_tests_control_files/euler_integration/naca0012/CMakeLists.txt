@@ -1,3 +1,5 @@
+add_subdirectory(naca_angle_attack_loop)
+
 configure_file(2d_euler_naca0012_subsonic_05_200.prm 2d_euler_naca0012_subsonic_05_200.prm COPYONLY)
 add_test(
   NAME 2D_EULER_INTEGRATION_NACA0012_SUBSONIC_LONG
