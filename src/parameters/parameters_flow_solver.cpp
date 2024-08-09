@@ -38,6 +38,7 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " leblanc_shock_tube | "
                           " shu_osher_problem | "
                           " advection_limiter | "
+                          " von_Neumann | "
                           " burgers_limiter "),
                           "The type of flow we want to simulate. "
                           "Choices are "
@@ -59,6 +60,7 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " leblanc_shock_tube | "
                           " shu_osher_problem | "
                           " advection_limiter | "
+                          " von_Neumann | "
                           " burgers_limiter >. ");
 
         prm.declare_entry("poly_degree", "1",
@@ -342,6 +344,7 @@ void FlowSolverParam::parse_parameters(dealii::ParameterHandler &prm)
         else if (flow_case_type_string == "shu_osher_problem")          {flow_case_type = shu_osher_problem;}
         else if (flow_case_type_string == "advection_limiter")          {flow_case_type = advection_limiter;}
         else if (flow_case_type_string == "burgers_limiter")            {flow_case_type = burgers_limiter;}
+        else if (flow_case_type_string == "von_Neumann")                {flow_case_type = von_Neumann;}
         
         poly_degree = prm.get_integer("poly_degree");
         

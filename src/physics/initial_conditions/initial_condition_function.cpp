@@ -650,6 +650,39 @@ real InitialConditionFunction_ShuOsherProblem<dim, nstate, real>
 }
 
 // ========================================================
+// von Neumann Exponential Function -- Initial Condition
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_VonNeumannDispersionDissipation<dim,nstate,real>
+::InitialConditionFunction_VonNeumannDispersionDissipation(
+    Parameters::AllParameters const* const param)
+        : InitialConditionFunction<dim,nstate,real>()
+{
+    left_bound = param->flow_solver_param.grid_left_bound;
+    right_bound = param->flow_solver_param.grid_right_bound;
+    midpoint = 0.5 *(left_bound + right_bound);
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_VonNeumannDispersionDissipation<dim,nstate,real>
+::value(const dealii::Point<dim,real> &point, const unsigned int /*istate*/) const
+{
+    real value = 1.0;
+    real pi = dealii::numbers::PI;
+    if constexpr(dim >= 1)
+      //  value *= exp(-20.0*(point[0] - midpoint)*(point[0] - midpoint));
+        value *= sin(pi*(point[0] - midpoint))+5.0;
+       // value *= cos(pi*(point[0] - midpoint))+5.0;
+       // value *= cos(pi*(point[0] - midpoint));
+    if constexpr(dim >= 2)
+        value *= exp(-20.0*(point[1] - midpoint)*(point[1] - midpoint));
+    if constexpr(dim == 3)
+        value *= exp(-20.0*(point[2] - midpoint)*(point[2] - midpoint));
+
+    return value;
+}
+
+// ========================================================
 // ZERO INITIAL CONDITION
 // ========================================================
 template <int dim, int nstate, typename real>
@@ -738,6 +771,8 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
         if constexpr (dim < 3 && nstate == 1)  return std::make_shared<InitialConditionFunction_Advection<dim, nstate, real> >();
     } else if (flow_type == FlowCaseEnum::burgers_limiter) {
         if constexpr (nstate==dim && dim<3) return std::make_shared<InitialConditionFunction_BurgersInviscid<dim, nstate, real> >();
+    } else if (flow_type == FlowCaseEnum::von_Neumann){
+        if constexpr (nstate == 1 || dim == nstate || nstate == dim + 2) return std::make_unique<InitialConditionFunction_VonNeumannDispersionDissipation<dim, nstate, real>>(param);
     }else {
         std::cout << "Invalid Flow Case Type. You probably forgot to add it to the list of flow cases in initial_condition_function.cpp" << std::endl;
         std::abort();
@@ -790,5 +825,10 @@ template class InitialConditionFunction_BurgersInviscid <PHILIP_DIM, PHILIP_DIM,
 template class InitialConditionFunction_AdvectionEnergy <PHILIP_DIM, 1, double>;
 template class InitialConditionFunction_ConvDiff <PHILIP_DIM, 1, double>;
 template class InitialConditionFunction_ConvDiffEnergy <PHILIP_DIM,1,double>;
+template class InitialConditionFunction_VonNeumannDispersionDissipation<PHILIP_DIM, 1, double>;
+#if PHILIP_DIM >1
+template class InitialConditionFunction_VonNeumannDispersionDissipation<PHILIP_DIM, PHILIP_DIM, double>;
+#endif
+template class InitialConditionFunction_VonNeumannDispersionDissipation<PHILIP_DIM, PHILIP_DIM+2, double>;
 
 } // PHiLiP namespace

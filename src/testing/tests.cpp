@@ -52,6 +52,7 @@
 #include "ROM_error_post_sampling.h"
 #include "HROM_error_post_sampling.h"
 #include "hyper_adaptive_sampling_new_error.h"
+#include "von_Neumann_dispersion_dissipation.h"
 
 namespace PHiLiP {
 namespace Tests {
@@ -332,6 +333,8 @@ std::unique_ptr< TestsBase > TestsFactory<dim,nstate,MeshType>
         if constexpr (dim==2 && nstate==dim+2)  return std::make_unique<BoundPreservingLimiterTests<dim, nstate>>(parameters_input, parameter_handler_input);
     } else if(test_type == Test_enum::naca0012_unsteady_check_quick){
         if constexpr (dim==2 && nstate==dim+2)  return std::make_unique<NACA0012UnsteadyCheckQuick<dim, nstate>>(parameters_input, parameter_handler_input);
+    } else if(test_type == Test_enum::von_Neumann){
+        if constexpr (nstate == 1 || dim == nstate || nstate == dim + 2) return std::make_unique<VonNeumannDispersionDissipation<dim, nstate>>(parameters_input);
     } else {
         std::cout << "Invalid test. You probably forgot to add it to the list of tests in tests.cpp" << std::endl;
         std::abort();

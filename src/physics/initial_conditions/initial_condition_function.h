@@ -427,6 +427,33 @@ public:
         Parameters::AllParameters const* const param);
 };
 
+/// Initial Condition Function: Exponential function for von Neumann dispersion/dissipation analysis
+template <int dim, int nstate, typename real>
+class InitialConditionFunction_VonNeumannDispersionDissipation
+        : public InitialConditionFunction<dim,nstate,real>
+{
+protected:
+    using dealii::Function<dim,real>::value; ///< dealii::Function we are templating on
+
+public:
+    /// Constructor for InitialConditionFunction_Inviscid
+    /** Calls the Function(const unsigned int n_components) constructor in deal.II*/
+    InitialConditionFunction_VonNeumannDispersionDissipation (Parameters::AllParameters const* const param);
+
+    //Left bound of domain
+    double left_bound;
+
+    //Right bound of domain
+    double right_bound;
+
+    //Midpoint of domain
+    double midpoint;
+
+    /// Value of initial condition
+    real value (const dealii::Point<dim,real> &point, const unsigned int istate) const override;
+
+};
+
 /// Initial condition 0.
 template <int dim, int nstate, typename real>
 class InitialConditionFunction_Zero : public InitialConditionFunction<dim,nstate,real>
@@ -458,6 +485,7 @@ public:
     create_InitialConditionFunction(
         Parameters::AllParameters const *const param);
 };
+
 
 } // PHiLiP namespace
 #endif

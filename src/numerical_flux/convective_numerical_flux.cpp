@@ -167,6 +167,12 @@ std::array<real, nstate> EntropyConservingBaselineNumericalFluxConvective<dim,ns
         }
         numerical_flux_dot_n[s] = flux_dot_n;
     }
+
+    //IR diss
+   // numerical_flux_dot_n[0] -= 0.25 * abs(soln_int[0] + soln_ext[0]) * (soln_ext[0] - soln_int[0]);
+   // numerical_flux_dot_n[0] -= 1.0 / 12.0 * abs(soln_ext[0] - soln_int[0]) * (soln_ext[0] - soln_int[0]);
+
+
     return numerical_flux_dot_n;
 }
 
@@ -205,6 +211,8 @@ std::array<real, nstate> LaxFriedrichsRiemannSolverDissipation<dim,nstate,real>
     std::array<real, nstate> numerical_flux_dot_n;
     for (int s=0; s<nstate; s++) {
         numerical_flux_dot_n[s] = - 0.5 * conv_max_eig * (soln_ext[s]-soln_int[s]);
+       //Downwind
+       // numerical_flux_dot_n[s] =  0.5 * conv_max_eig * (soln_ext[s]-soln_int[s]);
     }
 
     return numerical_flux_dot_n;

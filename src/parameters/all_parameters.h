@@ -210,6 +210,7 @@ public:
         ROM_error_post_sampling,
         HROM_error_post_sampling,
         hyper_adaptive_sampling_new_error,
+        von_Neumann,
         low_density
     };
     /// Store selected TestType from the input file.
