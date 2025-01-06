@@ -34,6 +34,7 @@ public:
         shu_osher_problem,
         advection_limiter,
         von_Neumann,
+        euler_density_wave,
         burgers_limiter
         };
     FlowCaseType flow_case_type; ///< Selected FlowCaseType from the input file

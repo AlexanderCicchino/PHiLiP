@@ -45,6 +45,7 @@ set(TESTS_SOURCE
     bound_preserving_limiter_tests.cpp
     naca0012_unsteady_check_quick.cpp
     von_Neumann_dispersion_dissipation.cpp
+    euler_density_wave.cpp
     )
 
 foreach(dim RANGE 1 3)

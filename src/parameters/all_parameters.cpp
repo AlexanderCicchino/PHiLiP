@@ -199,6 +199,7 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       " naca0012_unsteady_check_quick | "
                       " khi_robustness | "
                       " von_Neumann | "
+                      " euler_density_wave | "
                       " low_density "),
                       "The type of test we want to solve. "
                       "Choices are " 
@@ -249,6 +250,7 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       "  naca0012_unsteady_check_quick | "
                       "  khi_robustness | "
                       "  von_Neumann | "
+                      "  euler_density_wave | "
                       "  low_density>.");
 
     prm.declare_entry("pde_type", "advection",
@@ -440,6 +442,7 @@ const std::string test_string = prm.get("test_type");
     else if (test_string == "low_density")                              { test_type = low_density; }
     else if (test_string == "naca0012_unsteady_check_quick")            { test_type = naca0012_unsteady_check_quick; }
     else if (test_string == "von_Neumann")                              { test_type = von_Neumann; }
+    else if (test_string == "euler_density_wave")                       { test_type = euler_density_wave; }
     
     overintegration = prm.get_integer("overintegration");
 

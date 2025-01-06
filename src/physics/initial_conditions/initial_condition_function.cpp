@@ -681,6 +681,48 @@ inline real InitialConditionFunction_VonNeumannDispersionDissipation<dim,nstate,
 
     return value;
 }
+// ========================================================
+// Euler Density Wave -- Initial Condition
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_EulerDensityWave<dim,nstate,real>
+::InitialConditionFunction_EulerDensityWave()
+        : InitialConditionFunction<dim,nstate,real>()
+{
+    // Nothing to do here yet
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
+::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+    real value = 0.0;
+    real pi = dealii::numbers::PI;
+    real rho = 0.0;
+    if constexpr(dim==1)
+        rho = 1.0 + 0.98 * sin(pi*(point[0]));
+       // rho = 1.0 + 0.98 * sin(2.0*pi*(point[0]));
+        //rho = 2.0 + sin(2*pi*(point[0]));//Jesse's
+    else
+        rho = 1.0 + 0.98 * sin(2.0*pi*(point[0] +point[1]));
+
+    if(istate==0)//rho
+        value = rho;
+    if(istate==1)//u
+        value = 0.1 * rho;
+      //  value = 1.0 * rho;//Jesse's
+    if(istate==2 && dim > 1)//v
+        value = 0.2 * rho;
+    if(istate==2 && dim==1)//E
+        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
+       // value = 1.0/(0.4) + 0.5*rho;//Jesse's
+    if(istate==3 && dim==3)//w
+        value = 0.0;
+    if((istate==3 && dim==2) || istate==4)//E
+        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1 + 0.2*0.2);
+
+    return value;
+}
 
 // ========================================================
 // ZERO INITIAL CONDITION
@@ -773,6 +815,8 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
         if constexpr (nstate==dim && dim<3) return std::make_shared<InitialConditionFunction_BurgersInviscid<dim, nstate, real> >();
     } else if (flow_type == FlowCaseEnum::von_Neumann){
         if constexpr (nstate == 1 || dim == nstate || nstate == dim + 2) return std::make_unique<InitialConditionFunction_VonNeumannDispersionDissipation<dim, nstate, real>>(param);
+    } else if (flow_type == FlowCaseEnum::euler_density_wave){
+        if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerDensityWave<dim, nstate, real>>();
     }else {
         std::cout << "Invalid Flow Case Type. You probably forgot to add it to the list of flow cases in initial_condition_function.cpp" << std::endl;
         std::abort();
@@ -830,5 +874,6 @@ template class InitialConditionFunction_VonNeumannDispersionDissipation<PHILIP_D
 template class InitialConditionFunction_VonNeumannDispersionDissipation<PHILIP_DIM, PHILIP_DIM, double>;
 #endif
 template class InitialConditionFunction_VonNeumannDispersionDissipation<PHILIP_DIM, PHILIP_DIM+2, double>;
+template class InitialConditionFunction_EulerDensityWave<PHILIP_DIM, PHILIP_DIM+2, double>;
 
 } // PHiLiP namespace
