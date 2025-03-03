@@ -179,7 +179,8 @@ inline real InitialConditionFunction_BurgersInviscidEnergy<dim,nstate,real>
 {
     real value = 1.0;
     if constexpr(dim >= 1)
-        value *= sin(dealii::numbers::PI*point[0]);
+       // value *= sin(dealii::numbers::PI*point[0]);
+        value *= cos(dealii::numbers::PI*point[0]);
     if constexpr(dim >= 2)
         value *= sin(dealii::numbers::PI*point[1]);
     if constexpr(dim == 3)
@@ -648,6 +649,184 @@ real InitialConditionFunction_ShuOsherProblem<dim, nstate, real>
     }
     return value;
 }
+// ========================================================
+// Euler Density Wave -- Initial Condition
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_EulerDensityWave<dim,nstate,real>
+::InitialConditionFunction_EulerDensityWave()
+        : InitialConditionFunction<dim,nstate,real>()
+{
+    // Nothing to do here yet
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
+::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+    real value = 0.0;
+    real pi = dealii::numbers::PI;
+    real rho = 0.0;
+    if constexpr(dim==1)
+        rho = 1.0 + 0.98 * sin(pi*(point[0]));
+        //rho = 1.0 + 0.98 * sin(4.0*pi*(point[0]));
+        //rho = 2.0 + sin(2*pi*(point[0]));//Jesse's
+    else
+        rho = 1.0 + 0.98 * sin(2.0*pi*(point[0] +point[1]));
+       // rho = 1.0 + 0.98 * sin(pi*(point[0]));
+
+    if(istate==0)//rho
+        value = rho;
+    if(istate==1)//u
+        value = 0.1 * rho;
+      //  value = 1.0 * rho;//Jesse's
+    if(istate==2 && dim > 1)//v
+        value = 0.2 * rho;
+       // value = 0.0;
+    if(istate==2 && dim==1)//E
+        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
+       // value = 1.0/(0.4) + 0.5*rho;//Jesse's
+    if(istate==3 && dim==3)//w
+        value = 0.0;
+    if((istate==3 && dim==2) || istate==4)//E
+        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1 + 0.2*0.2);
+       // value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
+
+    return value;
+}
+// ========================================================
+// Euler Acoustic Wave -- Initial Condition
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_EulerAcousticWave<dim,nstate,real>
+::InitialConditionFunction_EulerAcousticWave()
+        : InitialConditionFunction<dim,nstate,real>()
+{
+    // Nothing to do here yet
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_EulerAcousticWave<dim,nstate,real>
+::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+    real value = 0.0;
+    real pi = dealii::numbers::PI;
+    real rho = 0.0;
+    if constexpr(dim==1)
+        rho = 1.0 + 0.98 * sin(pi*(point[0]));
+        //rho = 1.0 + 0.98 * sin(4.0*pi*(point[0]));
+        //rho = 2.0 + sin(2*pi*(point[0]));//Jesse's
+    else
+        rho = 1.0 + 0.98 * sin(2.0*pi*(point[0] +point[1]));
+       // rho = 1.0 + 0.98 * sin(pi*(point[0]));
+
+    if(istate==0)//rho
+        value = rho;
+    if(istate==1)//u
+        value = 0.1 * rho;
+      //  value = 1.0 * rho;//Jesse's
+    if(istate==2 && dim > 1)//v
+        value = 0.2 * rho;
+       // value = 0.0;
+    if(istate==2 && dim==1)//E
+        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
+       // value = 1.0/(0.4) + 0.5*rho;//Jesse's
+    if(istate==3 && dim==3)//w
+        value = 0.0;
+    if((istate==3 && dim==2) || istate==4)//E
+        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1 + 0.2*0.2);
+       // value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
+
+    return value;
+}
+// ========================================================
+// Euler Vorticity Wave -- Initial Condition
+// ========================================================
+template <int dim, int nstate, typename real>
+InitialConditionFunction_EulerVorticityWave<dim,nstate,real>
+::InitialConditionFunction_EulerVorticityWave(
+        Parameters::AllParameters const* const param)
+        : InitialConditionFunction<dim,nstate,real>()
+{
+    // Euler object; create using dynamic_pointer_cast and the create_Physics factory
+    // Note that Euler primitive/conservative vars are the same as NS
+    PHiLiP::Parameters::AllParameters parameters_euler = *param;
+    parameters_euler.pde_type = Parameters::AllParameters::PartialDifferentialEquation::euler;
+    this->euler_physics = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(
+                Physics::PhysicsFactory<dim,dim+2,double>::create_Physics(&parameters_euler));
+}
+
+template <int dim, int nstate, typename real>
+inline real InitialConditionFunction_EulerVorticityWave<dim,nstate,real>
+::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
+{
+#if 0
+    // Setting constants
+    const double pi = dealii::numbers::PI;
+
+    // Centre of the vortex  at t=0
+    const double x0 = 0.0;
+    const double y0 = 0.0;
+    const double x = point[0] - x0;
+    const double y = point[1] - y0;
+
+
+    // Primitive
+    std::array<real,nstate> sol_prim;
+    sol_prim[0] = 1.0;
+    sol_prim[1] = 1.0 + 0.98 * sin(pi*(x+y));
+    if constexpr (dim>=2){
+        sol_prim[1] = 0.98 * sin(pi*(x+y));
+    }
+    if constexpr (dim==3){
+        sol_prim[3] = 0.0;
+    }
+    sol_prim[nstate-1] = 1.0/1.4;
+
+    const std::array<real, nstate> sol_cons = this->euler_physics->convert_primitive_to_conservative(sol_prim);
+    return sol_cons[istate];
+#endif
+    //based on isentropic vortex
+//#if 0
+    // Setting constants
+    const double pi = dealii::numbers::PI;
+    const double gam = 1.4;
+   // const double M_infty = sqrt(2.0/gam);
+    const double M_infty = sqrt(1.0/gam);
+    const double R = 1.0;
+    const double sigma = 1.0;
+    const double beta = M_infty * 5.0 * sqrt(2.0)/4.0/pi * exp(1.0/2.0);
+    const double alpha = pi/4.0; //rad
+
+    // Centre of the vortex  at t=0
+    const double x0 = 0.0;
+    const double y0 = 0.0;
+    const double x = point[0] - x0;
+    const double y = point[1] - y0;
+
+    const double Omega = beta * exp(-0.5/sigma/sigma* (x/R * x/R + y/R * y/R));
+    const double delta_Ux = -y/R * Omega;
+    const double delta_Uy =  x/R * Omega;
+    const double delta_T  = 0.0;
+   // const double delta_T  = -(gam-1.0)/2.0 * Omega * Omega;
+
+    // Primitive
+    std::array<real,nstate> sol_prim;
+    sol_prim[0] = pow((1.0 + delta_T), 1.0/(gam-1.0));
+    sol_prim[1] = M_infty * cos(alpha) + delta_Ux;
+    if constexpr (dim>=2){
+       // sol_prim[2] = M_infty * sin(alpha) + delta_Uy;
+        sol_prim[2] = delta_Uy;
+    }
+    if constexpr (dim==3){
+        sol_prim[3] = 0.0;
+    }
+    sol_prim[nstate-1] = 1.0/gam*pow(1.0+delta_T, gam/(gam-1.0));
+
+    const std::array<real, nstate> sol_cons = this->euler_physics->convert_primitive_to_conservative(sol_prim);
+    return sol_cons[istate];
+//#endif
+}
 
 // ========================================================
 // ZERO INITIAL CONDITION
@@ -738,6 +917,12 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
         if constexpr (dim < 3 && nstate == 1)  return std::make_shared<InitialConditionFunction_Advection<dim, nstate, real> >();
     } else if (flow_type == FlowCaseEnum::burgers_limiter) {
         if constexpr (nstate==dim && dim<3) return std::make_shared<InitialConditionFunction_BurgersInviscid<dim, nstate, real> >();
+    } else if (flow_type == FlowCaseEnum::euler_density_wave){
+        if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerDensityWave<dim, nstate, real>>();
+    } else if (flow_type == FlowCaseEnum::euler_acoustic_wave){
+        if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerAcousticWave<dim, nstate, real>>();
+    } else if (flow_type == FlowCaseEnum::euler_vorticity_wave){
+        if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerVorticityWave<dim, nstate, real>>(param);
     }else {
         std::cout << "Invalid Flow Case Type. You probably forgot to add it to the list of flow cases in initial_condition_function.cpp" << std::endl;
         std::abort();
@@ -790,5 +975,8 @@ template class InitialConditionFunction_BurgersInviscid <PHILIP_DIM, PHILIP_DIM,
 template class InitialConditionFunction_AdvectionEnergy <PHILIP_DIM, 1, double>;
 template class InitialConditionFunction_ConvDiff <PHILIP_DIM, 1, double>;
 template class InitialConditionFunction_ConvDiffEnergy <PHILIP_DIM,1,double>;
+template class InitialConditionFunction_EulerDensityWave<PHILIP_DIM, PHILIP_DIM+2, double>;
+template class InitialConditionFunction_EulerAcousticWave<PHILIP_DIM, PHILIP_DIM+2, double>;
+template class InitialConditionFunction_EulerVorticityWave<PHILIP_DIM, PHILIP_DIM+2, double>;
 
 } // PHiLiP namespace

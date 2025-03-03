@@ -38,6 +38,9 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " leblanc_shock_tube | "
                           " shu_osher_problem | "
                           " advection_limiter | "
+                          " euler_density_wave | "
+                          " euler_acoustic_wave | "
+                          " euler_vorticity_wave | "
                           " burgers_limiter "),
                           "The type of flow we want to simulate. "
                           "Choices are "
@@ -59,6 +62,9 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " leblanc_shock_tube | "
                           " shu_osher_problem | "
                           " advection_limiter | "
+                          " euler_density_wave | "
+                          " euler_acoustic_wave | "
+                          " euler_vorticity_wave | "
                           " burgers_limiter >. ");
 
         prm.declare_entry("poly_degree", "1",
@@ -346,6 +352,9 @@ void FlowSolverParam::parse_parameters(dealii::ParameterHandler &prm)
         else if (flow_case_type_string == "shu_osher_problem")          {flow_case_type = shu_osher_problem;}
         else if (flow_case_type_string == "advection_limiter")          {flow_case_type = advection_limiter;}
         else if (flow_case_type_string == "burgers_limiter")            {flow_case_type = burgers_limiter;}
+        else if (flow_case_type_string == "euler_density_wave")         {flow_case_type = euler_density_wave;}
+        else if (flow_case_type_string == "euler_acoustic_wave")         {flow_case_type = euler_acoustic_wave;}
+        else if (flow_case_type_string == "euler_vorticity_wave")         {flow_case_type = euler_vorticity_wave;}
         
         poly_degree = prm.get_integer("poly_degree");
         

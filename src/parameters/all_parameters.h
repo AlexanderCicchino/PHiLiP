@@ -97,6 +97,9 @@ public:
     /// Flag to use weak or strong form of DG
     bool use_weak_form;
 
+    /// Flag to use Kovasznay mode preserving form.
+    bool use_kmp;
+
     /// Flux nodes type
     enum FluxNodes { GL, GLL };
     /// Store selected FluxNodes from the input file
@@ -109,7 +112,7 @@ public:
     bool use_split_form;
 
     /// Two point numerical flux type for split form
-    enum TwoPointNumericalFlux { KG, IR, CH, Ra };
+    enum TwoPointNumericalFlux { KG, IR, CH, Ra, Sh, CN, CI, CI2 };
     /// Store selected TwoPointNumericalFlux from the input file
     TwoPointNumericalFlux two_point_num_flux_type;
 
@@ -210,6 +213,7 @@ public:
         ROM_error_post_sampling,
         HROM_error_post_sampling,
         hyper_adaptive_sampling_new_error,
+        euler_density_wave,
         low_density
     };
     /// Store selected TestType from the input file.

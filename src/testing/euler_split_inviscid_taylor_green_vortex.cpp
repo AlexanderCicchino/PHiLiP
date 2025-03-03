@@ -63,6 +63,8 @@ std::array<double,2> EulerTaylorGreen<dim, nstate>::compute_change_in_entropy(co
             }
             std::array<double,nstate> entropy_var_state = euler_double->compute_entropy_variables(soln_state);
             std::array<double,nstate> kin_energy_state = euler_double->compute_kinetic_energy_variables(soln_state);
+         //   std::array<double,nstate> prim_soln = euler_double->convert_conservative_to_primitive(soln_state);
+         //   const double temp = euler_double->compute_temperature(prim_soln);
             for(int istate=0; istate<nstate; istate++){
                 if(iquad==0){
                     entropy_var_at_q[istate].resize(n_quad_pts);
@@ -70,6 +72,7 @@ std::array<double,2> EulerTaylorGreen<dim, nstate>::compute_change_in_entropy(co
                 }
                 energy_var_at_q[istate][iquad] = kin_energy_state[istate];
                 entropy_var_at_q[istate][iquad] = entropy_var_state[istate];
+            //    entropy_var_at_q[istate][iquad] *= temp;
             }
         }
         //project the enrtopy and KE var to modal coefficients
@@ -545,7 +548,9 @@ double EulerTaylorGreen<dim, nstate>::get_timestep(const std::shared_ptr < DGBas
         }
         const double max_eig = *(std::max_element(convective_eigenvalues.begin(), convective_eigenvalues.end()));
 
-        double cfl = 0.1 * delta_x/max_eig;
+       // double cfl = 0.1 * delta_x/max_eig;
+       // double cfl = 0.5 * delta_x/max_eig;
+        double cfl = delta_x/max_eig * dg->all_parameters->flow_solver_param.courant_friedrichs_lewy_number;
         if(cfl < cfl_min)
             cfl_min = cfl;
 
@@ -568,8 +573,9 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
     double left = 0.0;
     double right = 2 * dealii::numbers::PI;
-    const int n_refinements = 2;
-    unsigned int poly_degree = 3;
+    const unsigned int num_grid_elem_per_dir = all_parameters_new.flow_solver_param.number_of_grid_elements_per_dimension;
+    const int n_refinements = log(num_grid_elem_per_dir) / log(2.0);
+    const unsigned int poly_degree = all_parameters_new.flow_solver_param.poly_degree;
 
     const unsigned int grid_degree = all_parameters->use_curvilinear_grid ? poly_degree : 1;
     if(all_parameters->use_curvilinear_grid){
@@ -578,7 +584,8 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
     }
     else{
         //if straight
-        PHiLiP::Grids::straight_periodic_cube<dim,Triangulation>(grid, left, right, pow(2.0,n_refinements));
+        PHiLiP::Grids::straight_periodic_cube<dim,Triangulation>(grid, left, right, num_grid_elem_per_dir );
+       // PHiLiP::Grids::straight_periodic_cube<dim,Triangulation>(grid, left, right, pow(2.0,n_refinements));
     }
 
     // Create DG
@@ -590,8 +597,9 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
                 InitialConditionFactory<dim,nstate,double>::create_InitialConditionFunction(&all_parameters_new);
     SetInitialCondition<dim,nstate,double>::set_initial_condition(initial_condition_function, dg, &all_parameters_new);
 
-    const unsigned int n_global_active_cells2 = grid->n_global_active_cells();
-    double delta_x = (right-left)/pow(n_global_active_cells2,1.0/dim)/(poly_degree+1.0);
+   // const unsigned int n_global_active_cells2 = grid->n_global_active_cells();
+   // double delta_x = (right-left)/pow(n_global_active_cells2,1.0/dim)/(poly_degree+1.0);
+    double delta_x = (right-left)/pow(2.0,n_refinements)/(poly_degree+1.0);
     pcout<<" delta x "<<delta_x<<std::endl;
 
     all_parameters_new.ode_solver_param.initial_time_step =  get_timestep(dg,poly_degree,delta_x);
@@ -623,7 +631,7 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
         const double dt = dealii::Utilities::MPI::min(time_step, mpi_communicator);
         //integrate in time
         ode_solver->step_in_time(dt, false);
-        ode_solver->current_iteration += 1;
+//        ode_solver->current_iteration += 1;
         //check if print solution
         const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
         if (is_output_iteration) {
@@ -637,8 +645,8 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
         const double current_change_energy_mpi = dealii::Utilities::MPI::sum(current_change_entropy[1], mpi_communicator);
         //write to the file the change in entropy mpi
         myfile<<ode_solver->current_time<<" "<< current_change_entropy_mpi <<std::endl;
-        pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " << current_change_entropy_mpi<< std::endl;
-        pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " << current_change_energy_mpi<< std::endl;
+        pcout << "M plus K norm Change in Entropy at time " << ode_solver->current_time << " is " <<std::fixed << std::setprecision(16) << current_change_entropy_mpi<< std::endl;
+        pcout << "M plus K norm Change in Kinetic Energy at time " << ode_solver->current_time << " is " <<std::fixed << std::setprecision(16) << current_change_energy_mpi<< std::endl;
         //check if change in entropy is conserved at machine precision
         if(abs(current_change_entropy[0]) > 1e-12 && (dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::IR || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::CH || dg->all_parameters->two_point_num_flux_type == Parameters::AllParameters::TwoPointNumericalFlux::Ra)){
           pcout << " Change in entropy was not monotonically conserved." << std::endl;
@@ -648,11 +656,11 @@ int EulerTaylorGreen<dim, nstate>::run_test() const
         //get the kinetic energy
         const double current_energy = compute_kinetic_energy(dg, poly_degree);
         const double current_energy_mpi = (dealii::Utilities::MPI::sum(current_energy, mpi_communicator));
-        pcout << "Normalized kinetic energy " << ode_solver->current_time << " is " << current_energy_mpi/initial_energy_mpi<< std::endl;
+        pcout << "Normalized kinetic energy " << ode_solver->current_time << " is " << std::fixed << std::setprecision(16) <<current_energy_mpi/initial_energy_mpi<< std::endl;
         //get the entropy
         const double current_entropy = compute_entropy(dg, poly_degree);
         const double current_entropy_mpi = (dealii::Utilities::MPI::sum(current_entropy, mpi_communicator));
-        pcout << "Normalized entropy " << ode_solver->current_time << " is " << current_entropy_mpi/initial_entropy_mpi<< std::endl;
+        pcout << "Normalized entropy " << ode_solver->current_time << " is " << std::fixed << std::setprecision(16) <<current_entropy_mpi/initial_entropy_mpi<< std::endl;
 
         //get the volume work for kinetic energy
         double current_vol_work = compute_volume_term(dg, poly_degree);

@@ -47,6 +47,18 @@ public:
         const unsigned int                                      max_degree,
         const dealii::hp::FECollection<1>                       oneD_fe_collection_1state,
         const dealii::hp::QCollection<1>                        oneD_quadrature_collection) = 0;
+
+
+    /// Function to cell cell min entropy.
+    virtual void set_cell_min_entropy(
+        dealii::LinearAlgebra::distributed::Vector<double>&     solution,
+        const dealii::DoFHandler<dim>&                          dof_handler,
+        const dealii::hp::FECollection<dim>&                    fe_collection,
+        const dealii::hp::QCollection<dim>&                     volume_quadrature_collection,
+        const unsigned int                                      grid_degree,
+        const unsigned int                                      max_degree,
+        const dealii::hp::FECollection<1>                       oneD_fe_collection_1state,
+        const dealii::hp::QCollection<1>                        oneD_quadrature_collection) = 0;
 }; // End of BoundPreservingLimiter Class
 
 /// Base Class for bound preserving limiters templated on state
@@ -80,6 +92,17 @@ public:
         const std::array<std::vector<real>, nstate>&            soln_at_q,
         const unsigned int                                      n_quad_pts,
         const std::vector<real>&                                quad_weights);
+
+    /// Function to cell cell min entropy.
+    virtual void set_cell_min_entropy(
+        dealii::LinearAlgebra::distributed::Vector<double>&     solution,
+        const dealii::DoFHandler<dim>&                          dof_handler,
+        const dealii::hp::FECollection<dim>&                    fe_collection,
+        const dealii::hp::QCollection<dim>&                     volume_quadrature_collection,
+        const unsigned int                                      grid_degree,
+        const unsigned int                                      max_degree,
+        const dealii::hp::FECollection<1>                       oneD_fe_collection_1state,
+        const dealii::hp::QCollection<1>                        oneD_quadrature_collection) = 0;
 
 }; // End of BoundPreservingLimiterState Class
 } // PHiLiP namespace

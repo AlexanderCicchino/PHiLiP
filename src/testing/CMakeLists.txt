@@ -44,6 +44,7 @@ set(TESTS_SOURCE
     hyper_adaptive_sampling_new_error.cpp
     bound_preserving_limiter_tests.cpp
     naca0012_unsteady_check_quick.cpp
+    euler_density_wave.cpp
     )
 
 foreach(dim RANGE 1 3)

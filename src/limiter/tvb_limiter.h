@@ -74,6 +74,17 @@ public:
         const dealii::hp::FECollection<1>                       oneD_fe_collection_1state,
         const dealii::hp::QCollection<1>                        oneD_quadrature_collection);
 
+    /// Function to cell cell min entropy.
+    void set_cell_min_entropy(
+        dealii::LinearAlgebra::distributed::Vector<double>&     /*solution*/,
+        const dealii::DoFHandler<dim>&                          /*dof_handler*/,
+        const dealii::hp::FECollection<dim>&                    /*fe_collection*/,
+        const dealii::hp::QCollection<dim>&                     /*volume_quadrature_collection*/,
+        const unsigned int                                      /*grid_degree*/,
+        const unsigned int                                      /*max_degree*/,
+        const dealii::hp::FECollection<1>                       /*oneD_fe_collection_1state*/,
+        const dealii::hp::QCollection<1>                        /*oneD_quadrature_collection*/);
+
 }; // End of TVBLimiter Class
 } // PHiLiP namespace
 

@@ -441,12 +441,15 @@ protected:
         const std::array<real,nstate> &conservative_soln1,
         const std::array<real,nstate> &conservative_soln2) const;
 
+public:
     /// Compute Ismail-Roe parameter vector from primitive solution
     std::array<real,nstate> compute_ismail_roe_parameter_vector_from_primitive(
         const std::array<real,nstate> &primitive_soln) const;
 
     /// Compute Ismail-Roe logarithmic mean
     real compute_ismail_roe_logarithmic_mean(const real val1, const real val2) const;
+
+protected:
 
     /** Entropy conserving split form flux of Ismail & Roe.
      *  Refer to Gassner's paper (2016) Eq. 3.17  */
@@ -461,6 +464,26 @@ protected:
 
     /// Ranocha pressure equilibrium preserving, entropy and energy conserving flux.
     std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_ranocha (
+        const std::array<real,nstate> &conservative_soln1,
+        const std::array<real,nstate> &conservative_soln2) const;
+
+    /// Shima flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_shima (
+        const std::array<real,nstate> &conservative_soln1,
+        const std::array<real,nstate> &conservative_soln2) const;
+
+    /// Central flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_central (
+        const std::array<real,nstate> &conservative_soln1,
+        const std::array<real,nstate> &conservative_soln2) const;
+
+    /// Cicchino flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_cicchino (
+        const std::array<real,nstate> &conservative_soln1,
+        const std::array<real,nstate> &conservative_soln2) const;
+
+    /// Cicchino flux variant 2.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_cicchino2 (
         const std::array<real,nstate> &conservative_soln1,
         const std::array<real,nstate> &conservative_soln2) const;
 };

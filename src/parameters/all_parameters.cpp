@@ -69,6 +69,10 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       dealii::Patterns::Bool(),
                       "Use weak form by default. If false, use strong form.");
 
+    prm.declare_entry("use_kmp", "false",
+                      dealii::Patterns::Bool(),
+                      "If true, use KMP form.");
+
     prm.declare_entry("flux_nodes_type", "GL",
                       dealii::Patterns::Selection(
                       "GL | GLL"),
@@ -81,9 +85,9 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
 
     prm.declare_entry("two_point_num_flux_type", "KG",
                       dealii::Patterns::Selection(
-                      "KG | IR | CH | Ra"),
+                      "KG | IR | CH | Ra | Sh | CN | CI | CI2"),
                       "Two point flux type. "
-                      "Choices are <KG | IR | CH | Ra>.");
+                      "Choices are <KG | IR | CH | Ra | Sh | CN | CI | CI2>.");
 
     prm.declare_entry("use_curvilinear_split_form", "false",
                       dealii::Patterns::Bool(),
@@ -198,6 +202,7 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       " hyper_adaptive_sampling_new_error |"
                       " naca0012_unsteady_check_quick | "
                       " khi_robustness | "
+                      " euler_density_wave | "
                       " low_density "),
                       "The type of test we want to solve. "
                       "Choices are " 
@@ -247,6 +252,7 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       "  hyper_adaptive_sampling_new_error |"
                       "  naca0012_unsteady_check_quick | "
                       "  khi_robustness | "
+                      "  euler_density_wave | "
                       "  low_density>.");
 
     prm.declare_entry("pde_type", "advection",
@@ -437,10 +443,13 @@ const std::string test_string = prm.get("test_type");
     else if (test_string == "hyper_adaptive_sampling_new_error")        { test_type = hyper_adaptive_sampling_new_error; }
     else if (test_string == "low_density")                              { test_type = low_density; }
     else if (test_string == "naca0012_unsteady_check_quick")            { test_type = naca0012_unsteady_check_quick; }
+    else if (test_string == "euler_density_wave")                       { test_type = euler_density_wave; }
     
     overintegration = prm.get_integer("overintegration");
 
     use_weak_form = prm.get_bool("use_weak_form");
+
+    use_kmp = prm.get_bool("use_kmp");
     
     const std::string flux_nodes_string = prm.get("flux_nodes_type");
     if (flux_nodes_string == "GL") { flux_nodes_type = FluxNodes::GL; }
@@ -455,6 +464,10 @@ const std::string test_string = prm.get("test_type");
     if (two_point_num_flux_string == "IR") { two_point_num_flux_type = TwoPointNumericalFlux::IR; }
     if (two_point_num_flux_string == "CH") { two_point_num_flux_type = TwoPointNumericalFlux::CH; }
     if (two_point_num_flux_string == "Ra") { two_point_num_flux_type = TwoPointNumericalFlux::Ra; }
+    if (two_point_num_flux_string == "Sh") { two_point_num_flux_type = TwoPointNumericalFlux::Sh; }
+    if (two_point_num_flux_string == "CN") { two_point_num_flux_type = TwoPointNumericalFlux::CN; }
+    if (two_point_num_flux_string == "CI") { two_point_num_flux_type = TwoPointNumericalFlux::CI; }
+    if (two_point_num_flux_string == "CI2") { two_point_num_flux_type = TwoPointNumericalFlux::CI2; }
 
     use_curvilinear_split_form = prm.get_bool("use_curvilinear_split_form");
     use_curvilinear_grid = prm.get_bool("use_curvilinear_grid");

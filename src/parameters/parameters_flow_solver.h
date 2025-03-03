@@ -33,6 +33,9 @@ public:
         leblanc_shock_tube,
         shu_osher_problem,
         advection_limiter,
+        euler_density_wave,
+        euler_acoustic_wave,
+        euler_vorticity_wave,
         burgers_limiter
         };
     FlowCaseType flow_case_type; ///< Selected FlowCaseType from the input file

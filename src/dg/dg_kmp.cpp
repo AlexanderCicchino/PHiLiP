@@ -15,12 +15,12 @@
 
 #include <deal.II/fe/fe_dgq.h> // Used for flux interpolation
 
-#include "strong_dg.hpp"
+#include "dg_kmp.hpp"
 
 namespace PHiLiP {
 
 template <int dim, int nstate, typename real, typename MeshType>
-DGStrong<dim,nstate,real,MeshType>::DGStrong(
+DG_KMP<dim,nstate,real,MeshType>::DG_KMP(
     const Parameters::AllParameters *const parameters_input,
     const unsigned int degree,
     const unsigned int max_degree_input,
@@ -35,7 +35,7 @@ DGStrong<dim,nstate,real,MeshType>::DGStrong(
 *
 ***********************************************************/
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operators(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operators(
     typename dealii::DoFHandler<dim>::active_cell_iterator cell,
     const dealii::types::global_dof_index                  current_cell_index,
     const std::vector<dealii::types::global_dof_index>     &cell_dofs_indices,
@@ -122,7 +122,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operator
     }
 }
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_boundary_term_and_build_operators(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_boundary_term_and_build_operators(
     typename dealii::DoFHandler<dim>::active_cell_iterator /*cell*/,
     const dealii::types::global_dof_index                  current_cell_index,
     const unsigned int                                     iface,
@@ -183,7 +183,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_boundary_term_and_build_operat
 }
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
     typename dealii::DoFHandler<dim>::active_cell_iterator /*cell*/,
     typename dealii::DoFHandler<dim>::active_cell_iterator neighbor_cell,
     const dealii::types::global_dof_index                  current_cell_index,
@@ -310,7 +310,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
 }
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_subface_term_and_build_operators(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_subface_term_and_build_operators(
     typename dealii::DoFHandler<dim>::active_cell_iterator cell,
     typename dealii::DoFHandler<dim>::active_cell_iterator neighbor_cell,
     const dealii::types::global_dof_index                  current_cell_index,
@@ -395,7 +395,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_subface_term_and_build_operato
  *******************************************************************/
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
+void DG_KMP<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
 {
     using PDE_enum = Parameters::AllParameters::PartialDifferentialEquation;
     using ODE_enum = Parameters::ODESolverParam::ODESolverEnum;
@@ -498,7 +498,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
  **************************************************/
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_auxiliary_equation(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_auxiliary_equation(
     const std::vector<dealii::types::global_dof_index> &current_dofs_indices,
     const unsigned int poly_degree,
     OPERATOR::basis_functions<dim,2*dim,real> &soln_basis,
@@ -572,7 +572,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_auxiliary_equation
 }
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_boundary_term_auxiliary_equation(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_boundary_term_auxiliary_equation(
     const unsigned int iface,
     const dealii::types::global_dof_index current_cell_index,
     const unsigned int poly_degree,
@@ -718,7 +718,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_boundary_term_auxiliary_equati
 }
 /*********************************************************************************/
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
     const unsigned int iface, const unsigned int neighbor_iface,
     const dealii::types::global_dof_index current_cell_index,
     const dealii::types::global_dof_index neighbor_cell_index,
@@ -876,7 +876,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
 *
 ****************************************************/
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
     typename dealii::DoFHandler<dim>::active_cell_iterator cell,
     const dealii::types::global_dof_index                  current_cell_index,
     const std::vector<dealii::types::global_dof_index>     &cell_dofs_indices,
@@ -1309,7 +1309,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
 }
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_boundary_term_strong(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_boundary_term_strong(
     const unsigned int iface, 
     const dealii::types::global_dof_index current_cell_index,
     const unsigned int boundary_id,
@@ -1805,7 +1805,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_boundary_term_strong(
 
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
     const unsigned int iface, const unsigned int neighbor_iface, 
     const dealii::types::global_dof_index current_cell_index,
     const dealii::types::global_dof_index neighbor_cell_index,
@@ -2638,7 +2638,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
  *******************************************************************/
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_boundary_term_derivatives(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_boundary_term_derivatives(
     typename dealii::DoFHandler<dim>::active_cell_iterator /*cell*/,
     const dealii::types::global_dof_index /*current_cell_index*/,
     const unsigned int ,//face_number,
@@ -2790,7 +2790,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_boundary_term_derivatives(
 }
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_derivatives(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_derivatives(
     typename dealii::DoFHandler<dim>::active_cell_iterator /*cell*/,
     const dealii::types::global_dof_index /*current_cell_index*/,
     const dealii::FEValues<dim,dim> &/*fe_values_vol*/,
@@ -2917,7 +2917,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_derivatives(
 
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_derivatives(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_derivatives(
     typename dealii::DoFHandler<dim>::active_cell_iterator    /*cell*/,
     const dealii::types::global_dof_index                     /*current_cell_index*/,
     const dealii::types::global_dof_index                     /*neighbor_cell_index*/,
@@ -3121,7 +3121,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_derivatives(
  *******************************************************/
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
+void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
     typename dealii::DoFHandler<dim>::active_cell_iterator /*cell*/,
     const dealii::types::global_dof_index /*current_cell_index*/,
     const dealii::FEValues<dim,dim> &/*fe_values_vol*/,
@@ -3137,7 +3137,7 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_explicit(
 
 
 template <int dim, int nstate, typename real, typename MeshType>
-void DGStrong<dim,nstate,real,MeshType>::allocate_dual_vector()
+void DG_KMP<dim,nstate,real,MeshType>::allocate_dual_vector()
 {
     //Do nothing.
 }
@@ -3145,27 +3145,27 @@ void DGStrong<dim,nstate,real,MeshType>::allocate_dual_vector()
 // using default MeshType = Triangulation
 // 1D: dealii::Triangulation<dim>;
 // Otherwise: dealii::parallel::distributed::Triangulation<dim>;
-template class DGStrong <PHILIP_DIM, 1, double, dealii::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 2, double, dealii::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 3, double, dealii::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 4, double, dealii::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 5, double, dealii::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 6, double, dealii::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 1, double, dealii::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 2, double, dealii::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 3, double, dealii::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 4, double, dealii::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 5, double, dealii::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 6, double, dealii::Triangulation<PHILIP_DIM>>;
 
-template class DGStrong <PHILIP_DIM, 1, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 2, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 3, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 4, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 5, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 6, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 1, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 2, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 3, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 4, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 5, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 6, double, dealii::parallel::shared::Triangulation<PHILIP_DIM>>;
 
 #if PHILIP_DIM!=1
-template class DGStrong <PHILIP_DIM, 1, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 2, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 3, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 4, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 5, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
-template class DGStrong <PHILIP_DIM, 6, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 1, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 2, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 3, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 4, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 5, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
+template class DG_KMP <PHILIP_DIM, 6, double, dealii::parallel::distributed::Triangulation<PHILIP_DIM>>;
 #endif
 
 } // PHiLiP namespace

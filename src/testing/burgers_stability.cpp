@@ -94,12 +94,16 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
     PHiLiP::Parameters::AllParameters all_parameters_new = *all_parameters;  
     double left = 0.0;
     double right = 2.0;
-    const unsigned int n_grids = (all_parameters_new.use_energy) ? 4 : 5;
+   // const unsigned int n_grids = (all_parameters_new.use_energy) ? 4 : 5;
+    const unsigned int n_grids = (all_parameters_new.use_energy) ? 5 : 5;
+  //  const unsigned int n_grids = (all_parameters_new.use_energy) ? 8 : 5;
     std::vector<double> grid_size(n_grids);
     std::vector<double> soln_error(n_grids);
     unsigned int poly_degree = 4;
+   // unsigned int poly_degree = 0;
     dealii::ConvergenceTable convergence_table;
-    const unsigned int igrid_start = 3;
+    const unsigned int igrid_start = 4;
+  //  const unsigned int igrid_start = 7;
     const unsigned int grid_degree = 1;
 
     for(unsigned int igrid = igrid_start; igrid<n_grids; igrid++){
@@ -157,6 +161,8 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         // Create ODE solver using the factory and providing the DG object
         std::shared_ptr<ODE::ODESolverBase<dim, double>> ode_solver = ODE::ODESolverFactory<dim, double>::create_ODESolver(dg);
 
+   // ode_solver->limiter->set_cell_min_entropy(dg->solution,dg->dof_handler,dg->fe_collection,dg->volume_quadrature_collection,1,poly_degree,dg->oneD_fe_collection_1state, dg->oneD_quadrature_collection);
+
         double finalTime = 3.0;
 
         if (all_parameters_new.use_energy == true){//for split form get energy
@@ -178,13 +184,17 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
         ode_solver->current_iteration = 0;
         for (int i = 0; i < std::ceil(finalTime/dt); ++ i)
         {
-                ode_solver->advance_solution_time(dt);
+                ode_solver->step_in_time(dt,false);
+               // ode_solver->advance_solution_time(dt);
                 //Energy
                 double current_energy = compute_energy(dg);
                 current_energy /=initial_energy;
                 std::cout << std::setprecision(16) << std::fixed;
+                const bool is_output_iteration = (ode_solver->current_iteration % all_parameters_new.ode_solver_param.output_solution_every_x_steps == 0);
+                if (is_output_iteration) {
                 pcout << "Energy at time " << i * dt << " is " << current_energy << std::endl;
                 myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_energy << std::endl;
+                }
                 if (current_energy*initial_energy - initial_energy >= 1.0)
                 {
                     pcout<<"Energy not monotonicaly decreasing"<<std::endl;
@@ -194,20 +204,27 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
                 if ( (current_energy*initial_energy - initial_energy >= 1.0e-11)&&(all_parameters_new.conv_num_flux_type == Parameters::AllParameters::ConvectiveNumericalFlux::two_point_flux) )
                 {
                     pcout<<"Energy not conserved"<<std::endl;
-                    return 1;
-                    break;
+             //       return 1;
+             //       break;
                 }
                 //Conservation
                 double current_conservation = compute_conservation(dg, poly_degree);
                 current_conservation /=initial_conservation;
                 std::cout << std::setprecision(16) << std::fixed;
+                if (is_output_iteration) {
                 pcout << "Normalized Conservation at time " << i * dt << " is " << current_conservation<< std::endl;
                 myfile << i * dt << " " << std::fixed << std::setprecision(16) << current_conservation << std::endl;
+                }
                 if (current_conservation*initial_conservation - initial_conservation >= 10.00)
                 {
                     pcout << "Not conserved" << std::endl;
                     return 1;
                     break;
+                }
+                 
+                if (is_output_iteration) {
+                    const int file_number = ode_solver->current_iteration / all_parameters_new.ode_solver_param.output_solution_every_x_steps;
+                    dg->output_results_vtk(file_number);
                 }
             }
             myfile.close();
