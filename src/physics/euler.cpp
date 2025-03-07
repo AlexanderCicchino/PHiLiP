@@ -212,6 +212,62 @@ inline std::array<real,nstate> Euler<dim,nstate,real>
     return conservative_soln;
 }
 
+template <int dim, int nstate, typename real>
+inline std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim,nstate,real>
+::convert_grad_entropy_to_grad_conservative ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> cons_grad;
+    const std::array<real,nstate> prim_sol = convert_conservative_to_primitive(cons_sol);
+    //d rho / dx
+    for(int flux_dim=0; flux_dim<dim; flux_dim++){
+        cons_grad[0][flux_dim] = 0.0;
+        for(int istate=0; istate<(nstate-1); istate++){
+            cons_grad[0][flux_dim] += cons_sol[istate] * entropy_grad[istate][flux_dim];
+        }
+        cons_grad[0][flux_dim] += cons_sol[nstate-1] * entropy_grad[nstate-1][flux_dim];
+       // const real rhoE_P = cons_sol[nstate-1] + prim_sol[nstate-1];
+     //   const real rhoE_P = cons_sol[nstate-1]/cons_sol[0] + prim_sol[nstate-1];
+        const real a = sqrt(this->gam * prim_sol[nstate-1] / prim_sol[0]);
+        real vel2 = 0.0;
+        for(int idim=0; idim<dim; idim++){
+            vel2 += prim_sol[idim+1] * prim_sol[idim+1];
+        }
+        const real enthalpy = a * a /this->gamm1 + vel2 / 2.0;
+        //d (rho u) / d x_{idim}
+        for(int idim=0; idim<dim; idim++){
+            cons_grad[idim+1][flux_dim] = 0.0;
+            //rho u term
+            cons_grad[idim+1][flux_dim] = cons_sol[idim+1] * entropy_grad[0][flux_dim];
+            //rho u u terms
+            for(int idim2=0; idim2<dim; idim2++){
+                const real rhou_u = cons_sol[idim2+1] * prim_sol[idim+1];
+                cons_grad[idim+1][flux_dim] += rhou_u * entropy_grad[idim2+1][flux_dim];
+            }
+            //pressure on diagonal
+            cons_grad[idim+1][flux_dim] += prim_sol[nstate-1] * entropy_grad[idim+1][flux_dim];
+            //energy term
+           // const real u_rhoE_P = prim_sol[idim+1] * rhoE_P;
+           // cons_grad[idim+1][flux_dim] += u_rhoE_P * entropy_grad[nstate-1][flux_dim];
+            cons_grad[idim+1][flux_dim] += prim_sol[idim+1] * prim_sol[0] * enthalpy * entropy_grad[nstate-1][flux_dim];
+        }
+        //d (rho E) / d x_{idim}}
+        cons_grad[nstate-1][flux_dim] = cons_sol[nstate-1] * entropy_grad[0][flux_dim];
+       // real vel2 = 0.0;
+        cons_grad[nstate-1][flux_dim] = 0.0;
+        for(int idim=0; idim<dim; idim++){
+           // const real u_rhoE_P = prim_sol[idim+1] * rhoE_P;
+           // cons_grad[nstate-1][flux_dim] += u_rhoE_P * entropy_grad[idim+1][flux_dim];
+            cons_grad[nstate-1][flux_dim] += prim_sol[idim+1] * prim_sol[0] * enthalpy * entropy_grad[idim+1][flux_dim];
+       //     vel2 += prim_sol[idim+1] * prim_sol[idim+1];
+        }
+         
+       // const real rho_H2_a2_P = prim_sol[0] * (a * a / this->gamm1 + 0.5 * vel2) - a * a * prim_sol[nstate-1] / this->gamm1 ;
+        const real rho_H2_a2_P = prim_sol[0] * enthalpy * enthalpy - a * a * prim_sol[nstate-1] / this->gamm1 ;
+        cons_grad[nstate-1][flux_dim] += rho_H2_a2_P * entropy_grad[nstate-1][flux_dim];
+    }
+
+    return cons_grad;
+}
 //template <int dim, int nstate, typename real>
 //inline dealii::Tensor<1,dim,double> Euler<dim,nstate,real>::compute_velocities_inf() const
 //{
@@ -934,10 +990,218 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim, nstate, real>
 }
 
 template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim,nstate,real>
+::convert_conservative_gradient_to_primitive_gradient_euler (
+    const std::array<real,nstate> &conservative_soln,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &conservative_soln_gradient) const
+{
+    // conservative_soln_gradient is solution_gradient
+    std::array<dealii::Tensor<1,dim,real>,nstate> primitive_soln_gradient;
+
+    // get primitive solution
+    const std::array<real,nstate> primitive_soln = convert_conservative_to_primitive<real>(conservative_soln); // from Euler
+    // extract from primitive solution
+    const real density = primitive_soln[0];
+    const dealii::Tensor<1,dim,real> vel = extract_velocities_from_primitive<real>(primitive_soln); // from Euler
+
+    // density gradient
+    for (int d=0; d<dim; d++) {
+        primitive_soln_gradient[0][d] = conservative_soln_gradient[0][d];
+    }
+    // velocities gradient
+    for (int d1=0; d1<dim; d1++) {
+        for (int d2=0; d2<dim; d2++) {
+            primitive_soln_gradient[1+d1][d2] = (conservative_soln_gradient[1+d1][d2] - vel[d1]*conservative_soln_gradient[0][d2])/density;
+        }        
+    }
+    // pressure gradient
+    // -- formulation 1:
+    // const real2 vel2 = this->template compute_velocity_squared<real2>(vel); // from Euler
+    // for (int d1=0; d1<dim; d1++) {
+    //     primitive_soln_gradient[nstate-1][d1] = conservative_soln_gradient[nstate-1][d1] - 0.5*vel2*conservative_soln_gradient[0][d1];
+    //     for (int d2=0; d2<dim; d2++) {
+    //         primitive_soln_gradient[nstate-1][d1] -= conservative_soln[1+d2]*primitive_soln_gradient[1+d2][d1];
+    //     }
+    //     primitive_soln_gradient[nstate-1][d1] *= this->gamm1;
+    // }
+    // -- formulation 2 (equivalent to formulation 1):
+    for (int d1=0; d1<dim; d1++) {
+        primitive_soln_gradient[nstate-1][d1] = conservative_soln_gradient[nstate-1][d1];
+        for (int d2=0; d2<dim; d2++) {
+            primitive_soln_gradient[nstate-1][d1] -= 0.5*(primitive_soln[1+d2]*conservative_soln_gradient[1+d2][d1]  
+                                                           + conservative_soln[1+d2]*primitive_soln_gradient[1+d2][d1]);
+        }
+        primitive_soln_gradient[nstate-1][d1] *= this->gamm1;
+    }
+    return primitive_soln_gradient;
+}
+
+template <int dim, int nstate, typename real>
+dealii::Tensor<2,dim,real> Euler<dim,nstate,real>
+::extract_velocities_gradient_from_primitive_solution_gradient_euler (
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &primitive_soln_gradient) const
+{
+    dealii::Tensor<2,dim,real> velocities_gradient;
+    for (int d1=0; d1<dim; d1++) {
+        for (int d2=0; d2<dim; d2++) {
+            velocities_gradient[d1][d2] = primitive_soln_gradient[1+d1][d2];
+        }
+    }
+    return velocities_gradient;
+}
+template <int dim, int nstate, typename real>
+dealii::Tensor<1,dim,real> Euler<dim,nstate,real>
+::compute_temperature_gradient_euler (
+    const std::array<real,nstate> &primitive_soln,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &primitive_soln_gradient) const
+{
+    const real density = primitive_soln[0];
+    const real temperature = compute_temperature<real>(primitive_soln); // from Euler
+
+    dealii::Tensor<1,dim,real> temperature_gradient;
+    for (int d=0; d<dim; d++) {
+        temperature_gradient[d] = (this->gam*this->mach_inf_sqr*primitive_soln_gradient[nstate-1][d] - temperature*primitive_soln_gradient[0][d])/density;
+    }
+    return temperature_gradient;
+}
+
+template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim,nstate,real>
+::entropy_correction_sgs_flux (
+    const std::array<real,nstate> &/*cons_sol*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad,
+    const real ent_sgs_coef) const
+{
+
+//#if 0
+    std::array<dealii::Tensor<1,dim,real>,nstate> viscous_flux;
+    for(int istate=0; istate<nstate; istate++){
+        for(int idim=0; idim<dim; idim++){
+            viscous_flux[istate][idim] = -ent_sgs_coef * cons_grad[istate][idim];
+        }
+    }
+    return viscous_flux;
+//#endif
+#if 0
+    const std::array<dealii::Tensor<1,dim,real>,nstate> primitive_soln_gradient = convert_conservative_gradient_to_primitive_gradient_euler(cons_sol, cons_grad);
+    const std::array<real,nstate> primitive_soln = convert_conservative_to_primitive(cons_sol); // from Euler
+
+    // Step 3: Viscous stress tensor, Velocities, Heat flux
+    const dealii::Tensor<1,dim,real> vel = extract_velocities_from_primitive(primitive_soln); // from Euler
+    dealii::Tensor<2,dim,real> viscous_stress_tensor;
+    dealii::Tensor<1,dim,real> heat_flux;
+
+    // Get velocity gradients
+    const dealii::Tensor<2,dim,real> vel_gradient 
+        = extract_velocities_gradient_from_primitive_solution_gradient_euler(primitive_soln_gradient);
+    
+
+    //viscous stress tensor
+    // Strain rate tensor, S_{i,j}
+    dealii::Tensor<2,dim,real> strain_rate_tensor;
+    for (int d1=0; d1<dim; d1++) {
+        for (int d2=0; d2<dim; d2++) {
+            // rate of strain (deformation) tensor:
+            strain_rate_tensor[d1][d2] = 0.5*(vel_gradient[d1][d2] + vel_gradient[d2][d1]);
+        }
+    }
+    real tensor_magnitude_sqr = 0.0;
+    for (int i=0; i<dim; ++i) {
+        for (int j=0; j<dim; ++j) {
+            tensor_magnitude_sqr += strain_rate_tensor[i][j]*strain_rate_tensor[i][j];
+        }
+    }
+    
+    // Compute the eddy viscosity
+    // Scaled non-dimensional eddy viscosity; See Plata 2019, Computers and Fluids, Eq.(12)
+    const real scaled_eddy_viscosity_coef = primitive_soln[0]*ent_sgs_coef*sqrt(2.0*tensor_magnitude_sqr);
+
+    /* Nondimensionalized viscous stress tensor, $\bm{\tau}^{*}$ 
+     * Reference: Masatsuka 2018 "I do like CFD", p.148, eq.(4.14.12)
+     */
+
+    // Divergence of velocity
+    // -- Initialize
+    real vel_divergence = 0.0;
+    // -- Obtain from trace of strain rate tensor
+    for (int d=0; d<dim; d++) {
+        vel_divergence += strain_rate_tensor[d][d];
+    }
+
+    // Viscous stress tensor, \tau_{i,j}
+    const real scaled_2nd_viscosity_coefficient = (-2.0/3.0)*scaled_eddy_viscosity_coef; // Stokes' hypothesis
+    dealii::Tensor<2,dim,real> SGS_stress_tensor;
+    for (int d1=0; d1<dim; d1++) {
+        for (int d2=0; d2<dim; d2++) {
+            SGS_stress_tensor[d1][d2] = 2.0*scaled_eddy_viscosity_coef*strain_rate_tensor[d1][d2];
+        }
+        SGS_stress_tensor[d1][d1] += scaled_2nd_viscosity_coefficient*vel_divergence;
+    }
+
+    //heat flux
+    // Compute scaled heat conductivity
+    const real turbulent_prandtl_number = 0.6;//Hardcoded 0.6 Prt
+    const real scaled_heat_conductivity = scaled_eddy_viscosity_coef/(this->gamm1*this->mach_inf_sqr*turbulent_prandtl_number);
+
+    // Get temperature gradient
+    const dealii::Tensor<1,dim,real> temperature_gradient = compute_temperature_gradient_euler(primitive_soln, primitive_soln_gradient);
+
+    /* Nondimensionalized heat flux, $\bm{q}^{*}$
+     * Reference: Masatsuka 2018 "I do like CFD", p.148, eq.(4.14.13)
+     */
+    for (int d=0; d<dim; d++) {
+        heat_flux[d] = -scaled_heat_conductivity*temperature_gradient[d];
+    }
+    
+    // Step 4: Construct viscous flux; Note: sign corresponds to LHS
+    /* Nondimensionalized viscous flux (i.e. dissipative flux)
+     * Reference: Masatsuka 2018 "I do like CFD", p.148, eq.(4.12.1-4.12.4)
+     */
+
+    /* Construct viscous flux given velocities, viscous stress tensor,
+     * and heat flux; Note: sign corresponds to LHS
+     */
+    std::array<dealii::Tensor<1,dim,real>,nstate> viscous_flux;
+    for (int flux_dim=0; flux_dim<dim; ++flux_dim) {
+        // Density equation
+        viscous_flux[0][flux_dim] = 0.0;
+        // Momentum equation
+        for (int stress_dim=0; stress_dim<dim; ++stress_dim){
+            viscous_flux[1+stress_dim][flux_dim] = -viscous_stress_tensor[stress_dim][flux_dim];
+        }
+        // Energy equation
+        viscous_flux[nstate-1][flux_dim] = 0.0;
+        for (int stress_dim=0; stress_dim<dim; ++stress_dim){
+           viscous_flux[nstate-1][flux_dim] -= vel[stress_dim]*viscous_stress_tensor[flux_dim][stress_dim];
+        }
+        viscous_flux[nstate-1][flux_dim] += heat_flux[flux_dim];
+    }
+
+    return viscous_flux;
+#endif
+}
+
+template <int dim, int nstate, typename real>
 std::array<real,nstate> Euler<dim, nstate, real>
 ::compute_entropy_variables (
     const std::array<real,nstate> &conservative_soln) const
 {
+//#if 0
+    std::array<real,nstate> entropy_var;
+    const real density = conservative_soln[0];
+    const real pressure = compute_pressure<real>(conservative_soln);
+    
+    const real entropy = compute_entropy<real>(density, pressure);
+
+    entropy_var[0] = (gam - entropy + 1.0 )/gamm1 - conservative_soln[nstate-1] / pressure;
+    for(int idim=0; idim<dim; idim++){
+        entropy_var[idim+1] = conservative_soln[idim+1] / pressure;
+    }
+    entropy_var[nstate-1] = - density / pressure;
+
+    return entropy_var;
+//#endif
+#if 0
     std::array<real,nstate> entropy_var;
     const real density = conservative_soln[0];
     const real pressure = compute_pressure<real>(conservative_soln);
@@ -953,6 +1217,7 @@ std::array<real,nstate> Euler<dim, nstate, real>
     entropy_var[nstate-1] = - density / rho_theta;
 
     return entropy_var;
+#endif
 }
 
 template <int dim, int nstate, typename real>
@@ -960,6 +1225,25 @@ std::array<real,nstate> Euler<dim, nstate, real>
 ::compute_conservative_variables_from_entropy_variables (
     const std::array<real,nstate> &entropy_var) const
 {
+//#if 0
+    //Inverse mapping
+    //Extrapolated for 3D
+    std::array<real,nstate> conservative_var;
+    real entropy_var_vel_squared = 0.0;
+    for(int idim=0; idim<dim; idim++){
+        entropy_var_vel_squared += entropy_var[idim + 1] * entropy_var[idim + 1];
+    }
+    const real entropy = gam - (gamm1) * entropy_var[0] + 0.5 * (gamm1) * entropy_var_vel_squared / entropy_var[nstate-1];
+    const real pressure = pow(1.0 / pow(-entropy_var[nstate-1],gam), 1.0/(gamm1)) * exp( - entropy / (gamm1));
+
+    conservative_var[0] = - pressure * entropy_var[nstate-1];
+    for(int idim=0; idim<dim; idim++){
+        conservative_var[idim+1] = pressure * entropy_var[idim+1];
+    }
+    conservative_var[nstate-1] = pressure * (1.0 / (gamm1) - 0.5 * entropy_var_vel_squared / entropy_var[nstate-1]);
+    return conservative_var;
+//#endif
+#if 0
     //Eq. 119 and 120 from Chan, Jesse. "On discretely entropy conservative and entropy stable discontinuous Galerkin methods." Journal of Computational Physics 362 (2018): 346-374.
     //Extrapolated for 3D
     std::array<real,nstate> conservative_var;
@@ -977,6 +1261,7 @@ std::array<real,nstate> Euler<dim, nstate, real>
     }
     conservative_var[nstate-1] = rho_theta * (1.0 - 0.5 * entropy_var_vel_squared / entropy_var[nstate-1]);
     return conservative_var;
+#endif
 }
 
 template <int dim, int nstate, typename real>

@@ -61,6 +61,19 @@ std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim,nstate,real,nstat
 
 template <int dim, int nstate, typename real, int nstate_baseline_physics>
 std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim,nstate,real,nstate_baseline_physics>
+::entropy_correction_sgs_flux (
+    const std::array<real,nstate> &/*cons_sol*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &/*cons_grad*/,
+    const real /*ent_sgs_coef*/) const 
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> sgs_flux;
+    std::cout<<"The entropy corrcetion sgs flux not done for this pde."<<std::endl;
+    std::abort();
+    return sgs_flux;
+}
+
+template <int dim, int nstate, typename real, int nstate_baseline_physics>
+std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim,nstate,real,nstate_baseline_physics>
 ::dissipative_flux (
     const std::array<real,nstate> &conservative_soln,
     const std::array<dealii::Tensor<1,dim,real>,nstate> &solution_gradient,
@@ -212,6 +225,22 @@ std::array<real,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
         std::abort();
     }
     return conservative_soln;
+}
+
+template <int dim, int nstate, typename real, int nstate_baseline_physics>
+std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
+::convert_grad_entropy_to_grad_conservative (
+    const std::array<real,nstate> &cons_sol,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> grad_cons;
+    if constexpr(nstate==nstate_baseline_physics) {
+        grad_cons = physics_baseline->convert_grad_entropy_to_grad_conservative (cons_sol, entropy_grad);
+    } else {
+        // TO DO, make use of the physics_model object for nstate>nstate_baseline_physics
+        std::abort();
+    }
+    return grad_cons;
 }
 
 template <int dim, int nstate, typename real, int nstate_baseline_physics>

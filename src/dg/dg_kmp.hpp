@@ -35,6 +35,12 @@ public:
      */
     void assemble_auxiliary_residual ();
 
+    /// Apply cell entropy production correction.
+    void compute_entropy_correction_coef_and_norm();
+
+    /// Apply cell entropy production correction.
+    void apply_entropy_correction();
+
     /// Allocate the dual vector for optimization.
     void allocate_dual_vector ();
 
@@ -188,6 +194,7 @@ public:
         OPERATOR::basis_functions<dim,2*dim,real>          &soln_basis,
         OPERATOR::basis_functions<dim,2*dim,real>          &flux_basis,
         OPERATOR::metric_operators<real,dim,2*dim>         &metric_oper,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>  &soln_basis_projection_oper,
         std::vector<dealii::Tensor<1,dim,real>>            &local_auxiliary_RHS);
 
 protected:
@@ -220,6 +227,8 @@ public:
         const std::vector<dealii::types::global_dof_index> &dof_indices_ext,
         OPERATOR::basis_functions<dim,2*dim,real>          &soln_basis_int,
         OPERATOR::basis_functions<dim,2*dim,real>          &soln_basis_ext,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>  &soln_basis_projection_oper_int,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>  &soln_basis_projection_oper_ext,
         OPERATOR::metric_operators<real,dim,2*dim>         &metric_oper_int,
         std::vector<dealii::Tensor<1,dim,real>>            &local_auxiliary_RHS_int,
         std::vector<dealii::Tensor<1,dim,real>>            &local_auxiliary_RHS_ext);

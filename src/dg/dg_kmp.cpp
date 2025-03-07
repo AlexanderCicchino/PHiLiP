@@ -16,6 +16,7 @@
 #include <deal.II/fe/fe_dgq.h> // Used for flux interpolation
 
 #include "dg_kmp.hpp"
+#include "physics/physics_factory.h"
 
 namespace PHiLiP {
 
@@ -105,6 +106,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operators(
             soln_basis,
             flux_basis,
             metric_oper,
+            soln_basis_projection_oper_int,
             local_auxiliary_RHS);
     }
     else{
@@ -278,6 +280,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
             poly_degree_int, poly_degree_ext,
             current_dofs_indices, neighbor_dofs_indices,
             soln_basis_int, soln_basis_ext,
+            soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
             metric_oper_int,
             current_cell_rhs_aux, neighbor_cell_rhs_aux);
         // add local contribution from neighbor cell to global vector
@@ -385,6 +388,943 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_subface_term_and_build_operators
         compute_auxiliary_right_hand_side,
         compute_dRdW, compute_dRdX, compute_d2R);
 
+}
+/*******************************************************************
+ *
+ *
+ *                      ENTROPY CORRECTION NORM AND SURFACE INTEGRAL
+ *
+ *
+ *
+ *******************************************************************/
+template <int dim, int nstate, typename real, typename MeshType>
+void DG_KMP<dim,nstate,real,MeshType>::compute_entropy_correction_coef_and_norm()
+{
+    //Get the cell entropy correction coef and norm and store globally to be used in residual eval
+
+    const unsigned int init_grid_degree = this->high_order_grid->fe_system.tensor_degree();
+    //Constructor for the operators
+    OPERATOR::basis_functions<dim,2*dim,real> soln_basis(1, this->max_degree, init_grid_degree);
+    OPERATOR::basis_functions<dim,2*dim,real> soln_basis_ext(1, this->max_degree, init_grid_degree);
+    OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper(1, this->max_degree, init_grid_degree);
+    OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_ext(1, this->max_degree, init_grid_degree);
+    OPERATOR::basis_functions<dim,2*dim,real> flux_basis(1, this->max_degree, init_grid_degree);
+    OPERATOR::basis_functions<dim,2*dim,real> flux_basis_ext(1, this->max_degree, init_grid_degree);
+    OPERATOR::local_basis_stiffness<dim,2*dim,real> flux_basis_stiffness(1, this->max_degree, init_grid_degree, true);
+
+    OPERATOR::mapping_shape_functions<dim,2*dim,real> mapping_basis(1, init_grid_degree, init_grid_degree);
+    const unsigned int grid_degree = this->high_order_grid->fe_system.tensor_degree();
+    const dealii::FESystem<dim> &fe_metric = this->high_order_grid->fe_system;
+    const unsigned int n_metric_dofs = this->high_order_grid->fe_system.dofs_per_cell;
+
+    this->reinit_operators_for_cell_residual_loop(
+        this->max_degree, this->max_degree, init_grid_degree,
+        soln_basis, soln_basis_ext,
+        flux_basis, flux_basis_ext,
+        flux_basis_stiffness,
+        soln_basis_projection_oper, soln_basis_projection_oper_ext,
+        mapping_basis);
+
+    //Only for Euler / Navier-Stokes
+    if constexpr (nstate == dim+2){
+        std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_double  = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(PHiLiP::Physics::PhysicsFactory<dim,nstate,double>::create_Physics(this->all_parameters));
+
+        //Loop over cells and stroe the coefficient and norm for the entropy corrected SGS flux
+        auto metric_cell = this->high_order_grid->dof_handler_grid.begin_active();
+        for (auto soln_cell = this->dof_handler.begin_active(); soln_cell != this->dof_handler.end(); ++soln_cell, ++metric_cell) {
+            if (!soln_cell->is_locally_owned()) continue;
+         
+            std::vector<dealii::types::global_dof_index> current_dofs_indices;
+            // Current reference element related to this physical cell
+            const int poly_degree = soln_cell->active_fe_index();
+            const dealii::FESystem<dim,dim> &current_fe_ref = this->fe_collection[poly_degree];
+            const unsigned int n_dofs_curr_cell = current_fe_ref.n_dofs_per_cell();
+            const unsigned int n_dofs_cell = current_fe_ref.n_dofs_per_cell();
+         
+         
+            // get mapping support points and determinant of Jacobian
+            // setup metric cell
+            std::vector<dealii::types::global_dof_index> metric_dof_indices(n_metric_dofs);
+            metric_cell->get_dof_indices (metric_dof_indices);
+            // get mapping_support points
+            std::array<std::vector<real>,dim> mapping_support_points;
+            for(int idim=0; idim<dim; idim++){
+                mapping_support_points[idim].resize(n_metric_dofs/dim);
+            }
+            const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<dim>(grid_degree);
+            for (unsigned int idof = 0; idof< n_metric_dofs; ++idof) {
+                const real val = (this->high_order_grid->volume_nodes[metric_dof_indices[idof]]);
+                const unsigned int istate = fe_metric.system_to_component_index(idof).first;
+                const unsigned int ishape = fe_metric.system_to_component_index(idof).second;
+                const unsigned int igrid_node = index_renumbering[ishape];
+                mapping_support_points[istate][igrid_node] = val;
+            }
+            //get determinant of Jacobian
+            const unsigned int n_quad_pts = this->volume_quadrature_collection[poly_degree].size();
+            const unsigned int n_grid_nodes = n_metric_dofs / dim;
+            //get determinant of Jacobian
+            const bool store_vol_flux_nodes = this->all_parameters->manufactured_convergence_study_param.manufactured_solution_param.use_manufactured_source_term;
+            const bool store_surf_flux_nodes = (this->all_parameters->use_periodic_bc) ? false : true;
+            OPERATOR::metric_operators<real, dim, 2*dim> metric_oper(1, poly_degree, grid_degree, store_vol_flux_nodes, store_surf_flux_nodes);
+            metric_oper.build_volume_metric_operators(
+                this->volume_quadrature_collection[poly_degree].size(), n_grid_nodes,
+                mapping_support_points,
+                mapping_basis,
+                this->all_parameters->use_invariant_curl_form);
+         
+            const std::vector<double> &quad_weights = this->volume_quadrature_collection[poly_degree].get_weights();
+            const std::vector<double> &surf_quad_weights = this->face_quadrature_collection[poly_degree].get_weights();
+         
+            // Obtain the mapping from local dof indices to global dof indices
+            current_dofs_indices.resize(n_dofs_curr_cell);
+            soln_cell->get_dof_indices (current_dofs_indices);
+         
+            //Extract the local solution dofs in the cell from the global solution dofs
+            const unsigned int n_shape_fns = n_dofs_curr_cell / nstate;
+            std::array<std::vector<real>,nstate> soln_coeff;
+            std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_coeff;
+            for (unsigned int idof = 0; idof < n_dofs_cell; ++idof) {
+                const unsigned int istate = this->fe_collection[poly_degree].system_to_component_index(idof).first;
+                const unsigned int ishape = this->fe_collection[poly_degree].system_to_component_index(idof).second;
+                if(ishape == 0)
+                    soln_coeff[istate].resize(n_shape_fns);
+                soln_coeff[istate][ishape] = DGBase<dim,real,MeshType>::solution(current_dofs_indices[idof]);
+                for(int idim=0; idim<dim; idim++){
+                    if(ishape == 0){
+                        aux_soln_coeff[istate][idim].resize(n_shape_fns);
+                    }
+                    aux_soln_coeff[istate][idim][ishape] = DGBase<dim,real,MeshType>::auxiliary_solution[idim](current_dofs_indices[idof]);
+                }
+            }
+            std::array<std::vector<real>,nstate> soln_at_q;
+            std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_at_q; //auxiliary sol at flux nodes
+            // Interpolate each state to the quadrature points using sum-factorization
+            // with the basis functions in each reference direction.
+            for(int istate=0; istate<nstate; istate++){
+                soln_at_q[istate].resize(n_quad_pts);
+                soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
+                                                 soln_basis.oneD_vol_operator);
+                for(int idim=0; idim<dim; idim++){
+                    aux_soln_at_q[istate][idim].resize(n_quad_pts);
+                    soln_basis.matrix_vector_mult_1D(aux_soln_coeff[istate][idim], aux_soln_at_q[istate][idim],
+                                                     soln_basis.oneD_vol_operator);
+                }
+            }
+            //get entropy projected variables
+            std::array<std::vector<real>,nstate> entropy_var_at_q;//entropy variable at quad pts
+            std::array<std::vector<real>,nstate> projected_entropy_var;//the coefficients
+            std::array<std::vector<real>,nstate> projected_entropy_var_at_q;//the coefficients
+            for(int istate=0; istate<nstate; istate++){
+                entropy_var_at_q[istate].resize(n_quad_pts);
+                projected_entropy_var[istate].resize(n_shape_fns);
+                projected_entropy_var_at_q[istate].resize(n_quad_pts);
+            }
+            for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+                std::array<real,nstate> soln_state;
+                for(int istate=0; istate<nstate; istate++){
+                    soln_state[istate] = soln_at_q[istate][iquad];
+                }
+                std::array<real,nstate> entropy_var;
+                entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+
+//check
+//                std::array<real,nstate> cons_var;
+//                cons_var = this->pde_physics_double->compute_conservative_variables_from_entropy_variables(entropy_var);
+//                for(int istate=0; istate<nstate; istate++){
+//                    this->pcout<<std::fixed << std::setprecision(16)<< "cons var before "<<soln_state[istate]<<" after "<<cons_var[istate]<<" for istate "<<istate<<std::endl;
+//                    this->pcout<<std::fixed << std::setprecision(16)<< "diff in cons  "<<abs(soln_state[istate]-cons_var[istate])<<" for istate "<<istate<<std::endl;
+//                }
+
+                for(int istate=0; istate<nstate; istate++){
+                    entropy_var_at_q[istate][iquad] = entropy_var[istate];
+                }
+            }
+            for(int istate=0; istate<nstate; istate++){
+                soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_at_q[istate],
+                                                                 projected_entropy_var[istate],
+                                                                 soln_basis_projection_oper.oneD_vol_operator);
+                soln_basis.matrix_vector_mult_1D(projected_entropy_var[istate],
+                                                 projected_entropy_var_at_q[istate],
+                                                 soln_basis.oneD_vol_operator);
+            }
+         
+            
+            //loop over quad points and compute the SGS flux with coef = 1 for the norm, then store norm
+            real norm = 0.0;
+            for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+                std::array<real,nstate> soln_state;
+                std::array<real,nstate> entropy_var;
+                std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state;
+                std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var;
+                for(int istate=0; istate<nstate; istate++){
+                    entropy_var[istate] = projected_entropy_var_at_q[istate][iquad];
+                    for(int idim=0; idim<dim; idim++){
+                        grad_entropy_var[istate][idim] = aux_soln_at_q[istate][idim][iquad];
+                    }
+                }
+                soln_state = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var);
+                aux_soln_state = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state, grad_entropy_var);
+                std::array<dealii::Tensor<1,dim,real>,nstate> sgs_phys_flux;
+                sgs_phys_flux = this->pde_physics_double->entropy_correction_sgs_flux(soln_state, aux_soln_state, 1.0);
+                for(int istate=0; istate<nstate; istate++){
+                    for(int idim=0; idim<dim; idim++){
+                        norm += quad_weights[iquad] * metric_oper.det_Jac_vol[iquad]
+                              * (-sgs_phys_flux[istate][idim])//since the viscous flux is a negative sign
+                              * grad_entropy_var[istate][idim];
+                    }
+                }
+            }
+            this->cell_entropy_correction_norm[current_dofs_indices[0]] = norm;
+         
+            const unsigned int n_face_quad_pts = this->face_quadrature_collection[poly_degree].size();//assume interior cell does the work
+            //loop over faces and compute the entropy surface integral residual
+            for (unsigned int iface=0; iface < dealii::GeometryInfo<dim>::faces_per_cell; ++iface) {
+                auto current_face = soln_cell->face(iface);
+                const auto neighbor_cell = (current_face->at_boundary() && soln_cell->has_periodic_neighbor(iface)) ? soln_cell->periodic_neighbor(iface) : soln_cell->neighbor_or_periodic_neighbor(iface);
+
+
+                if (!DGBase<dim,real,MeshType>::current_cell_should_do_the_work(soln_cell, neighbor_cell)) //only do the ones that should do work
+                    continue;
+
+
+                const unsigned int neighbor_iface = (current_face->at_boundary() && soln_cell->has_periodic_neighbor(iface)) ? soln_cell->periodic_neighbor_of_periodic_neighbor(iface) : soln_cell->neighbor_of_neighbor(iface);
+                const unsigned int n_dofs_neigh_cell = this->fe_collection[neighbor_cell->active_fe_index()].n_dofs_per_cell();
+               // const dealii::types::global_dof_index neighbor_cell_index = neighbor_cell->active_cell_index();
+         
+                // Obtain the mapping from local dof indices to global dof indices for neighbor cell
+                std::vector<dealii::types::global_dof_index> neighbor_dofs_indices;
+                neighbor_dofs_indices.resize(n_dofs_neigh_cell);
+                neighbor_cell->get_dof_indices (neighbor_dofs_indices);
+         
+                const int poly_degree_ext = neighbor_cell->active_fe_index();
+                const unsigned int n_dofs_ext = this->fe_collection[poly_degree_ext].dofs_per_cell;
+                const unsigned int n_shape_fns_ext = n_dofs_ext / nstate;
+         
+                metric_oper.build_facet_metric_operators(
+                    iface,
+                    this->face_quadrature_collection[poly_degree].size(),
+                    n_grid_nodes,
+                    mapping_support_points,
+                    mapping_basis,
+                    this->all_parameters->use_invariant_curl_form);
+         
+                //get int and ext soln coeff, then entropy projected var on face
+                //loop over quad points and compute v f* - psi dot n
+                //get neighbor solution
+                // Extract exterior modal coefficients of solution
+                std::array<std::vector<real>,nstate> soln_coeff_ext;
+                for (unsigned int idof = 0; idof < n_dofs_ext; ++idof) {
+                    const unsigned int istate = this->fe_collection[poly_degree_ext].system_to_component_index(idof).first;
+                    const unsigned int ishape = this->fe_collection[poly_degree_ext].system_to_component_index(idof).second;
+                    if(ishape == 0){
+                        soln_coeff_ext[istate].resize(n_shape_fns_ext);
+                    }
+                    soln_coeff_ext[istate][ishape] = DGBase<dim,real,MeshType>::solution(neighbor_dofs_indices[idof]);
+                }
+                std::array<std::vector<real>,nstate> soln_at_vol_q_ext;
+                for(int istate=0; istate<nstate; ++istate){
+                    // allocate
+                    soln_at_vol_q_ext[istate].resize(n_quad_pts);
+                    // solve soln at volume cubature nodes
+                    soln_basis.matrix_vector_mult_1D(soln_coeff_ext[istate], soln_at_vol_q_ext[istate],
+                                                         soln_basis.oneD_vol_operator);
+                }
+                std::array<std::vector<real>,nstate> entropy_var_vol_ext;
+                for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+                    std::array<real,nstate> soln_state;
+                    for(int istate=0; istate<nstate; istate++){
+                        soln_state[istate] = soln_at_vol_q_ext[istate][iquad];
+                    }
+                    std::array<real,nstate> entropy_var;
+                    entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+                    for(int istate=0; istate<nstate; istate++){
+                        if(iquad==0){
+                            entropy_var_vol_ext[istate].resize(n_quad_pts);
+                        }
+                        entropy_var_vol_ext[istate][iquad] = entropy_var[istate];
+                    }
+                }
+                //project it onto the solution basis functions and interpolate it
+                std::array<std::vector<real>,nstate> projected_entropy_var_surf_int;
+                std::array<std::vector<real>,nstate> projected_entropy_var_surf_ext;
+                for(int istate=0; istate<nstate; istate++){
+                    // allocate
+                    projected_entropy_var_surf_int[istate].resize(n_face_quad_pts);
+                    projected_entropy_var_surf_ext[istate].resize(n_face_quad_pts);
+         
+                    //interior
+                    soln_basis.matrix_vector_mult_surface_1D(iface,
+                                                             projected_entropy_var[istate],
+                                                             projected_entropy_var_surf_int[istate],
+                                                             soln_basis.oneD_surf_operator,
+                                                             soln_basis.oneD_vol_operator);
+         
+                    //exterior
+                    std::vector<real> entropy_var_coeff_ext(n_shape_fns_ext);
+                    soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_vol_ext[istate],
+                                                                         entropy_var_coeff_ext,
+                                                                         soln_basis_projection_oper.oneD_vol_operator);
+         
+                    soln_basis.matrix_vector_mult_surface_1D(neighbor_iface,
+                                                             entropy_var_coeff_ext,
+                                                             projected_entropy_var_surf_ext[istate],
+                                                             soln_basis.oneD_surf_operator,
+                                                             soln_basis.oneD_vol_operator);
+                }
+         
+                //compute facet entropy flux
+                const dealii::Tensor<1,dim,double> unit_ref_normal_int = dealii::GeometryInfo<dim>::unit_normal_vector[iface];
+                for (unsigned int iquad=0; iquad<n_face_quad_pts; ++iquad) {
+                    dealii::Tensor<1,dim,real> unit_phys_normal_int;
+                    dealii::Tensor<2,dim,real> metric_cofactor_surf;
+                    for(int idim=0; idim<dim; idim++){
+                        for(int jdim=0; jdim<dim; jdim++){
+                            metric_cofactor_surf[idim][jdim] = metric_oper.metric_cofactor_surf[idim][jdim][iquad];
+                        }
+                    }
+                    metric_oper.transform_reference_to_physical(unit_ref_normal_int,
+                                                                metric_cofactor_surf,
+                                                                unit_phys_normal_int);
+                    const double face_Jac_norm_scaled = unit_phys_normal_int.norm();
+                    unit_phys_normal_int /= face_Jac_norm_scaled;//normalize it.
+                    std::array<real,nstate> entropy_var_face_int;
+                    std::array<real,nstate> entropy_var_face_ext;
+                    for(int istate=0; istate<nstate; istate++){
+                        entropy_var_face_int[istate] = projected_entropy_var_surf_int[istate][iquad];
+                        entropy_var_face_ext[istate] = projected_entropy_var_surf_ext[istate][iquad];
+                    }
+         
+                    std::array<real,nstate> soln_state_int;
+                    soln_state_int = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var_face_int);
+                    std::array<real,nstate> soln_state_ext;
+                    soln_state_ext = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var_face_ext);
+         
+                    //get surface entropy potential
+                    dealii::Tensor<1,dim,real> entropy_potential_int;
+                    dealii::Tensor<1,dim,real> entropy_potential_ext;
+                    //Entropy potential is rho * u_{idim}
+                    for(int idim=0; idim<dim; idim++){
+                        entropy_potential_int[idim] = soln_state_int[idim+1];
+                        entropy_potential_ext[idim] = soln_state_ext[idim+1];
+                    }
+                    //get 2pt flux Ranocha
+                    std::array<dealii::Tensor<1,dim,real>,nstate> ent_cons_flux = euler_double->convective_numerical_split_flux_ranocha(soln_state_int,soln_state_ext);
+                    real fv_psi_dot_n_int = 0.0;
+                    real fv_psi_dot_n_ext = 0.0;
+                    for(int idim=0; idim<dim; idim++){
+                        real fv_int = 0.0;
+                        real fv_ext = 0.0;
+                        for(int istate=0; istate<nstate; istate++){
+                            fv_int += ent_cons_flux[istate][idim] * entropy_var_face_int[istate];
+                            fv_ext += ent_cons_flux[istate][idim] * entropy_var_face_ext[istate];
+                        }
+                        fv_psi_dot_n_int += (entropy_potential_int[idim] - fv_int) * unit_phys_normal_int[idim];
+                        fv_psi_dot_n_ext += (entropy_potential_ext[idim] - fv_ext) * (-unit_phys_normal_int[idim]);
+                    }
+                    real surf_int = fv_psi_dot_n_int 
+                                  * face_Jac_norm_scaled 
+                                  * surf_quad_weights[iquad];
+                    real surf_ext = fv_psi_dot_n_ext 
+                                  * face_Jac_norm_scaled 
+                                  * surf_quad_weights[iquad];
+                    this->cell_entropy_correction_coef[current_dofs_indices[0]] -= surf_int;
+                    this->cell_entropy_correction_coef[neighbor_dofs_indices[0]] -= surf_ext;
+                 //   this->cell_entropy_correction_coef[current_dofs_indices[0]] = surf_int;
+                 //   this->cell_entropy_correction_coef[neighbor_dofs_indices[0]] = surf_ext;
+         
+                }
+            }
+         
+        }//end of cell loop
+         
+        this->cell_entropy_correction_coef.update_ghost_values();
+        this->cell_entropy_correction_norm.update_ghost_values();
+    }//End of if statement nstate == dim+2
+
+}
+template <int dim, int nstate, typename real, typename MeshType>
+void DG_KMP<dim,nstate,real,MeshType>::apply_entropy_correction()
+{
+    //Add the Entropy corrcetion SGS flux to the residual in strong form
+
+    this->cell_entropy_correction_coef.update_ghost_values();
+    this->cell_entropy_correction_norm.update_ghost_values();
+    const unsigned int init_grid_degree = this->high_order_grid->fe_system.tensor_degree();
+    //Constructor for the operators
+    OPERATOR::basis_functions<dim,2*dim,real> soln_basis(1, this->max_degree, init_grid_degree);
+    OPERATOR::basis_functions<dim,2*dim,real> soln_basis_ext(1, this->max_degree, init_grid_degree);
+    OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper(1, this->max_degree, init_grid_degree);
+    OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_ext(1, this->max_degree, init_grid_degree);
+    OPERATOR::basis_functions<dim,2*dim,real> flux_basis(1, this->max_degree, init_grid_degree);
+    OPERATOR::basis_functions<dim,2*dim,real> flux_basis_ext(1, this->max_degree, init_grid_degree);
+    OPERATOR::local_basis_stiffness<dim,2*dim,real> flux_basis_stiffness(1, this->max_degree, init_grid_degree, true);
+
+    OPERATOR::mapping_shape_functions<dim,2*dim,real> mapping_basis(1, init_grid_degree, init_grid_degree);
+    const unsigned int grid_degree = this->high_order_grid->fe_system.tensor_degree();
+    const dealii::FESystem<dim> &fe_metric = this->high_order_grid->fe_system;
+    const unsigned int n_metric_dofs = this->high_order_grid->fe_system.dofs_per_cell;
+
+    this->reinit_operators_for_cell_residual_loop(
+        this->max_degree, this->max_degree, init_grid_degree,
+        soln_basis, soln_basis_ext,
+        flux_basis, flux_basis_ext,
+        flux_basis_stiffness,
+        soln_basis_projection_oper, soln_basis_projection_oper_ext,
+        mapping_basis);
+
+    //Only for Euler / Navier-Stokes
+    if constexpr (nstate == dim+2){
+
+        //Loop over cells
+        auto metric_cell = this->high_order_grid->dof_handler_grid.begin_active();
+        for (auto soln_cell = this->dof_handler.begin_active(); soln_cell != this->dof_handler.end(); ++soln_cell, ++metric_cell) {
+            if (!soln_cell->is_locally_owned()) continue;
+         
+            std::vector<dealii::types::global_dof_index> current_dofs_indices;
+            // Current reference element related to this physical cell
+            const int poly_degree = soln_cell->active_fe_index();
+            const dealii::FESystem<dim,dim> &current_fe_ref = this->fe_collection[poly_degree];
+            const unsigned int n_dofs_curr_cell = current_fe_ref.n_dofs_per_cell();
+            const unsigned int n_dofs_cell = current_fe_ref.n_dofs_per_cell();
+         
+         
+            // get mapping support points and determinant of Jacobian
+            // setup metric cell
+            std::vector<dealii::types::global_dof_index> metric_dof_indices(n_metric_dofs);
+            metric_cell->get_dof_indices (metric_dof_indices);
+            // get mapping_support points
+            std::array<std::vector<real>,dim> mapping_support_points;
+            for(int idim=0; idim<dim; idim++){
+                mapping_support_points[idim].resize(n_metric_dofs/dim);
+            }
+            const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<dim>(grid_degree);
+            for (unsigned int idof = 0; idof< n_metric_dofs; ++idof) {
+                const real val = (this->high_order_grid->volume_nodes[metric_dof_indices[idof]]);
+                const unsigned int istate = fe_metric.system_to_component_index(idof).first;
+                const unsigned int ishape = fe_metric.system_to_component_index(idof).second;
+                const unsigned int igrid_node = index_renumbering[ishape];
+                mapping_support_points[istate][igrid_node] = val;
+            }
+            //get determinant of Jacobian
+            const unsigned int n_quad_pts = this->volume_quadrature_collection[poly_degree].size();
+            const unsigned int n_grid_nodes = n_metric_dofs / dim;
+            //get determinant of Jacobian
+            const bool store_vol_flux_nodes = this->all_parameters->manufactured_convergence_study_param.manufactured_solution_param.use_manufactured_source_term;
+            const bool store_surf_flux_nodes = (this->all_parameters->use_periodic_bc) ? false : true;
+            OPERATOR::metric_operators<real, dim, 2*dim> metric_oper(1, poly_degree, grid_degree, store_vol_flux_nodes, store_surf_flux_nodes);
+            metric_oper.build_volume_metric_operators(
+                this->volume_quadrature_collection[poly_degree].size(), n_grid_nodes,
+                mapping_support_points,
+                mapping_basis,
+                this->all_parameters->use_invariant_curl_form);
+         
+            const std::vector<double> &quad_weights = this->volume_quadrature_collection[poly_degree].get_weights();
+            const std::vector<double> &surf_quad_weights = this->face_quadrature_collection[poly_degree].get_weights();
+         
+            // Obtain the mapping from local dof indices to global dof indices
+            current_dofs_indices.resize(n_dofs_curr_cell);
+            soln_cell->get_dof_indices (current_dofs_indices);
+         
+            //Extract the local solution dofs in the cell from the global solution dofs
+            const unsigned int n_shape_fns = n_dofs_curr_cell / nstate;
+            std::array<std::vector<real>,nstate> soln_coeff;
+            std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_coeff;
+            for (unsigned int idof = 0; idof < n_dofs_cell; ++idof) {
+                const unsigned int istate = this->fe_collection[poly_degree].system_to_component_index(idof).first;
+                const unsigned int ishape = this->fe_collection[poly_degree].system_to_component_index(idof).second;
+                if(ishape == 0)
+                    soln_coeff[istate].resize(n_shape_fns);
+                soln_coeff[istate][ishape] = DGBase<dim,real,MeshType>::solution(current_dofs_indices[idof]);
+                for(int idim=0; idim<dim; idim++){
+                    if(ishape == 0){
+                        aux_soln_coeff[istate][idim].resize(n_shape_fns);
+                    }
+                    aux_soln_coeff[istate][idim][ishape] = DGBase<dim,real,MeshType>::auxiliary_solution[idim](current_dofs_indices[idof]);
+                }
+            }
+            std::array<std::vector<real>,nstate> soln_at_q;
+            std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_at_q; //auxiliary sol at flux nodes
+            // Interpolate each state to the quadrature points using sum-factorization
+            // with the basis functions in each reference direction.
+            for(int istate=0; istate<nstate; istate++){
+                soln_at_q[istate].resize(n_quad_pts);
+                soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
+                                                 soln_basis.oneD_vol_operator);
+                for(int idim=0; idim<dim; idim++){
+                    aux_soln_at_q[istate][idim].resize(n_quad_pts);
+                    soln_basis.matrix_vector_mult_1D(aux_soln_coeff[istate][idim], aux_soln_at_q[istate][idim],
+                                                     soln_basis.oneD_vol_operator);
+                }
+            }
+            //get entropy projected variables
+            std::array<std::vector<real>,nstate> entropy_var_at_q;//entropy variable at quad pts
+            std::array<std::vector<real>,nstate> projected_entropy_var;//the coefficients
+            std::array<std::vector<real>,nstate> projected_entropy_var_at_q;//the coefficients
+            for(int istate=0; istate<nstate; istate++){
+                entropy_var_at_q[istate].resize(n_quad_pts);
+                projected_entropy_var[istate].resize(n_shape_fns);
+                projected_entropy_var_at_q[istate].resize(n_shape_fns);
+            }
+            for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+                std::array<real,nstate> soln_state;
+                for(int istate=0; istate<nstate; istate++){
+                    soln_state[istate] = soln_at_q[istate][iquad];
+                }
+                std::array<real,nstate> entropy_var;
+                entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+                for(int istate=0; istate<nstate; istate++){
+                    entropy_var_at_q[istate][iquad] = entropy_var[istate];
+                }
+            }
+            for(int istate=0; istate<nstate; istate++){
+                soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_at_q[istate],
+                                                                 projected_entropy_var[istate],
+                                                                 soln_basis_projection_oper.oneD_vol_operator);
+                soln_basis.matrix_vector_mult_1D(projected_entropy_var[istate],
+                                                 projected_entropy_var_at_q[istate],
+                                                 soln_basis.oneD_vol_operator);
+            }
+         
+        //    this->pcout<<"coeff int "<<this->cell_entropy_correction_coef[current_dofs_indices[0]]<<" norm "<<this->cell_entropy_correction_norm[current_dofs_indices[0]]<<std::endl;
+            real ent_sgs_coeff = this->cell_entropy_correction_coef[current_dofs_indices[0]] / (this->cell_entropy_correction_norm[current_dofs_indices[0]]+1e-20);
+            ent_sgs_coeff = std::max(0.0, ent_sgs_coeff);
+
+            //loop over quad and store the ent_sgs_ref_flux
+            std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> ent_sgs_ref_flux_at_q;
+            for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+                //extract soln and auxiliary soln at quad pt to be used in physics
+                std::array<real,nstate> soln_state;
+                std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state;
+                std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var;
+                for(int istate=0; istate<nstate; istate++){
+                    soln_state[istate] = soln_at_q[istate][iquad];
+                    for(int idim=0; idim<dim; idim++){
+                        grad_entropy_var[istate][idim] = aux_soln_at_q[istate][idim][iquad];
+                    }
+                }
+                aux_soln_state = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state, grad_entropy_var);
+             
+                // Copy Metric Cofactor in a way can use for transforming Tensor Blocks to reference space
+                // The way it is stored in metric_operators is to use sum-factorization in each direction,
+                // but here it is cleaner to apply a reference transformation in each Tensor block returned by physics.
+                dealii::Tensor<2,dim,real> metric_cofactor;
+                for(int idim=0; idim<dim; idim++){
+                    for(int jdim=0; jdim<dim; jdim++){
+                        metric_cofactor[idim][jdim] = metric_oper.metric_cofactor_vol[idim][jdim][iquad];
+                    }
+                }
+                // Entropy Correction SGS Fluc
+                std::array<dealii::Tensor<1,dim,real>,nstate> ent_sgs_phys_flux;
+                //Compute the physical dissipative flux
+                ent_sgs_phys_flux = this->pde_physics_double->entropy_correction_sgs_flux(soln_state, aux_soln_state, ent_sgs_coeff);
+                //Write the values in a way that we can use sum-factorization on.
+                for(int istate=0; istate<nstate; istate++){
+                    dealii::Tensor<1,dim,real> ent_sgs_ref_flux;
+                    //Trnasform to reference fluxes
+                 
+                    //transform the entropy correction sgs flux to reference space
+                    metric_oper.transform_physical_to_reference(
+                        ent_sgs_phys_flux[istate],
+                        metric_cofactor,
+                        ent_sgs_ref_flux);
+                 
+                    //Write the data in a way that we can use sum-factorization on.
+                    //Since sum-factorization improves the speed for matrix-vector multiplications,
+                    //We need the values to have their inner elements be vectors.
+                    for(int idim=0; idim<dim; idim++){
+                        //allocate
+                        if(iquad == 0){
+                            ent_sgs_ref_flux_at_q[istate][idim].resize(n_quad_pts);
+                        }
+                 
+                        ent_sgs_ref_flux_at_q[istate][idim][iquad] = ent_sgs_ref_flux[idim];
+                    }
+                }
+            }//end of quad loop
+            //do divergence and add to residual
+            for(int istate=0; istate<nstate; istate++){
+             
+                //Compute reference divergence of the reference fluxes.
+                std::vector<real> ent_sgs_flux_divergence(n_quad_pts); 
+                //Reference divergence of the reference ent sgs flux.
+                flux_basis.divergence_matrix_vector_mult_1D(ent_sgs_ref_flux_at_q[istate], ent_sgs_flux_divergence,
+                                                            flux_basis.oneD_vol_operator,
+                                                            flux_basis.oneD_grad_operator);
+                std::vector<real> rhs(n_shape_fns);
+                soln_basis.inner_product_1D(ent_sgs_flux_divergence, quad_weights, rhs, soln_basis.oneD_vol_operator, false, -1.0);
+                for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                    DGBase<dim,real,MeshType>::right_hand_side(current_dofs_indices[istate*n_shape_fns + ishape]) += rhs[ishape];
+                }
+            }//end of state loop
+
+            
+         
+            const unsigned int n_face_quad_pts = this->face_quadrature_collection[poly_degree].size();//assume interior cell does the work
+            //loop over faces and compute the entropy surface integral residual
+            for (unsigned int iface=0; iface < dealii::GeometryInfo<dim>::faces_per_cell; ++iface) {
+                auto current_face = soln_cell->face(iface);
+                const auto neighbor_cell = (current_face->at_boundary() && soln_cell->has_periodic_neighbor(iface)) ? soln_cell->periodic_neighbor(iface) : soln_cell->neighbor_or_periodic_neighbor(iface);
+
+                if (!DGBase<dim,real,MeshType>::current_cell_should_do_the_work(soln_cell, neighbor_cell)) //only do the ones that should do work
+                    continue;
+
+                const unsigned int neighbor_iface = (current_face->at_boundary() && soln_cell->has_periodic_neighbor(iface)) ? soln_cell->periodic_neighbor_of_periodic_neighbor(iface) : soln_cell->neighbor_of_neighbor(iface);
+                const unsigned int n_dofs_neigh_cell = this->fe_collection[neighbor_cell->active_fe_index()].n_dofs_per_cell();
+               // const dealii::types::global_dof_index neighbor_cell_index = neighbor_cell->active_cell_index();
+         
+                // Obtain the mapping from local dof indices to global dof indices for neighbor cell
+                std::vector<dealii::types::global_dof_index> neighbor_dofs_indices;
+                neighbor_dofs_indices.resize(n_dofs_neigh_cell);
+                neighbor_cell->get_dof_indices (neighbor_dofs_indices);
+         
+                const int poly_degree_ext = neighbor_cell->active_fe_index();
+                const unsigned int n_dofs_ext = this->fe_collection[poly_degree_ext].dofs_per_cell;
+                const unsigned int n_shape_fns_ext = n_dofs_ext / nstate;
+         
+                metric_oper.build_facet_metric_operators(
+                    iface,
+                    this->face_quadrature_collection[poly_degree].size(),
+                    n_grid_nodes,
+                    mapping_support_points,
+                    mapping_basis,
+                    this->all_parameters->use_invariant_curl_form);
+
+
+                //get neighbour metric operator
+                std::vector<dealii::types::global_dof_index> neighbor_metric_dofs_indices(n_metric_dofs);
+                const auto metric_neighbor_cell = (current_face->at_boundary() && soln_cell->has_periodic_neighbor(iface)) ? metric_cell->periodic_neighbor(iface) : metric_cell->neighbor_or_periodic_neighbor(iface);
+                metric_neighbor_cell->get_dof_indices(neighbor_metric_dofs_indices);
+                std::array<std::vector<real>,dim> mapping_support_points_neigh;
+                for(int idim=0; idim<dim; idim++){
+                    mapping_support_points_neigh[idim].resize(n_grid_nodes);
+                }
+                const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<dim>(grid_degree);
+                for (unsigned int idof = 0; idof< n_metric_dofs; ++idof) {
+                    const real val = (this->high_order_grid->volume_nodes[neighbor_metric_dofs_indices[idof]]);
+                    const unsigned int istate = fe_metric.system_to_component_index(idof).first;
+                    const unsigned int ishape = fe_metric.system_to_component_index(idof).second;
+                    const unsigned int igrid_node = index_renumbering[ishape];
+                    mapping_support_points_neigh[istate][igrid_node] = val;
+                }
+                //build the metric operators for strong form
+                OPERATOR::metric_operators<real, dim, 2*dim> metric_oper_ext(1, poly_degree_ext, grid_degree, store_vol_flux_nodes, store_surf_flux_nodes);
+                metric_oper_ext.build_volume_metric_operators(
+                    this->volume_quadrature_collection[poly_degree_ext].size(), n_grid_nodes,
+                    mapping_support_points_neigh,
+                    mapping_basis,
+                    this->all_parameters->use_invariant_curl_form);
+
+         
+                //get int and ext soln coeff, then entropy projected var on face
+                //loop over quad points and compute v f* - psi dot n
+                //get neighbor solution
+                // Extract exterior modal coefficients of solution
+                std::array<std::vector<real>,nstate> soln_coeff_ext;
+                std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_coeff_ext;
+                for (unsigned int idof = 0; idof < n_dofs_ext; ++idof) {
+                    const unsigned int istate = this->fe_collection[poly_degree_ext].system_to_component_index(idof).first;
+                    const unsigned int ishape = this->fe_collection[poly_degree_ext].system_to_component_index(idof).second;
+                    if(ishape == 0){
+                        soln_coeff_ext[istate].resize(n_shape_fns_ext);
+                    }
+                    soln_coeff_ext[istate][ishape] = DGBase<dim,real,MeshType>::solution(neighbor_dofs_indices[idof]);
+                    for(int idim=0; idim<dim; idim++){
+                        if(ishape == 0){
+                            aux_soln_coeff_ext[istate][idim].resize(n_shape_fns_ext);
+                        }
+                        aux_soln_coeff_ext[istate][idim][ishape] = DGBase<dim,real,MeshType>::auxiliary_solution[idim](neighbor_dofs_indices[idof]);
+                    }
+                }
+                //interp to vol q
+                std::array<std::vector<real>,nstate> soln_at_vol_q_ext;
+                std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_at_vol_q_ext;
+                std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_at_surf_q_int;
+                std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> aux_soln_at_surf_q_ext;
+                for(int istate=0; istate<nstate; ++istate){
+                    // allocate
+                    soln_at_vol_q_ext[istate].resize(n_quad_pts);
+                    // solve soln at volume cubature nodes
+                    soln_basis.matrix_vector_mult_1D(soln_coeff_ext[istate], soln_at_vol_q_ext[istate],
+                                                         soln_basis.oneD_vol_operator);
+                    for(int idim=0; idim<dim; idim++){
+                        // alocate
+                        aux_soln_at_vol_q_ext[istate][idim].resize(n_quad_pts);
+                        soln_basis_ext.matrix_vector_mult_1D(aux_soln_coeff_ext[istate][idim], aux_soln_at_vol_q_ext[istate][idim],
+                                                             soln_basis_ext.oneD_vol_operator);
+                         
+                        // allocate
+                        aux_soln_at_surf_q_int[istate][idim].resize(n_face_quad_pts);
+                        aux_soln_at_surf_q_ext[istate][idim].resize(n_face_quad_pts);
+                        // solve auxiliary soln at facet cubature nodes
+                        soln_basis.matrix_vector_mult_surface_1D(iface,
+                                                                     aux_soln_coeff[istate][idim], aux_soln_at_surf_q_int[istate][idim],
+                                                                     soln_basis.oneD_surf_operator,
+                                                                     soln_basis.oneD_vol_operator);
+                        soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
+                                                                     aux_soln_coeff_ext[istate][idim], aux_soln_at_surf_q_ext[istate][idim],
+                                                                     soln_basis_ext.oneD_surf_operator,
+                                                                     soln_basis_ext.oneD_vol_operator);
+                    }
+                }
+                std::array<std::vector<real>,nstate> entropy_var_vol_ext;
+                for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+                    std::array<real,nstate> soln_state;
+                    for(int istate=0; istate<nstate; istate++){
+                        soln_state[istate] = soln_at_vol_q_ext[istate][iquad];
+                    }
+                    std::array<real,nstate> entropy_var;
+                    entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+                    for(int istate=0; istate<nstate; istate++){
+                        if(iquad==0){
+                            entropy_var_vol_ext[istate].resize(n_quad_pts);
+                        }
+                        entropy_var_vol_ext[istate][iquad] = entropy_var[istate];
+                    }
+                }
+                //project it onto the solution basis functions and interpolate it
+                std::array<std::vector<real>,nstate> projected_entropy_var_surf_int;
+                std::array<std::vector<real>,nstate> projected_entropy_var_surf_ext;
+                for(int istate=0; istate<nstate; istate++){
+                    // allocate
+                    projected_entropy_var_surf_int[istate].resize(n_face_quad_pts);
+                    projected_entropy_var_surf_ext[istate].resize(n_face_quad_pts);
+         
+                    //interior
+                    soln_basis.matrix_vector_mult_surface_1D(iface,
+                                                             projected_entropy_var[istate],
+                                                             projected_entropy_var_surf_int[istate],
+                                                             soln_basis.oneD_surf_operator,
+                                                             soln_basis.oneD_vol_operator);
+         
+                    //exterior
+                    std::vector<real> entropy_var_coeff_ext(n_shape_fns_ext);
+                    soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_vol_ext[istate],
+                                                                         entropy_var_coeff_ext,
+                                                                         soln_basis_projection_oper.oneD_vol_operator);
+         
+                    soln_basis.matrix_vector_mult_surface_1D(neighbor_iface,
+                                                             entropy_var_coeff_ext,
+                                                             projected_entropy_var_surf_ext[istate],
+                                                             soln_basis.oneD_surf_operator,
+                                                             soln_basis.oneD_vol_operator);
+                }
+
+        
+                real ent_sgs_coeff_ext = this->cell_entropy_correction_coef[neighbor_dofs_indices[0]] / (this->cell_entropy_correction_norm[neighbor_dofs_indices[0]]+1e-20);
+                ent_sgs_coeff_ext = std::max(0.0, ent_sgs_coeff_ext);
+
+                //get exterior ent sgs flux at volume quad nodes
+                // Next we do exterior volume reference fluxes.
+                // Note we split the quad integrals because the interior and exterior could be of different poly basis
+                std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> ent_sgs_ref_flux_at_vol_q_ext;
+                for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
+                 
+                    // Extract exterior volume metric cofactor matrix at given volume cubature node.
+                    dealii::Tensor<2,dim,real> metric_cofactor_vol_ext;
+                    for(int idim=0; idim<dim; idim++){
+                        for(int jdim=0; jdim<dim; jdim++){
+                            metric_cofactor_vol_ext[idim][jdim] = metric_oper_ext.metric_cofactor_vol[idim][jdim][iquad];
+                        }
+                    }
+                 
+                    std::array<real,nstate> soln_state;
+                    std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state;
+                    std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var;
+                    for(int istate=0; istate<nstate; istate++){
+                        soln_state[istate] = soln_at_vol_q_ext[istate][iquad];
+                        for(int idim=0; idim<dim; idim++){
+                            grad_entropy_var[istate][idim] = aux_soln_at_vol_q_ext[istate][idim][iquad];
+                        }
+                    }
+                    aux_soln_state = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state, grad_entropy_var);
+                 
+                    // Compute the entropy correction sgs dissipative flux
+                    std::array<dealii::Tensor<1,dim,real>,nstate> ent_sgs_phys_flux;
+                    ent_sgs_phys_flux = this->pde_physics_double->entropy_correction_sgs_flux(soln_state, aux_soln_state, ent_sgs_coeff_ext);
+                 
+                    // Write the values in a way that we can use sum-factorization on.
+                    for(int istate=0; istate<nstate; istate++){
+                        dealii::Tensor<1,dim,real> ent_sgs_ref_flux;
+                        // transform the ent sgs flux to reference space
+                        metric_oper.transform_physical_to_reference(
+                            ent_sgs_phys_flux[istate],
+                            metric_cofactor_vol_ext,
+                            ent_sgs_ref_flux);
+                 
+                        // Write the data in a way that we can use sum-factorization on.
+                        // Since sum-factorization improves the speed for matrix-vector multiplications,
+                        // We need the values to have their inner elements be vectors.
+                        for(int idim=0; idim<dim; idim++){
+                            // allocate
+                            if(iquad == 0){
+                                ent_sgs_ref_flux_at_vol_q_ext[istate][idim].resize(n_quad_pts);
+                            }
+                            // write data
+                            ent_sgs_ref_flux_at_vol_q_ext[istate][idim][iquad] = ent_sgs_ref_flux[idim];
+                        }
+                    }
+                }
+
+                // Interpolate the volume reference fluxes to the facet.
+                // And do the dot product with the UNIT REFERENCE normal.
+                // Since we are computing a dot product with the unit reference normal,
+                // we exploit the fact that the unit reference normal has a value of 0 in all reference directions except
+                // the outward reference normal dircetion.
+                const dealii::Tensor<1,dim,double> unit_ref_normal_int = dealii::GeometryInfo<dim>::unit_normal_vector[iface];
+                const dealii::Tensor<1,dim,double> unit_ref_normal_ext = dealii::GeometryInfo<dim>::unit_normal_vector[neighbor_iface];
+                // Extract the reference direction that is outward facing on the facet.
+                const int dim_not_zero_int = iface / 2;//reference direction of face integer division
+                const int dim_not_zero_ext = neighbor_iface / 2;//reference direction of face integer division
+                 
+                std::array<std::vector<real>,nstate> ent_sgs_int_vol_ref_flux_interp_to_face_dot_ref_normal;
+                std::array<std::vector<real>,nstate> ent_sgs_ext_vol_ref_flux_interp_to_face_dot_ref_normal;
+                for(int istate=0; istate<nstate; istate++){
+                    //allocate
+                    ent_sgs_int_vol_ref_flux_interp_to_face_dot_ref_normal[istate].resize(n_face_quad_pts);
+                    ent_sgs_ext_vol_ref_flux_interp_to_face_dot_ref_normal[istate].resize(n_face_quad_pts);
+                 
+                    // solve
+                    // Note, since the normal is zero in all other reference directions, we only have to interpolate one given reference direction to the facet
+                    // interpolate reference volume dissipative flux to the facet, and apply unit reference normal as scaled by 1.0 or -1.0
+                    flux_basis.matrix_vector_mult_surface_1D(iface, 
+                                                             ent_sgs_ref_flux_at_q[istate][dim_not_zero_int],
+                                                             ent_sgs_int_vol_ref_flux_interp_to_face_dot_ref_normal[istate],
+                                                             flux_basis.oneD_surf_operator,
+                                                             flux_basis.oneD_vol_operator,
+                                                             false, unit_ref_normal_int[dim_not_zero_int]);
+                    flux_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface, 
+                                                                 ent_sgs_ref_flux_at_vol_q_ext[istate][dim_not_zero_ext],
+                                                                 ent_sgs_ext_vol_ref_flux_interp_to_face_dot_ref_normal[istate],
+                                                                 flux_basis_ext.oneD_surf_operator,
+                                                                 flux_basis_ext.oneD_vol_operator,
+                                                                 false, unit_ref_normal_ext[dim_not_zero_ext]);
+                }
+
+                //Do the surface numerical flux as the average
+                std::array<std::vector<real>,nstate> ent_sgs_num_flux_dot_n;
+                for (unsigned int iquad=0; iquad<n_face_quad_pts; ++iquad) {
+                    // Copy Metric Cofactor on the facet in a way can use for transforming Tensor Blocks to reference space
+                    // The way it is stored in metric_operators is to use sum-factorization in each direction,
+                    // but here it is cleaner to apply a reference transformation in each Tensor block returned by physics.
+                    // Note that for a conforming mesh, the facet metric cofactor matrix is the same from either interioir or exterior metric terms. 
+                    // This is verified for the metric computations in: unit_tests/operator_tests/surface_conforming_test.cpp
+                    dealii::Tensor<2,dim,real> metric_cofactor_surf;
+                    for(int idim=0; idim<dim; idim++){
+                        for(int jdim=0; jdim<dim; jdim++){
+                            metric_cofactor_surf[idim][jdim] = metric_oper.metric_cofactor_surf[idim][jdim][iquad];
+                        }
+                    }
+                 
+                    std::array<real,nstate> entropy_var_face_int;
+                    std::array<real,nstate> entropy_var_face_ext;
+                    std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state_int;
+                    std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state_ext;
+                    std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var_int;
+                    std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var_ext;
+                    for(int istate=0; istate<nstate; istate++){
+                        entropy_var_face_int[istate] = projected_entropy_var_surf_int[istate][iquad];
+                        entropy_var_face_ext[istate] = projected_entropy_var_surf_ext[istate][iquad];
+                        for(int idim=0; idim<dim; idim++){
+                            grad_entropy_var_int[istate][idim] = aux_soln_at_surf_q_int[istate][idim][iquad];
+                            grad_entropy_var_ext[istate][idim] = aux_soln_at_surf_q_ext[istate][idim][iquad];
+                        }
+                    }
+                    std::array<real,nstate> soln_state_int;
+                    soln_state_int = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var_face_int);
+                    std::array<real,nstate> soln_state_ext;
+                    soln_state_ext = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var_face_ext);
+                 
+                    aux_soln_state_int = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state_int, grad_entropy_var_int);
+                    aux_soln_state_ext = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state_ext, grad_entropy_var_ext);
+                 
+                    // numerical fluxes
+                    dealii::Tensor<1,dim,real> unit_phys_normal_int;
+                    metric_oper.transform_reference_to_physical(unit_ref_normal_int,
+                                                                metric_cofactor_surf,
+                                                                unit_phys_normal_int);
+                    const double face_Jac_norm_scaled = unit_phys_normal_int.norm();
+                    unit_phys_normal_int /= face_Jac_norm_scaled;//normalize it. 
+                    // Note that the facet determinant of metric jacobian is the above norm multiplied by the determinant of the metric Jacobian evaluated on the facet.
+                    // Since the determinant of the metric Jacobian evaluated on the face cancels off, we can just scale the numerical flux by the norm.
+                 
+                    std::array<dealii::Tensor<1,dim,real>,nstate> ent_sgs_phys_flux_int;
+                    std::array<dealii::Tensor<1,dim,real>,nstate> ent_sgs_phys_flux_ext;
+                    ent_sgs_phys_flux_int = this->pde_physics_double->entropy_correction_sgs_flux(soln_state_int, aux_soln_state_int, ent_sgs_coeff);
+                    ent_sgs_phys_flux_ext = this->pde_physics_double->entropy_correction_sgs_flux(soln_state_ext, aux_soln_state_ext, ent_sgs_coeff_ext);
+                    std::array<real,nstate> ent_sgs_num_flux_dot_n_at_q;
+                    for(int istate=0; istate<nstate; istate++){
+                        ent_sgs_num_flux_dot_n_at_q[istate] = 0.0;
+                        for(int idim=0; idim<dim; idim++){
+                            ent_sgs_num_flux_dot_n_at_q[istate] += 0.5 * (ent_sgs_phys_flux_int[istate][idim] + ent_sgs_phys_flux_ext[istate][idim]) * unit_phys_normal_int[idim];
+                        }
+                    }
+                 
+                    // Write the values in a way that we can use sum-factorization on.
+                    for(int istate=0; istate<nstate; istate++){
+                        // Write the data in a way that we can use sum-factorization on.
+                        // Since sum-factorization improves the speed for matrix-vector multiplications,
+                        // We need the values to have their inner elements be vectors of n_face_quad_pts.
+                 
+                        // allocate
+                        if(iquad == 0){
+                            ent_sgs_num_flux_dot_n[istate].resize(n_face_quad_pts);
+                        }
+                 
+                        // write data
+                        ent_sgs_num_flux_dot_n[istate][iquad] = face_Jac_norm_scaled * ent_sgs_num_flux_dot_n_at_q[istate];
+                    }
+                }
+                //Inner product with test function and add to residual
+                for(int istate=0; istate<nstate; istate++){
+                    // interior RHS
+                    std::vector<real> rhs_int(n_shape_fns);
+                 
+                    // dissipative flux
+                    soln_basis.inner_product_surface_1D(iface, 
+                                                        ent_sgs_int_vol_ref_flux_interp_to_face_dot_ref_normal[istate], 
+                                                        surf_quad_weights, rhs_int, 
+                                                        soln_basis.oneD_surf_operator, 
+                                                        soln_basis.oneD_vol_operator,
+                                                        false, 1.0);//adding=false, subtract the negative so add it
+                    // dissipative numerical flux
+                    soln_basis.inner_product_surface_1D(iface, ent_sgs_num_flux_dot_n[istate], 
+                                                        surf_quad_weights, rhs_int, 
+                                                        soln_basis.oneD_surf_operator, 
+                                                        soln_basis.oneD_vol_operator,
+                                                        true, -1.0);//adding=true, scaled by factor=-1.0 bc subtract it
+                 
+                 
+                    for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+                        DGBase<dim,real,MeshType>::right_hand_side(current_dofs_indices[istate*n_shape_fns + ishape]) += rhs_int[ishape];
+                    }
+                 
+                    // exterior RHS
+                    std::vector<real> rhs_ext(n_shape_fns_ext);
+                 
+                    // dissipative flux
+                    soln_basis_ext.inner_product_surface_1D(neighbor_iface, 
+                                                            ent_sgs_ext_vol_ref_flux_interp_to_face_dot_ref_normal[istate], 
+                                                            surf_quad_weights, rhs_ext, 
+                                                            soln_basis_ext.oneD_surf_operator, 
+                                                            soln_basis_ext.oneD_vol_operator,
+                                                            false, 1.0);//adding=false
+                    // dissipative numerical flux
+                    soln_basis_ext.inner_product_surface_1D(neighbor_iface, ent_sgs_num_flux_dot_n[istate], 
+                                                            surf_quad_weights, rhs_ext, 
+                                                            soln_basis_ext.oneD_surf_operator, 
+                                                            soln_basis_ext.oneD_vol_operator,
+                                                            true, 1.0);//adding=true, scaled by factor=1.0 because negative numerical flux and subtract it
+                 
+                 
+                    for(unsigned int ishape=0; ishape<n_shape_fns_ext; ishape++){
+                        DGBase<dim,real,MeshType>::right_hand_side(neighbor_dofs_indices[istate*n_shape_fns_ext + ishape]) += rhs_ext[ishape];
+                    }
+                }
+
+            }//end of face loop
+         
+        }//end of cell loop
+    }//End of if statement nstate == dim+2
 }
 /*******************************************************************
  *
@@ -504,6 +1444,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_auxiliary_equation(
     OPERATOR::basis_functions<dim,2*dim,real> &soln_basis,
     OPERATOR::basis_functions<dim,2*dim,real> &flux_basis,
     OPERATOR::metric_operators<real,dim,2*dim> &metric_oper,
+    OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper,
     std::vector<dealii::Tensor<1,dim,real>> &local_auxiliary_RHS)
 {
     //Please see header file for exact formula we are solving.
@@ -526,13 +1467,52 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_auxiliary_equation(
 
         soln_coeff[istate][ishape] = DGBase<dim,real,MeshType>::solution(current_dofs_indices[idof]);
     }
+    std::array<std::vector<real>,nstate> soln_at_q;
+    for(int istate=0; istate<nstate; istate++){
+        soln_at_q[istate].resize(n_quad_pts);
+        soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
+                                         soln_basis.oneD_vol_operator);
+    }
+
+    std::array<std::vector<real>,nstate> projected_entropy_var_at_q;
+    std::array<std::vector<real>,nstate> entropy_var_at_q;
+    for(int istate=0; istate<nstate; istate++){
+        entropy_var_at_q[istate].resize(n_quad_pts);
+    }
+    for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+        std::array<real,nstate> soln_state;
+        for(int istate=0; istate<nstate; istate++){
+            soln_state[istate] = soln_at_q[istate][iquad];
+        }
+        std::array<real,nstate> entropy_var;
+        entropy_var = this->pde_physics_double->compute_entropy_variables(soln_state);
+        for(int istate=0; istate<nstate; istate++){
+            entropy_var_at_q[istate][iquad] = entropy_var[istate];
+        }
+    }
+    //project entropy var
+    std::array<std::vector<real>,nstate> projected_entropy_var;
+    for(int istate=0; istate<nstate; ++istate){
+        //allocate
+        projected_entropy_var[istate].resize(n_shape_fns);
+        //solve
+        soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_at_q[istate],
+                                                         projected_entropy_var[istate],
+                                                         soln_basis_projection_oper.oneD_vol_operator);
+  //  }
+  //  for(int istate=0; istate<nstate; ++istate){
+        //allocate
+        projected_entropy_var_at_q[istate].resize(n_quad_pts);
+        //solve
+        soln_basis.matrix_vector_mult_1D(projected_entropy_var[istate],
+                                         projected_entropy_var_at_q[istate],
+                                         soln_basis.oneD_vol_operator);
+    }
+
+
     //Interpolate each state to the quadrature points using sum-factorization
     //with the basis functions in each reference direction.
     for(int istate=0; istate<nstate; istate++){
-        std::vector<real> soln_at_q(n_quad_pts);
-        //interpolate soln coeff to volume cubature nodes
-        soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q,
-                                         soln_basis.oneD_vol_operator);
         //the volume integral for the auxiliary equation is the physical integral of the physical gradient of the solution.
         //That is, we need to physically integrate (we have determinant of Jacobian cancel) the Eq. (12) (with u for chi) in
         //Cicchino, Alexander, et al. "Provably stable flux reconstruction high-order methods on curvilinear elements." Journal of Computational Physics 463 (2022): 111259.
@@ -542,7 +1522,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_auxiliary_equation(
         for(int idim=0; idim<dim; idim++){
             ref_gradient_basis_fns_times_soln[idim].resize(n_quad_pts);
         }
-        flux_basis.gradient_matrix_vector_mult_1D(soln_at_q, ref_gradient_basis_fns_times_soln,
+        flux_basis.gradient_matrix_vector_mult_1D(projected_entropy_var_at_q[istate], ref_gradient_basis_fns_times_soln,
                                                   flux_basis.oneD_vol_operator,
                                                   flux_basis.oneD_grad_operator);
         //transform the gradient into a physical gradient operator scaled by determinant of metric Jacobian
@@ -728,6 +1708,8 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
     const std::vector<dealii::types::global_dof_index> &dof_indices_ext,
     OPERATOR::basis_functions<dim,2*dim,real> &soln_basis_int,
     OPERATOR::basis_functions<dim,2*dim,real> &soln_basis_ext,
+    OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper_ext,
     OPERATOR::metric_operators<real,dim,2*dim> &metric_oper_int,
     std::vector<dealii::Tensor<1,dim,real>> &local_auxiliary_RHS_int,
     std::vector<dealii::Tensor<1,dim,real>> &local_auxiliary_RHS_ext)
@@ -770,23 +1752,99 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
         soln_coeff_ext[istate][ishape] = DGBase<dim,real,MeshType>::solution(dof_indices_ext[idof]);
     }
 
-    //Interpolate soln modal coefficients to the facet
-    std::array<std::vector<real>,nstate> soln_at_surf_q_int;
-    std::array<std::vector<real>,nstate> soln_at_surf_q_ext;
+//    //Interpolate soln modal coefficients to the facet
+//    std::array<std::vector<real>,nstate> soln_at_surf_q_int;
+//    std::array<std::vector<real>,nstate> soln_at_surf_q_ext;
+//    for(int istate=0; istate<nstate; ++istate){
+//        //allocate
+//        soln_at_surf_q_int[istate].resize(n_face_quad_pts);
+//        soln_at_surf_q_ext[istate].resize(n_face_quad_pts);
+//        //solve soln at facet cubature nodes
+//        soln_basis_int.matrix_vector_mult_surface_1D(iface,
+//                                                     soln_coeff_int[istate], soln_at_surf_q_int[istate],
+//                                                     soln_basis_int.oneD_surf_operator,
+//                                                     soln_basis_int.oneD_vol_operator);
+//        soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
+//                                                     soln_coeff_ext[istate], soln_at_surf_q_ext[istate],
+//                                                     soln_basis_ext.oneD_surf_operator,
+//                                                     soln_basis_ext.oneD_vol_operator);
+//    }
+
+
+    std::array<std::vector<real>,nstate> entropy_var_at_surf_q_int;
+    std::array<std::vector<real>,nstate> entropy_var_at_surf_q_ext;
+    const unsigned int n_quad_pts_vol_int = this->volume_quadrature_collection[poly_degree_int].size();
+    const unsigned int n_quad_pts_vol_ext = this->volume_quadrature_collection[poly_degree_ext].size();
+    //interp soln to quad pts
+    std::array<std::vector<real>,nstate> soln_at_vol_q_int;
+    std::array<std::vector<real>,nstate> soln_at_vol_q_ext;
+    std::array<std::vector<real>,nstate> entropy_var_at_vol_q_int;
+    std::array<std::vector<real>,nstate> entropy_var_at_vol_q_ext;
     for(int istate=0; istate<nstate; ++istate){
         //allocate
-        soln_at_surf_q_int[istate].resize(n_face_quad_pts);
-        soln_at_surf_q_ext[istate].resize(n_face_quad_pts);
+        soln_at_vol_q_int[istate].resize(n_quad_pts_vol_int);
+        soln_at_vol_q_ext[istate].resize(n_quad_pts_vol_ext);
+        entropy_var_at_vol_q_int[istate].resize(n_quad_pts_vol_int);
+        entropy_var_at_vol_q_ext[istate].resize(n_quad_pts_vol_ext);
+        //solve soln at vol cubature nodes
+        soln_basis_int.matrix_vector_mult_1D(soln_coeff_int[istate], soln_at_vol_q_int[istate],
+                                             soln_basis_int.oneD_vol_operator);
+        soln_basis_ext.matrix_vector_mult_1D(soln_coeff_ext[istate], soln_at_vol_q_ext[istate],
+                                             soln_basis_ext.oneD_vol_operator);
+    }
+    //get entropy var at volume quad pts
+    //assume quad int  = quad ext
+    for(unsigned int iquad=0; iquad<n_quad_pts_vol_int; iquad++){
+        std::array<real,nstate> soln_state_int;
+        std::array<real,nstate> soln_state_ext;
+        for(int istate=0; istate<nstate; istate++){
+            soln_state_int[istate] = soln_at_vol_q_int[istate][iquad];
+            soln_state_ext[istate] = soln_at_vol_q_ext[istate][iquad];
+        }
+        std::array<real,nstate> entropy_var_int;
+        entropy_var_int = this->pde_physics_double->compute_entropy_variables(soln_state_int);
+        std::array<real,nstate> entropy_var_ext;
+        entropy_var_ext = this->pde_physics_double->compute_entropy_variables(soln_state_ext);
+        for(int istate=0; istate<nstate; istate++){
+            entropy_var_at_vol_q_int[istate][iquad] = entropy_var_int[istate];
+            entropy_var_at_vol_q_ext[istate][iquad] = entropy_var_ext[istate];
+        }
+    }
+
+    //project entropy var
+    std::array<std::vector<real>,nstate> projected_entropy_var_int;
+    std::array<std::vector<real>,nstate> projected_entropy_var_ext;
+    for(int istate=0; istate<nstate; ++istate){
+        //allocate
+        projected_entropy_var_int[istate].resize(n_shape_fns_int);
+        projected_entropy_var_ext[istate].resize(n_shape_fns_ext);
+        //solve
+        soln_basis_projection_oper_int.matrix_vector_mult_1D(entropy_var_at_vol_q_int[istate], 
+                                                             projected_entropy_var_int[istate],
+                                                             soln_basis_projection_oper_int.oneD_vol_operator);
+        soln_basis_projection_oper_ext.matrix_vector_mult_1D(entropy_var_at_vol_q_ext[istate], 
+                                                             projected_entropy_var_ext[istate],
+                                                             soln_basis_projection_oper_ext.oneD_vol_operator);
+//    }
+
+    //interp projected entropy var to surface
+//    for(int istate=0; istate<nstate; ++istate){
+        //allocate
+        entropy_var_at_surf_q_int[istate].resize(n_face_quad_pts);
+        entropy_var_at_surf_q_ext[istate].resize(n_face_quad_pts);
         //solve soln at facet cubature nodes
         soln_basis_int.matrix_vector_mult_surface_1D(iface,
-                                                     soln_coeff_int[istate], soln_at_surf_q_int[istate],
+                                                     projected_entropy_var_int[istate], 
+                                                     entropy_var_at_surf_q_int[istate],
                                                      soln_basis_int.oneD_surf_operator,
                                                      soln_basis_int.oneD_vol_operator);
         soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
-                                                     soln_coeff_ext[istate], soln_at_surf_q_ext[istate],
+                                                     projected_entropy_var_ext[istate], 
+                                                     entropy_var_at_surf_q_ext[istate],
                                                      soln_basis_ext.oneD_surf_operator,
                                                      soln_basis_ext.oneD_vol_operator);
     }
+
 
     //evaluate physical facet fluxes dot product with physical unit normal scaled by determinant of metric facet Jacobian
     //the outward reference normal dircetion.
@@ -817,8 +1875,10 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
         std::array<real,nstate> soln_state_int;
         std::array<real,nstate> soln_state_ext;
         for(int istate=0; istate<nstate; istate++){
-            soln_state_int[istate] = soln_at_surf_q_int[istate][iquad];
-            soln_state_ext[istate] = soln_at_surf_q_ext[istate][iquad];
+          //  soln_state_int[istate] = soln_at_surf_q_int[istate][iquad];
+          //  soln_state_ext[istate] = soln_at_surf_q_ext[istate][iquad];
+            soln_state_int[istate] = entropy_var_at_surf_q_int[istate][iquad];
+            soln_state_ext[istate] = entropy_var_at_surf_q_ext[istate][iquad];
         }
         diss_soln_num_flux = this->diss_num_flux_double->evaluate_solution_flux(soln_state_int, soln_state_ext, unit_phys_normal_int);
 
@@ -831,10 +1891,10 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_auxiliary_equation(
                 }
                 //solve
                 surf_num_flux_minus_surf_soln_int_dot_normal[istate][idim][iquad]
-                    = (diss_soln_num_flux[istate] - soln_at_surf_q_int[istate][iquad]) * unit_phys_normal_int[idim] * face_Jac_norm_scaled;
+                    = (diss_soln_num_flux[istate] - soln_state_int[istate]) * unit_phys_normal_int[idim] * face_Jac_norm_scaled;
 
                 surf_num_flux_minus_surf_soln_ext_dot_normal[istate][idim][iquad]
-                    = (diss_soln_num_flux[istate] - soln_at_surf_q_ext[istate][iquad]) * (- unit_phys_normal_int[idim]) * face_Jac_norm_scaled;
+                    = (diss_soln_num_flux[istate] - soln_state_ext[istate]) * (- unit_phys_normal_int[idim]) * face_Jac_norm_scaled;
             }
         }
     }
@@ -977,10 +2037,12 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
     //get entropy projected variables
     std::array<std::vector<real>,nstate> entropy_var_at_q;
     std::array<std::vector<real>,nstate> projected_entropy_var_at_q;
-    if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
+    std::array<std::vector<real>,nstate> entropy_var_coeff;
+//    if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
         for(int istate=0; istate<nstate; istate++){
             entropy_var_at_q[istate].resize(n_quad_pts);
             projected_entropy_var_at_q[istate].resize(n_quad_pts);
+            entropy_var_coeff[istate].resize(n_shape_fns);
         }
         for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
             std::array<real,nstate> soln_state;
@@ -994,15 +2056,15 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
             }
         }
         for(int istate=0; istate<nstate; istate++){
-            std::vector<real> entropy_var_coeff(n_shape_fns);;
+           // std::vector<real> entropy_var_coeff(n_shape_fns);
             soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_at_q[istate],
-                                                             entropy_var_coeff,
+                                                             entropy_var_coeff[istate],
                                                              soln_basis_projection_oper.oneD_vol_operator);
-            soln_basis.matrix_vector_mult_1D(entropy_var_coeff,
+            soln_basis.matrix_vector_mult_1D(entropy_var_coeff[istate],
                                              projected_entropy_var_at_q[istate],
                                              soln_basis.oneD_vol_operator);
         }
-    }
+//    }
 
 
     //Compute the physical fluxes, then convert them into reference fluxes.
@@ -1011,6 +2073,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
     //For curvilinear split-form in Eq. (22), we apply a two-pt flux of the metric-cofactor matrix on the matrix operator constructed by the entropy stable/conservtive 2pt flux.
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> conv_ref_flux_at_q;
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> diffusive_ref_flux_at_q;
+//    std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> ent_sgs_ref_flux_at_q;
     std::array<std::vector<real>,nstate> source_at_q;
     std::array<std::vector<real>,nstate> physical_source_at_q;
 
@@ -1036,12 +2099,14 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
         //extract soln and auxiliary soln at quad pt to be used in physics
         std::array<real,nstate> soln_state;
         std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state;
+        std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var;
         for(int istate=0; istate<nstate; istate++){
             soln_state[istate] = soln_at_q[istate][iquad];
             for(int idim=0; idim<dim; idim++){
-                aux_soln_state[istate][idim] = aux_soln_at_q[istate][idim][iquad];
+                grad_entropy_var[istate][idim] = aux_soln_at_q[istate][idim][iquad];
             }
         }
+        aux_soln_state = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state, grad_entropy_var);
 
         // Copy Metric Cofactor in a way can use for transforming Tensor Blocks to reference space
         // The way it is stored in metric_operators is to use sum-factorization in each direction,
@@ -1145,10 +2210,17 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
             physical_source = this->pde_physics_double->physical_source_term (vol_flux_node, soln_state, aux_soln_state, current_cell_index);
         }
 
+//        // Entropy Correction SGS Fluc
+//        std::array<dealii::Tensor<1,dim,real>,nstate> ent_sgs_phys_flux;
+//        //Compute the physical dissipative flux
+//        ent_sgs_phys_flux = this->pde_physics_double->entropy_correction_sgs_flux(soln_state, aux_soln_state, 1.0);
+
+
         //Write the values in a way that we can use sum-factorization on.
         for(int istate=0; istate<nstate; istate++){
             dealii::Tensor<1,dim,real> conv_ref_flux;
             dealii::Tensor<1,dim,real> diffusive_ref_flux;
+//            dealii::Tensor<1,dim,real> ent_sgs_ref_flux;
             //Trnasform to reference fluxes
             if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
                 //Do Nothing. 
@@ -1170,6 +2242,12 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                 metric_cofactor,
                 diffusive_ref_flux);
 
+//            //transform the entropy correction sgs flux to reference space
+//            metric_oper.transform_physical_to_reference(
+//                ent_sgs_phys_flux[istate],
+//                metric_cofactor,
+//                ent_sgs_ref_flux);
+
             //Write the data in a way that we can use sum-factorization on.
             //Since sum-factorization improves the speed for matrix-vector multiplications,
             //We need the values to have their inner elements be vectors.
@@ -1178,6 +2256,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                 if(iquad == 0){
                     conv_ref_flux_at_q[istate][idim].resize(n_quad_pts);
                     diffusive_ref_flux_at_q[istate][idim].resize(n_quad_pts);
+//                    ent_sgs_ref_flux_at_q[istate][idim].resize(n_quad_pts);
                 }
                 //write data
                 if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
@@ -1188,6 +2267,8 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
                 }
 
                 diffusive_ref_flux_at_q[istate][idim][iquad] = diffusive_ref_flux[idim];
+
+//                ent_sgs_ref_flux_at_q[istate][idim][iquad] = ent_sgs_ref_flux[idim];
             }
             if(this->all_parameters->manufactured_convergence_study_param.manufactured_solution_param.use_manufactured_source_term) {
                 if(iquad == 0){
@@ -1220,6 +2301,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
     //For each state we:
     //  1. Compute reference divergence.
     //  2. Then compute and write the rhs for the given state.
+//    real conv_rhs_entropy = 0.0;
     for(int istate=0; istate<nstate; istate++){
 
         //Compute reference divergence of the reference fluxes.
@@ -1278,6 +2360,11 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
             soln_basis.inner_product_1D(conv_flux_divergence, vol_quad_weights, rhs, soln_basis.oneD_vol_operator, false, -1.0);
         }
 
+        for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+           // conv_rhs_entropy += rhs[ishape] * entropy_var_coeff[istate][ishape]; 
+            this->cell_entropy_correction_coef[cell_dofs_indices[0]] += rhs[ishape] * entropy_var_coeff[istate][ishape];//subtracting off the conv residual's contribution
+        }
+
         // Diffusive
         // Note that for diffusion, the negative is defined in the physics. Since we used the auxiliary
         // variable, put a negative here.
@@ -1306,6 +2393,25 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_strong(
         }
 
     }
+
+//    //Entropy correction SGS flux
+//    for(int istate=0; istate<nstate; istate++){
+//        std::vector<real> ent_sgs_flux_divergence(n_quad_pts); 
+//        //Reference divergence of the reference entropy correction sgs flux.
+//        flux_basis.divergence_matrix_vector_mult_1D(ent_sgs_ref_flux_at_q[istate], ent_sgs_flux_divergence,
+//                                                    flux_basis.oneD_vol_operator,
+//                                                    flux_basis.oneD_grad_operator);
+//
+//        real entropy_correction_coef = (this->cell_entropy_correction_coef[cell_dofs_indices[0]] - conv_rhs_entropy) / (this->cell_entropy_correction_norm[cell_dofs_indices[0]] + 1e-20);
+//        std::vector<real> rhs(n_shape_fns);
+//        // Entropy SGS flux residual contribution
+//        // Note that for diffusion, the negative is defined in the physics. Since we used the auxiliary
+//        // variable, put a negative here.
+//        soln_basis.inner_product_1D(ent_sgs_flux_divergence, vol_quad_weights, rhs, soln_basis.oneD_vol_operator, false, -entropy_correction_coef);
+//        for(unsigned int ishape=0; ishape<n_shape_fns; ishape++){
+//            local_rhs_int_cell(istate*n_shape_fns + ishape) += rhs[ishape];
+//        }
+//    }
 }
 
 template <int dim, int nstate, typename real, typename MeshType>
@@ -1957,6 +3063,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
     // First we do interior.
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> conv_ref_flux_at_vol_q_int;
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> diffusive_ref_flux_at_vol_q_int;
+//    std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> ent_sgs_ref_flux_at_vol_q_int;
     for (unsigned int iquad=0; iquad<n_quad_pts_vol_int; ++iquad) {
         // Copy Metric Cofactor in a way can use for transforming Tensor Blocks to reference space
         // The way it is stored in metric_operators is to use sum-factorization in each direction,
@@ -1969,12 +3076,14 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
         }
         std::array<real,nstate> soln_state;
         std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state;
+        std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var;
         for(int istate=0; istate<nstate; istate++){
             soln_state[istate] = soln_at_vol_q_int[istate][iquad];
             for(int idim=0; idim<dim; idim++){
-                aux_soln_state[istate][idim] = aux_soln_at_vol_q_int[istate][idim][iquad];
+                grad_entropy_var[istate][idim] = aux_soln_at_vol_q_int[istate][idim][iquad];
             }
         }
+        aux_soln_state = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state, grad_entropy_var);
 
         // Evaluate physical convective flux
         std::array<dealii::Tensor<1,dim,real>,nstate> conv_phys_flux;
@@ -1987,10 +3096,15 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
         std::array<dealii::Tensor<1,dim,real>,nstate> diffusive_phys_flux;
         diffusive_phys_flux = this->pde_physics_double->dissipative_flux(soln_state, aux_soln_state, current_cell_index);
 
+//        // Compute the entropy correction sgs dissipative flux
+//        std::array<dealii::Tensor<1,dim,real>,nstate> ent_sgs_phys_flux;
+//        ent_sgs_phys_flux = this->pde_physics_double->entropy_correction_sgs_flux(soln_state, aux_soln_state, 1.0);
+
         // Write the values in a way that we can use sum-factorization on.
         for(int istate=0; istate<nstate; istate++){
             dealii::Tensor<1,dim,real> conv_ref_flux;
             dealii::Tensor<1,dim,real> diffusive_ref_flux;
+//            dealii::Tensor<1,dim,real> ent_sgs_ref_flux;
             // transform the conservative convective physical flux to reference space
             if(!this->all_parameters->use_split_form && !this->all_parameters->use_curvilinear_split_form){
                 metric_oper_int.transform_physical_to_reference(
@@ -2004,6 +3118,12 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                 metric_cofactor_vol_int,
                 diffusive_ref_flux);
 
+//            // transform the ent sgs flux to reference space
+//            metric_oper_int.transform_physical_to_reference(
+//                ent_sgs_phys_flux[istate],
+//                metric_cofactor_vol_int,
+//                ent_sgs_ref_flux);
+
             // Write the data in a way that we can use sum-factorization on.
             // Since sum-factorization improves the speed for matrix-vector multiplications,
             // We need the values to have their inner elements be vectors.
@@ -2012,12 +3132,14 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                 if(iquad == 0){
                     conv_ref_flux_at_vol_q_int[istate][idim].resize(n_quad_pts_vol_int);
                     diffusive_ref_flux_at_vol_q_int[istate][idim].resize(n_quad_pts_vol_int);
+//                    ent_sgs_ref_flux_at_vol_q_int[istate][idim].resize(n_quad_pts_vol_int);
                 }
                 // write data
                 if(!this->all_parameters->use_split_form && !this->all_parameters->use_curvilinear_split_form){
                     conv_ref_flux_at_vol_q_int[istate][idim][iquad] = conv_ref_flux[idim];
                 }
                 diffusive_ref_flux_at_vol_q_int[istate][idim][iquad] = diffusive_ref_flux[idim];
+//                ent_sgs_ref_flux_at_vol_q_int[istate][idim][iquad] = ent_sgs_ref_flux[idim];
             }
         }
     }
@@ -2026,6 +3148,7 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
     // Note we split the quad integrals because the interior and exterior could be of different poly basis
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> conv_ref_flux_at_vol_q_ext;
     std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> diffusive_ref_flux_at_vol_q_ext;
+//    std::array<dealii::Tensor<1,dim,std::vector<real>>,nstate> ent_sgs_ref_flux_at_vol_q_ext;
     for (unsigned int iquad=0; iquad<n_quad_pts_vol_ext; ++iquad) {
 
         // Extract exterior volume metric cofactor matrix at given volume cubature node.
@@ -2038,12 +3161,14 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
 
         std::array<real,nstate> soln_state;
         std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state;
+        std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var;
         for(int istate=0; istate<nstate; istate++){
             soln_state[istate] = soln_at_vol_q_ext[istate][iquad];
             for(int idim=0; idim<dim; idim++){
-                aux_soln_state[istate][idim] = aux_soln_at_vol_q_ext[istate][idim][iquad];
+                grad_entropy_var[istate][idim] = aux_soln_at_vol_q_ext[istate][idim][iquad];
             }
         }
+        aux_soln_state = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state, grad_entropy_var);
 
         // Evaluate physical convective flux
         std::array<dealii::Tensor<1,dim,real>,nstate> conv_phys_flux;
@@ -2055,10 +3180,15 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
         std::array<dealii::Tensor<1,dim,real>,nstate> diffusive_phys_flux;
         diffusive_phys_flux = this->pde_physics_double->dissipative_flux(soln_state, aux_soln_state, neighbor_cell_index);
 
+//        // Compute the entropy correction sgs dissipative flux
+//        std::array<dealii::Tensor<1,dim,real>,nstate> ent_sgs_phys_flux;
+//        ent_sgs_phys_flux = this->pde_physics_double->entropy_correction_sgs_flux(soln_state, aux_soln_state, 1.0);
+
         // Write the values in a way that we can use sum-factorization on.
         for(int istate=0; istate<nstate; istate++){
             dealii::Tensor<1,dim,real> conv_ref_flux;
             dealii::Tensor<1,dim,real> diffusive_ref_flux;
+//            dealii::Tensor<1,dim,real> ent_sgs_ref_flux;
             // transform the conservative convective physical flux to reference space
             if(!this->all_parameters->use_split_form && !this->all_parameters->use_curvilinear_split_form){
                 metric_oper_ext.transform_physical_to_reference(
@@ -2072,6 +3202,12 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                 metric_cofactor_vol_ext,
                 diffusive_ref_flux);
 
+//            // transform the ent sgs flux to reference space
+//            metric_oper_int.transform_physical_to_reference(
+//                ent_sgs_phys_flux[istate],
+//                metric_cofactor_vol_int,
+//                ent_sgs_ref_flux);
+
             // Write the data in a way that we can use sum-factorization on.
             // Since sum-factorization improves the speed for matrix-vector multiplications,
             // We need the values to have their inner elements be vectors.
@@ -2080,12 +3216,14 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                 if(iquad == 0){
                     conv_ref_flux_at_vol_q_ext[istate][idim].resize(n_quad_pts_vol_ext);
                     diffusive_ref_flux_at_vol_q_ext[istate][idim].resize(n_quad_pts_vol_ext);
+//                    ent_sgs_ref_flux_at_vol_q_ext[istate][idim].resize(n_quad_pts_vol_ext);
                 }
                 // write data
                 if(!this->all_parameters->use_split_form && !this->all_parameters->use_curvilinear_split_form){
                     conv_ref_flux_at_vol_q_ext[istate][idim][iquad] = conv_ref_flux[idim];
                 }
                 diffusive_ref_flux_at_vol_q_ext[istate][idim][iquad] = diffusive_ref_flux[idim];
+//                ent_sgs_ref_flux_at_vol_q_ext[istate][idim][iquad] = ent_sgs_ref_flux[idim];
             }
         }
     }
@@ -2190,38 +3328,42 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
     std::array<std::vector<real>,nstate> projected_entropy_var_vol_ext;
     std::array<std::vector<real>,nstate> projected_entropy_var_surf_int;
     std::array<std::vector<real>,nstate> projected_entropy_var_surf_ext;
+    std::array<std::vector<real>,nstate> entropy_var_coeff_int;
+    std::array<std::vector<real>,nstate> entropy_var_coeff_ext;
     for(int istate=0; istate<nstate; istate++){
         // allocate
         projected_entropy_var_vol_int[istate].resize(n_quad_pts_vol_int);
         projected_entropy_var_vol_ext[istate].resize(n_quad_pts_vol_ext);
         projected_entropy_var_surf_int[istate].resize(n_face_quad_pts);
         projected_entropy_var_surf_ext[istate].resize(n_face_quad_pts);
+        entropy_var_coeff_int[istate].resize(n_shape_fns_int);
+        entropy_var_coeff_ext[istate].resize(n_shape_fns_ext);
 
         //interior
-        std::vector<real> entropy_var_coeff_int(n_shape_fns_int);
+//        std::vector<real> entropy_var_coeff_int(n_shape_fns_int);
         soln_basis_projection_oper_int.matrix_vector_mult_1D(entropy_var_vol_int[istate],
-                                                             entropy_var_coeff_int,
+                                                             entropy_var_coeff_int[istate],
                                                              soln_basis_projection_oper_int.oneD_vol_operator);
-        soln_basis_int.matrix_vector_mult_1D(entropy_var_coeff_int,
+        soln_basis_int.matrix_vector_mult_1D(entropy_var_coeff_int[istate],
                                              projected_entropy_var_vol_int[istate],
                                              soln_basis_int.oneD_vol_operator);
         soln_basis_int.matrix_vector_mult_surface_1D(iface,
-                                                     entropy_var_coeff_int, 
+                                                     entropy_var_coeff_int[istate], 
                                                      projected_entropy_var_surf_int[istate],
                                                      soln_basis_int.oneD_surf_operator,
                                                      soln_basis_int.oneD_vol_operator);
 
         //exterior
-        std::vector<real> entropy_var_coeff_ext(n_shape_fns_ext);
+//        std::vector<real> entropy_var_coeff_ext(n_shape_fns_ext);
         soln_basis_projection_oper_ext.matrix_vector_mult_1D(entropy_var_vol_ext[istate],
-                                                             entropy_var_coeff_ext,
+                                                             entropy_var_coeff_ext[istate],
                                                              soln_basis_projection_oper_ext.oneD_vol_operator);
 
-        soln_basis_ext.matrix_vector_mult_1D(entropy_var_coeff_ext,
+        soln_basis_ext.matrix_vector_mult_1D(entropy_var_coeff_ext[istate],
                                              projected_entropy_var_vol_ext[istate],
                                              soln_basis_ext.oneD_vol_operator);
         soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
-                                                     entropy_var_coeff_ext, 
+                                                     entropy_var_coeff_ext[istate], 
                                                      projected_entropy_var_surf_ext[istate],
                                                      soln_basis_ext.oneD_surf_operator,
                                                      soln_basis_ext.oneD_vol_operator);
@@ -2445,6 +3587,8 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
         std::array<real,nstate> entropy_var_face_ext;
         std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state_int;
         std::array<dealii::Tensor<1,dim,real>,nstate> aux_soln_state_ext;
+        std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var_int;
+        std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy_var_ext;
         std::array<real,nstate> soln_interp_to_face_int;
         std::array<real,nstate> soln_interp_to_face_ext;
         for(int istate=0; istate<nstate; istate++){
@@ -2453,11 +3597,10 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
             entropy_var_face_int[istate] = projected_entropy_var_surf_int[istate][iquad];
             entropy_var_face_ext[istate] = projected_entropy_var_surf_ext[istate][iquad];
             for(int idim=0; idim<dim; idim++){
-                aux_soln_state_int[istate][idim] = aux_soln_at_surf_q_int[istate][idim][iquad];
-                aux_soln_state_ext[istate][idim] = aux_soln_at_surf_q_ext[istate][idim][iquad];
+                grad_entropy_var_int[istate][idim] = aux_soln_at_surf_q_int[istate][idim][iquad];
+                grad_entropy_var_ext[istate][idim] = aux_soln_at_surf_q_ext[istate][idim][iquad];
             }
         }
-
         std::array<real,nstate> soln_state_int;
         soln_state_int = this->pde_physics_double->compute_conservative_variables_from_entropy_variables (entropy_var_face_int);
         std::array<real,nstate> soln_state_ext;
@@ -2470,6 +3613,10 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                 soln_state_ext[istate] = soln_at_surf_q_ext[istate][iquad];
             }
         }
+
+        aux_soln_state_int = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state_int, grad_entropy_var_int);
+        aux_soln_state_ext = this->pde_physics_double->convert_grad_entropy_to_grad_conservative(soln_state_ext, grad_entropy_var_ext);
+
 
         // numerical fluxes
         dealii::Tensor<1,dim,real> unit_phys_normal_int;
@@ -2545,6 +3692,18 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                                                     soln_basis_int.oneD_vol_operator,
                                                     false, 1.0);
         }
+
+        // convective numerical flux
+        soln_basis_int.inner_product_surface_1D(iface, conv_num_flux_dot_n[istate], 
+                                                surf_quad_weights, rhs_int, 
+                                                soln_basis_int.oneD_surf_operator, 
+                                                soln_basis_int.oneD_vol_operator,
+                                                true, -1.0);//adding=true, scaled by factor=-1.0 bc subtract it
+
+        for(unsigned int ishape=0; ishape<n_shape_fns_int; ishape++){
+            this->cell_entropy_correction_coef[dof_indices_int[0]] += rhs_int[ishape] * entropy_var_coeff_int[istate][ishape];//subtracting off the conv residual's contribution
+        }
+
         // dissipative flux
         soln_basis_int.inner_product_surface_1D(iface, 
                                                 diffusive_int_vol_ref_flux_interp_to_face_dot_ref_normal[istate], 
@@ -2552,12 +3711,6 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                                                 soln_basis_int.oneD_surf_operator, 
                                                 soln_basis_int.oneD_vol_operator,
                                                 true, 1.0);//adding=true, subtract the negative so add it
-        // convective numerical flux
-        soln_basis_int.inner_product_surface_1D(iface, conv_num_flux_dot_n[istate], 
-                                                surf_quad_weights, rhs_int, 
-                                                soln_basis_int.oneD_surf_operator, 
-                                                soln_basis_int.oneD_vol_operator,
-                                                true, -1.0);//adding=true, scaled by factor=-1.0 bc subtract it
         // dissipative numerical flux
         soln_basis_int.inner_product_surface_1D(iface, diss_auxi_num_flux_dot_n[istate], 
                                                 surf_quad_weights, rhs_int, 
@@ -2598,6 +3751,17 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                                                     soln_basis_ext.oneD_vol_operator,
                                                     false, 1.0);//adding false
         }
+        // convective numerical flux
+        soln_basis_ext.inner_product_surface_1D(neighbor_iface, conv_num_flux_dot_n[istate], 
+                                                surf_quad_weights, rhs_ext, 
+                                                soln_basis_ext.oneD_surf_operator, 
+                                                soln_basis_ext.oneD_vol_operator,
+                                                true, 1.0);//adding=true, scaled by factor=1.0 because negative numerical flux and subtract it
+
+        for(unsigned int ishape=0; ishape<n_shape_fns_int; ishape++){
+            this->cell_entropy_correction_coef[dof_indices_ext[0]] += rhs_ext[ishape] * entropy_var_coeff_ext[istate][ishape];//subtracting off the conv residual's contribution
+        }
+
         // dissipative flux
         soln_basis_ext.inner_product_surface_1D(neighbor_iface, 
                                                 diffusive_ext_vol_ref_flux_interp_to_face_dot_ref_normal[istate], 
@@ -2605,12 +3769,6 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_strong(
                                                 soln_basis_ext.oneD_surf_operator, 
                                                 soln_basis_ext.oneD_vol_operator,
                                                 true, 1.0);//adding=true
-        // convective numerical flux
-        soln_basis_ext.inner_product_surface_1D(neighbor_iface, conv_num_flux_dot_n[istate], 
-                                                surf_quad_weights, rhs_ext, 
-                                                soln_basis_ext.oneD_surf_operator, 
-                                                soln_basis_ext.oneD_vol_operator,
-                                                true, 1.0);//adding=true, scaled by factor=1.0 because negative numerical flux and subtract it
         // dissipative numerical flux
         soln_basis_ext.inner_product_surface_1D(neighbor_iface, diss_auxi_num_flux_dot_n[istate], 
                                                 surf_quad_weights, rhs_ext, 

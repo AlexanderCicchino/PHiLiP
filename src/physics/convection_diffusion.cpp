@@ -78,6 +78,19 @@ std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim,nstate,rea
 
 template <int dim, int nstate, typename real>
 std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim,nstate,real>
+::entropy_correction_sgs_flux (
+    const std::array<real,nstate> &/*cons_sol*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &/*cons_grad*/,
+    const real /*ent_sgs_coef*/) const 
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> sgs_flux;
+    std::cout<<"The entropy corrcetion sgs flux not done for this pde."<<std::endl;
+    std::abort();
+    return sgs_flux;
+}
+
+template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim,nstate,real>
 ::convective_numerical_split_flux (
     const std::array<real,nstate> &soln1,
     const std::array<real,nstate> &soln2) const
@@ -105,6 +118,14 @@ std::array<real,nstate> ConvectionDiffusion<dim, nstate, real>
     return entropy_var;
 }
 
+template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim, nstate, real>
+::convert_grad_entropy_to_grad_conservative (
+    const std::array<real,nstate> &/*cons_sol*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const
+{
+    return entropy_grad;
+}
 template <int dim, int nstate, typename real>
 dealii::Tensor<1,dim,real> ConvectionDiffusion<dim,nstate,real>
 ::advection_speed () const

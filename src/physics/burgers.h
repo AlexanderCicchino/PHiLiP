@@ -65,6 +65,12 @@ public:
     /// Convective flux: \f$ \mathbf{F}_{conv} =  u \f$
     std::array<dealii::Tensor<1,dim,real>,nstate> convective_flux (const std::array<real,nstate> &solution) const;
 
+    /// Entropy conserving SGS flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_correction_sgs_flux (
+        const std::array<real,nstate> &cons_sol,
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad,
+        const real ent_sgs_coef) const;
+
     /// Convective split flux
     std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux (
                 const std::array<real,nstate> &conservative_soln1,
@@ -77,6 +83,10 @@ public:
     /// Computes the conservative variables from the entropy variables.
     std::array<real,nstate> compute_conservative_variables_from_entropy_variables (
                 const std::array<real,nstate> &entropy_var) const;
+
+    /// Given gradient entropy variables
+    /// returns gradient conservative variables.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_entropy_to_grad_conservative ( const std::array<real,nstate> &/*cons_sol*/, const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const;
 
     /// Spectral radius of convective term Jacobian is 'c'
     std::array<real,nstate> convective_eigenvalues (
