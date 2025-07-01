@@ -1320,6 +1320,30 @@ void Euler<dim,nstate,real>
 }
 
 template <int dim, int nstate, typename real>
+void Euler<dim, nstate, real>
+::boundary_postshock(
+    std::array<real, nstate>& soln_bc) const
+{
+    if(dim==2) {
+        //std::cout << "post shock condition" << std::endl;
+        std::array<real, nstate> primitive_boundary_values;
+        primitive_boundary_values[0] = 1.0;
+        primitive_boundary_values[1] = 1.774823949298;
+        primitive_boundary_values[2] = 0.0;
+        primitive_boundary_values[3] = 1.0;
+
+        const std::array<real, nstate> conservative_bc = convert_primitive_to_conservative(primitive_boundary_values);
+        for (int istate = 0; istate < nstate; ++istate) {
+            soln_bc[istate] = conservative_bc[istate];
+        }
+    } else {
+        for (int istate = 0; istate < nstate; ++istate) {
+            soln_bc[istate] = 0;
+        }
+    }
+}
+
+template <int dim, int nstate, typename real>
 void Euler<dim,nstate,real>
 ::boundary_face_values (
    const int boundary_type,
@@ -1362,6 +1386,9 @@ void Euler<dim,nstate,real>
     else if (boundary_type == 1006) {
         // Slip wall boundary condition
         boundary_slip_wall (normal_int, soln_int, soln_grad_int, soln_bc, soln_grad_bc);
+    } 
+    else if (boundary_type == 1007) {
+        boundary_postshock(soln_bc);
     } 
     else {
         this->pcout << "Invalid boundary_type: " << boundary_type << std::endl;
