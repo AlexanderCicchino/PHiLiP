@@ -83,6 +83,10 @@ public:
         const std::array<real,nstate> &soln1,
         const std::array<real,nstate> &soln2) const override;
 
+    /// Computes the primitive variables from the conservative variables.
+    std::array<real,nstate> compute_prim_from_cons (
+                const std::array<real,nstate> &conservative_soln) const;
+
     /// Computes the entropy variables.
     std::array<real,nstate> compute_entropy_variables (
                 const std::array<real,nstate> &conservative_soln) const;
@@ -91,9 +95,21 @@ public:
     std::array<real,nstate> compute_conservative_variables_from_entropy_variables (
                 const std::array<real,nstate> &entropy_var) const;
 
+    /// Computes the conservative variables from the entropy variables.
+    std::array<real,nstate> convert_cons_to_prim(
+                const std::array<real,nstate> &cons_sol) const;
+
     /// Given gradient entropy variables
     /// returns gradient conservative variables.
     std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_entropy_to_grad_conservative ( const std::array<real,nstate> &/*cons_sol*/, const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const;
+
+    /// Given gradient cons variables
+    /// returns gradient entropy variables.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_cons_to_grad_entropy ( const std::array<real,nstate> &/*cons_sol*/, const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad) const;
+
+    /// Given gradient prim variables
+    /// returns gradient conservative variables.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_prim_to_grad_conservative ( const std::array<real,nstate> &/*cons_sol*/, const std::array<dealii::Tensor<1,dim,real>,nstate> &prim_grad) const;
 
     /// Spectral radius of convective term Jacobian is 'c'
     std::array<real,nstate> convective_eigenvalues (

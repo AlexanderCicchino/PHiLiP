@@ -417,6 +417,8 @@ public:
      /// The entropy production per cell.
     dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_correction_coef;
     dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_correction_norm;
+    dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_correction_coef_face;
+    dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_correction_norm_face;
 private:
     /// Modal coefficients of the solution used to compute dRdW last
     /// Will be used to avoid recomputing dRdW.

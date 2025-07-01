@@ -6,17 +6,25 @@ set test_type = euler_split_taylor_green
 
 set use_weak_form = false
 
-set flux_nodes_type = GL
+set flux_nodes_type = GLL
 
 set do_renumber_dofs = false
+
+set use_kmp = false
+
+set ent_sgs_type = AV
+
+set use_entsgs = false
+
+set use_ec_entsgs = false
 
 set overintegration = 0
 
 set use_split_form = true
 
-set two_point_num_flux_type = Ra
+set two_point_num_flux_type = KG
 
-set use_curvilinear_split_form = true
+set use_curvilinear_split_form = false
 
 set energy_file = cplus_curv_not_weight_adj
 
@@ -27,11 +35,12 @@ set pde_type = euler
 
 #set conv_num_flux = two_point_flux_with_lax_friedrichs_dissipation
 set conv_num_flux = two_point_flux
+#set conv_num_flux = central_flux
 #set conv_num_flux = roe
 
 set use_energy = true
 
-set flux_reconstruction = cPlus
+set flux_reconstruction = cDG
 
 set use_inverse_mass_on_the_fly = true
 
@@ -52,6 +61,7 @@ subsection ODE solver
   set print_iteration_modulo = 100
 
   set ode_solver_type = runge_kutta
+ # set ode_solver_type = rrk_explicit
 
   set initial_time_step = 0.001
 
@@ -72,8 +82,9 @@ subsection flow_solver
     set apply_initial_condition_method = project_initial_condition_function
     set poly_degree = 3
     set final_time = 14.0
+    set courant_friedrichs_lewy_number = 0.1
     subsection grid
-        set number_of_grid_elements_per_dimension = 2
+        set number_of_grid_elements_per_dimension = 4
     end
 end
 

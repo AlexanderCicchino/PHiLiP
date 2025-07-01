@@ -673,6 +673,9 @@ inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
         //rho = 2.0 + sin(2*pi*(point[0]));//Jesse's
     else
         rho = 1.0 + 0.98 * sin(2.0*pi*(point[0] +point[1]));
+       // rho = 2.0 + 0.5 * sin(2.0*pi*(point[0] +point[1]));
+       // rho = 1.0 + 0.98 * sin(2.0*pi*(point[0] + 2.0 * point[1]));
+       // rho = 1.0 + 0.5 * sin(2.0*pi*(point[0] +point[1]));
        // rho = 1.0 + 0.98 * sin(pi*(point[0]));
 
     if(istate==0)//rho
@@ -682,6 +685,7 @@ inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
       //  value = 1.0 * rho;//Jesse's
     if(istate==2 && dim > 1)//v
         value = 0.2 * rho;
+      //  value = 0.5 * rho;
        // value = 0.0;
     if(istate==2 && dim==1)//E
         value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
@@ -690,6 +694,7 @@ inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
         value = 0.0;
     if((istate==3 && dim==2) || istate==4)//E
         value = 20.0/(0.4) + 0.5*rho*(0.1*0.1 + 0.2*0.2);
+      //  value = 20.0/(0.4) + 0.5*rho*(0.1*0.1 + 0.5*0.5);
        // value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
 
     return value;
@@ -699,45 +704,56 @@ inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
 // ========================================================
 template <int dim, int nstate, typename real>
 InitialConditionFunction_EulerAcousticWave<dim,nstate,real>
-::InitialConditionFunction_EulerAcousticWave()
+::InitialConditionFunction_EulerAcousticWave(
+        Parameters::AllParameters const *const param)
         : InitialConditionFunction<dim,nstate,real>()
 {
-    // Nothing to do here yet
+    // Euler object; create using dynamic_pointer_cast and the create_Physics factory
+    // This test should only be used for Euler
+    this->euler_physics = std::dynamic_pointer_cast<Physics::Euler<dim,dim+2,double>>(
+                Physics::PhysicsFactory<dim,dim+2,double>::create_Physics(param));
 }
 
 template <int dim, int nstate, typename real>
 inline real InitialConditionFunction_EulerAcousticWave<dim,nstate,real>
 ::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
 {
-    real value = 0.0;
-    real pi = dealii::numbers::PI;
-    real rho = 0.0;
-    if constexpr(dim==1)
-        rho = 1.0 + 0.98 * sin(pi*(point[0]));
-        //rho = 1.0 + 0.98 * sin(4.0*pi*(point[0]));
-        //rho = 2.0 + sin(2*pi*(point[0]));//Jesse's
-    else
-        rho = 1.0 + 0.98 * sin(2.0*pi*(point[0] +point[1]));
-       // rho = 1.0 + 0.98 * sin(pi*(point[0]));
+    const double radius = 0.1;
+    const double kappa = log(2) / radius / radius;
+//    const double amplitude = 1.0;
+  //  const double pi = dealii::numbers::PI;
 
-    if(istate==0)//rho
-        value = rho;
-    if(istate==1)//u
-        value = 0.1 * rho;
-      //  value = 1.0 * rho;//Jesse's
-    if(istate==2 && dim > 1)//v
-        value = 0.2 * rho;
-       // value = 0.0;
-    if(istate==2 && dim==1)//E
-        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
-       // value = 1.0/(0.4) + 0.5*rho;//Jesse's
-    if(istate==3 && dim==3)//w
-        value = 0.0;
-    if((istate==3 && dim==2) || istate==4)//E
-        value = 20.0/(0.4) + 0.5*rho*(0.1*0.1 + 0.2*0.2);
-       // value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
+    // Centre of the vortex  at t=0
+    const double x0 = 0.0;
+    const double y0 = 0.0;
+    const double x = point[0] - x0;
+    const double y = point[1] - y0;
 
-    return value;
+    const double omega = exp(-kappa * (x * x + y * y));
+    const double p0 = 20.0;
+    const double rho0 = 1.0;
+    const double delp = 1.0;
+    const double delrho = 0.5; 
+    const double c2 = 1.4 * delp / delrho;
+    std::array<real,nstate> sol_prim;
+  //  sol_prim[0] = 0.02;
+    sol_prim[0] = rho0 + delrho * omega;
+   // sol_prim[0] = 0.5;
+    for(int idim=0; idim<dim; idim++){
+       // sol_prim[idim+1] = 0.0;
+        sol_prim[idim+1] = - delp / rho0 / sqrt(c2) * omega * (-kappa * point[idim]);
+       // sol_prim[idim+1] = 0.1;
+//       if(idim==0)
+//            sol_prim[idim+1] = 0.1;
+//       if(idim==1)
+//            sol_prim[idim+1] = 0.2;
+    }
+    sol_prim[nstate-1] = p0 + delp * omega;
+   // sol_prim[nstate-1] = 2.0 + 1.0 * sin(2.0 * pi*(point[0]+point[1]));
+   // sol_prim[0] = 1.4 * sol_prim[nstate-1];
+
+    const std::array<real,nstate> soln_conservative = this->euler_physics->convert_primitive_to_conservative(sol_prim);
+    return soln_conservative[istate];
 }
 // ========================================================
 // Euler Vorticity Wave -- Initial Condition
@@ -920,7 +936,7 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
     } else if (flow_type == FlowCaseEnum::euler_density_wave){
         if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerDensityWave<dim, nstate, real>>();
     } else if (flow_type == FlowCaseEnum::euler_acoustic_wave){
-        if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerAcousticWave<dim, nstate, real>>();
+        if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerAcousticWave<dim, nstate, real>>(param);
     } else if (flow_type == FlowCaseEnum::euler_vorticity_wave){
         if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerVorticityWave<dim, nstate, real>>(param);
     }else {

@@ -436,7 +436,7 @@ std::abort();
    // double finalTime = 5.;
     double finalTime = all_parameters_new.flow_solver_param.final_time;
     std::cout<<"Final time "<<finalTime<<std::endl;
-    finalTime = 15.0;
+ //   finalTime = 15.0;
     // finalTime = 0.1;//to speed things up locally in tests, doesn't need full 14seconds to verify.
     double dt = all_parameters_new.ode_solver_param.initial_time_step;
     // double dt = all_parameters_new.ode_solver_param.initial_time_step / 10.0;
@@ -556,7 +556,7 @@ std::abort();
             pcout << "Energy at time " << ode_solver->current_time << " is " << current_energy_mpi << std::endl;
             pcout << "Actual Energy Divided by volume at time " << ode_solver->current_time << " is " << current_energy_mpi*initial_energy_mpi/(8*pow(dealii::numbers::PI,3)) << std::endl;
             // myfile << i * dt << " " << current_energy << std::endl;
-            myfile << ode_solver->current_time << " " << current_energy_mpi << std::endl;
+//            myfile << ode_solver->current_time << " " << current_energy_mpi << std::endl;
             // if (current_energy*initial_energy - initial_energy >= 1.00)
 //            if (current_energy_mpi*initial_energy_mpi - initial_energy_mpi >= 1.00)
 //            {
@@ -572,6 +572,7 @@ std::abort();
            // double current_entropy_mpi = (dealii::Utilities::MPI::sum(current_entropy, mpi_communicator))/initial_entropy_mpi;
             double current_entropy_mpi = (dealii::Utilities::MPI::sum(current_entropy, mpi_communicator));
             pcout << "Entropy change at time " << ode_solver->current_time << " is " << current_entropy_mpi << std::endl;
+            myfile<<ode_solver->current_time<<" "<< current_entropy_mpi <<std::endl;
              
              
            // ode_solver->current_iteration += 1;

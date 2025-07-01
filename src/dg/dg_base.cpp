@@ -1249,6 +1249,8 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
         // set vanishing visc coef to zero
         this->cell_entropy_correction_coef = 0;
         this->cell_entropy_correction_norm = 0;
+        this->cell_entropy_correction_coef_face = 0;
+        this->cell_entropy_correction_norm_face = 0;
         //compute the entropy correction surf integral and norm
         compute_entropy_correction_coef_and_norm();
 
@@ -1929,6 +1931,8 @@ void DGBase<dim,real,MeshType>::allocate_system (
      //only use idof=0 for it for now (in future should be 1 value per elem)
     cell_entropy_correction_coef.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
     cell_entropy_correction_norm.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
+    cell_entropy_correction_coef_face.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
+    cell_entropy_correction_norm_face.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
 
     // System matrix allocation
     if (compute_dRdW || compute_dRdX || compute_d2R) {

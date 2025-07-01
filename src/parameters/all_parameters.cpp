@@ -73,6 +73,31 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       dealii::Patterns::Bool(),
                       "If true, use KMP form.");
 
+    prm.declare_entry("use_ec_entsgs", "false",
+                      dealii::Patterns::Bool(),
+                      "If true, use the entropy conserving form of ent sgs.");
+
+    prm.declare_entry("use_entsgs", "false",
+                      dealii::Patterns::Bool(),
+                      "If true, use the ent sgs.");
+
+//    prm.declare_entry("use_aux_grad_prim", "false",
+//                      dealii::Patterns::Bool(),
+//                      "If true, use the gradient of the primitive var for the auxiliary variable.");
+
+    prm.declare_entry("aux_var_type", "grad_cons",
+                      dealii::Patterns::Selection(
+                      "grad_cons | grad_ent | grad_prim"),
+                      "Aux variable type. "
+                      "Choices are <grad_cons | grad_ent | grad_prim>.");
+
+    prm.declare_entry("ent_sgs_type", "AV",
+                      dealii::Patterns::Selection(
+                      "AV | Upwind | Smag | AV_NS | AV_GP | AV_GP_Par"),
+                      "Entropy conserving sgs flux type. "
+                      "Choices are <AV | Upwind | Smag | AV_NS | AV_GP | AV_GP_Par>.");
+
+
     prm.declare_entry("flux_nodes_type", "GL",
                       dealii::Patterns::Selection(
                       "GL | GLL"),
@@ -203,6 +228,8 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       " naca0012_unsteady_check_quick | "
                       " khi_robustness | "
                       " euler_density_wave | "
+                      " hit_chai_mahesh | "
+                      " euler_acoustic_wave | "
                       " low_density "),
                       "The type of test we want to solve. "
                       "Choices are " 
@@ -253,6 +280,8 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       "  naca0012_unsteady_check_quick | "
                       "  khi_robustness | "
                       "  euler_density_wave | "
+                      "  hit_chai_mahesh | "
+                      "  euler_acoustic_wave | "
                       "  low_density>.");
 
     prm.declare_entry("pde_type", "advection",
@@ -444,12 +473,33 @@ const std::string test_string = prm.get("test_type");
     else if (test_string == "low_density")                              { test_type = low_density; }
     else if (test_string == "naca0012_unsteady_check_quick")            { test_type = naca0012_unsteady_check_quick; }
     else if (test_string == "euler_density_wave")                       { test_type = euler_density_wave; }
+    else if (test_string == "euler_acoustic_wave")                      { test_type = euler_acoustic_wave; }
+    else if (test_string == "hit_chai_mahesh")                          { test_type = hit_chai_mahesh; }
     
     overintegration = prm.get_integer("overintegration");
 
     use_weak_form = prm.get_bool("use_weak_form");
 
     use_kmp = prm.get_bool("use_kmp");
+
+    use_ec_entsgs = prm.get_bool("use_ec_entsgs");
+
+    use_entsgs = prm.get_bool("use_entsgs");
+
+ //   use_aux_grad_prim = prm.get_bool("use_aux_grad_prim");
+
+    const std::string aux_var_string = prm.get("aux_var_type");
+    if (aux_var_string == "grad_cons") { aux_var_type = AuxVar::grad_cons; }
+    if (aux_var_string == "grad_ent")  { aux_var_type = AuxVar::grad_ent; }
+    if (aux_var_string == "grad_prim") { aux_var_type = AuxVar::grad_prim; }
+    
+    const std::string ent_sgs_string = prm.get("ent_sgs_type");
+    if (ent_sgs_string == "AV") { ent_sgs_type = EntSGS::AV; }
+    if (ent_sgs_string == "Upwind") { ent_sgs_type = EntSGS::Upwind; }
+    if (ent_sgs_string == "Smag") { ent_sgs_type = EntSGS::Smag; }
+    if (ent_sgs_string == "AV_NS") { ent_sgs_type = EntSGS::AV_NS; }
+    if (ent_sgs_string == "AV_GP") { ent_sgs_type = EntSGS::AV_GP; }
+    if (ent_sgs_string == "AV_GP_Par") { ent_sgs_type = EntSGS::AV_GP_Par; }
     
     const std::string flux_nodes_string = prm.get("flux_nodes_type");
     if (flux_nodes_string == "GL") { flux_nodes_type = FluxNodes::GL; }

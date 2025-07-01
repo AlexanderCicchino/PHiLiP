@@ -6,7 +6,7 @@ set test_type = euler_density_wave
 
 set use_weak_form = false
 
-set flux_nodes_type = GLL
+set flux_nodes_type = GL
 
 set use_kmp = false
 
@@ -14,9 +14,9 @@ set use_ec_entsgs = false
 
 set use_entsgs = false
 
-set aux_var_type = grad_prim
+set aux_var_type = grad_ent
 
-set ent_sgs_type = AV_NS
+#set ent_sgs_type = AV_NS
 
 set do_renumber_dofs = false
 
@@ -26,7 +26,7 @@ set two_point_num_flux_type = Ra
 
 #set use_curvilinear_split_form = false
 
-set energy_file = ES_gradu_p4_cfl005
+set energy_file = ES
 
 #set use_asymptotic_stable = true
 
@@ -82,30 +82,29 @@ subsection ODE solver
 end
 
 # freestream Mach number
-#subsection euler
-#  set mach_infinity = 0.1
-#end
+subsection euler
+  set mach_infinity = 0.1
+end
+
+# freestream Reynolds number and Prandtl number
+subsection navier_stokes
+  set prandtl_number = 0.71
+  set reynolds_number_inf = 1600.0
+end
 
 subsection flow_solver
-    set flow_case_type = euler_density_wave
-   # set flow_case_type = euler_vorticity_wave
-  #  set flow_case_type = isentropic_vortex
-#    set interpolate_initial_condition = false
-    set poly_degree = 5
-   # set courant_friedrichs_lewy_number = 0.5
-    set courant_friedrichs_lewy_number = 0.1
-   ## set courant_friedrichs_lewy_number = 0.001
-  #  set courant_friedrichs_lewy_number = 0.05
-   # set courant_friedrichs_lewy_number = 0.3
+    set flow_case_type = hit_flow
+    set poly_degree = 3
+    set courant_friedrichs_lewy_number = 0.2
     set final_time = 15.0
 
     subsection grid
         set grid_degree = 1
-        set grid_left_bound = -1
+        set grid_left_bound = -0
         set grid_right_bound = 1
        # set grid_left_bound = -5
        # set grid_right_bound = 5
-        set number_of_grid_elements_per_dimension = 4
+        set number_of_grid_elements_per_dimension = 8
     end
 end
 

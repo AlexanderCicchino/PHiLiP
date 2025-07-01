@@ -201,10 +201,50 @@ std::array<real, nstate> LaxFriedrichsRiemannSolverDissipation<dim,nstate,real>
         conv_max_eig = conv_max_eig_ext;
     }
    // conv_max_eig = std::max(conv_max_eig_int, conv_max_eig_ext);
+   //Based on primitive jump
+//   std::array<real,nstate> prim_int = pde_physics->convert_cons_to_prim(soln_int);
+//   std::array<real,nstate> prim_ext = pde_physics->convert_cons_to_prim(soln_ext);
+//   std::array<dealii::Tensor<1,dim,real>,nstate> grad_prim;
+//   std::array<real,nstate> cons_avg;
+//   for(int istate=0; istate<nstate; istate++){
+//       for(int idim=0; idim<dim; idim++){
+//           grad_prim[istate][idim] = prim_ext[istate] - prim_int[istate];
+//       }
+//       cons_avg[istate] = 0.5 * (soln_int[istate] + soln_ext[istate]);
+//   }
+//   std::array<dealii::Tensor<1,dim,real>,nstate> cons_grad = pde_physics->convert_grad_prim_to_grad_conservative(cons_avg, grad_prim);
+//end based on primitive jump
+
+//    std::array<real,nstate> prim_int = pde_physics->convert_cons_to_prim(soln_int);
+//    std::array<real,nstate> prim_ext = pde_physics->convert_cons_to_prim(soln_ext);
+//    std::array<real,nstate> cons_grad;
+//    cons_grad[0] = prim_ext[0] - prim_int[0];
+//    real kin_en_int = 0.0;
+//    real kin_en_ext = 0.0;
+//    for(int idim=0; idim<dim; idim++){
+//        cons_grad[idim+1] = prim_ext[idim+1] * prim_ext[0] - prim_int[idim+1] * prim_int[0];
+//        kin_en_int += prim_int[0] * prim_int[idim+1] * prim_int[idim+1];
+//        kin_en_ext += prim_ext[0] * prim_ext[idim+1] * prim_ext[idim+1];
+//    }
+//    cons_grad[nstate-1] = (prim_ext[nstate-1] / 0.4 + 0.5 *kin_en_ext)  - (prim_int[nstate-1] / 0.4 + 0.5 *kin_en_int);
+
+    std::array<real,nstate> entvar_int = pde_physics->compute_entropy_variables(soln_int);
+    std::array<real,nstate> entvar_ext = pde_physics->compute_entropy_variables(soln_ext);
+    real sign = 1.0;
+    real sum = 0.0;
+    for (int s=0; s<nstate; s++) {
+        sum +=(entvar_ext[s] - entvar_int[s]) * (soln_ext[s] - soln_int[s]);
+    }
+    if(sum <0)
+        sign = -1.0;
     // Scalar dissipation
     std::array<real, nstate> numerical_flux_dot_n;
     for (int s=0; s<nstate; s++) {
-        numerical_flux_dot_n[s] = - 0.5 * conv_max_eig * (soln_ext[s]-soln_int[s]);
+//        numerical_flux_dot_n[s] = - 0.5 * conv_max_eig * (soln_ext[s]-soln_int[s]);
+//        numerical_flux_dot_n[s] = - 0.5 * conv_max_eig * cons_grad[s][0];//based on primitive jump
+    //    numerical_flux_dot_n[s] = - 0.5 * conv_max_eig * cons_grad[s];
+        //Entropy dissipative
+        numerical_flux_dot_n[s] = - sign * 0.5 * conv_max_eig * (soln_ext[s]-soln_int[s]);
         //Entropy prod
 //        numerical_flux_dot_n[s] = - 0.25 * abs(soln_ext[s]+soln_int[s]) * (soln_ext[s]-soln_int[s]);
 //        numerical_flux_dot_n[s] -=  1.0/12.0 * abs(soln_ext[s]-soln_int[s]) * (soln_ext[s]-soln_int[s]);

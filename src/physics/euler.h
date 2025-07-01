@@ -224,9 +224,26 @@ public:
     /// Opposite of convert_primitive_to_conservative
     std::array<real,nstate> convert_primitive_to_conservative ( const std::array<real,nstate> &primitive_soln ) const;
 
+    /// Given cons variables [density, [velocities], pressure],
+    /// returns prim variables [density, [momentum], total energy].
+    std::array<real,nstate> compute_prim_from_cons ( const std::array<real,nstate> &conservative_soln ) const;
+
+    /// Computes the conservative variables from the entropy variables.
+    std::array<real,nstate> convert_cons_to_prim(
+                const std::array<real,nstate> &cons_sol) const;
+
+
     /// Given gradient entropy variables
     /// returns gradient conservative variables.
     std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_entropy_to_grad_conservative ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const;
+
+    /// Given gradient primitive variables
+    /// returns gradient conservative variables.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_prim_to_grad_conservative ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &prim_grad) const;
+
+    /// Given gradient conservative variables
+    /// returns gradient entropy variables.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_cons_to_grad_entropy ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad) const;
 
     /// Evaluate pressure from conservative variables
     template<typename real2>
@@ -495,15 +512,13 @@ public:
         const std::array<real,nstate> &conservative_soln1,
         const std::array<real,nstate> &conservative_soln2) const;
 
-protected:
-
-    /// Shima flux.
-    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_shima (
+    /// Central flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_central (
         const std::array<real,nstate> &conservative_soln1,
         const std::array<real,nstate> &conservative_soln2) const;
 
-    /// Central flux.
-    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_central (
+    /// Shima flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_shima (
         const std::array<real,nstate> &conservative_soln1,
         const std::array<real,nstate> &conservative_soln2) const;
 

@@ -112,6 +112,22 @@ std::array<real,nstate> ConvectionDiffusion<dim, nstate, real>
 
 template <int dim, int nstate, typename real>
 std::array<real,nstate> ConvectionDiffusion<dim, nstate, real>
+::compute_prim_from_cons (
+    const std::array<real,nstate> &conservative_soln) const
+{
+    return conservative_soln;
+}
+
+template <int dim, int nstate, typename real>
+std::array<real,nstate> ConvectionDiffusion<dim, nstate, real>
+::convert_cons_to_prim (
+    const std::array<real,nstate> &cons_sol) const
+{
+    return cons_sol;
+}
+
+template <int dim, int nstate, typename real>
+std::array<real,nstate> ConvectionDiffusion<dim, nstate, real>
 ::compute_conservative_variables_from_entropy_variables (
     const std::array<real,nstate> &entropy_var) const
 {
@@ -125,6 +141,22 @@ std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim, nstate, r
     const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const
 {
     return entropy_grad;
+}
+template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim, nstate, real>
+::convert_grad_cons_to_grad_entropy (
+    const std::array<real,nstate> &/*cons_sol*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad) const
+{
+    return cons_grad;
+}
+template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> ConvectionDiffusion<dim, nstate, real>
+::convert_grad_prim_to_grad_conservative (
+    const std::array<real,nstate> &/*cons_sol*/,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &prim_grad) const
+{
+    return prim_grad;
 }
 template <int dim, int nstate, typename real>
 dealii::Tensor<1,dim,real> ConvectionDiffusion<dim,nstate,real>

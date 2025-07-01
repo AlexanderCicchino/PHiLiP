@@ -455,10 +455,17 @@ protected:
 public:
     /// Constructor for InitialConditionFunction_EulerAcousticWave.
     /** Calls the Function(const unsigned int n_components) constructor in deal.II*/
-    InitialConditionFunction_EulerAcousticWave ();
+    InitialConditionFunction_EulerAcousticWave (
+            Parameters::AllParameters const *const param);
 
     /// Value of initial condition
     real value (const dealii::Point<dim,real> &point, const unsigned int istate) const override;
+
+protected:
+
+    // Euler physics pointer. Used to convert primitive to conservative.
+    std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_physics;
+
 };
 
 /// Initial Condition Function: Euler Vorticity Wave

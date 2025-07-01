@@ -214,6 +214,36 @@ std::array<real,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
 
 template <int dim, int nstate, typename real, int nstate_baseline_physics>
 std::array<real,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
+::compute_prim_from_cons (
+    const std::array<real,nstate> &conservative_soln) const
+{
+    std::array<real,nstate> prim_var;
+    if constexpr(nstate==nstate_baseline_physics) {
+        prim_var = physics_baseline->compute_prim_from_cons (conservative_soln);
+    } else {
+        // TO DO, make use of the physics_model object for nstate>nstate_baseline_physics
+        std::abort();
+    }
+    return prim_var;
+}
+
+template <int dim, int nstate, typename real, int nstate_baseline_physics>
+std::array<real,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
+::convert_cons_to_prim (
+    const std::array<real,nstate> &cons_sol) const
+{
+    std::array<real,nstate> prim_var;
+    if constexpr(nstate==nstate_baseline_physics) {
+        prim_var = physics_baseline->convert_cons_to_prim (cons_sol);
+    } else {
+        // TO DO, make use of the physics_model object for nstate>nstate_baseline_physics
+        std::abort();
+    }
+    return prim_var;
+}
+
+template <int dim, int nstate, typename real, int nstate_baseline_physics>
+std::array<real,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
 ::compute_conservative_variables_from_entropy_variables (
     const std::array<real,nstate> &entropy_var) const
 {
@@ -236,6 +266,36 @@ std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim, nstate, real, ns
     std::array<dealii::Tensor<1,dim,real>,nstate> grad_cons;
     if constexpr(nstate==nstate_baseline_physics) {
         grad_cons = physics_baseline->convert_grad_entropy_to_grad_conservative (cons_sol, entropy_grad);
+    } else {
+        // TO DO, make use of the physics_model object for nstate>nstate_baseline_physics
+        std::abort();
+    }
+    return grad_cons;
+}
+template <int dim, int nstate, typename real, int nstate_baseline_physics>
+std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
+::convert_grad_cons_to_grad_entropy (
+    const std::array<real,nstate> &cons_sol,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> grad_entropy;
+    if constexpr(nstate==nstate_baseline_physics) {
+        grad_entropy = physics_baseline->convert_grad_cons_to_grad_entropy (cons_sol, cons_grad);
+    } else {
+        // TO DO, make use of the physics_model object for nstate>nstate_baseline_physics
+        std::abort();
+    }
+    return grad_entropy;
+}
+template <int dim, int nstate, typename real, int nstate_baseline_physics>
+std::array<dealii::Tensor<1,dim,real>,nstate> PhysicsModel<dim, nstate, real, nstate_baseline_physics>
+::convert_grad_prim_to_grad_conservative (
+    const std::array<real,nstate> &cons_sol,
+    const std::array<dealii::Tensor<1,dim,real>,nstate> &prim_grad) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> grad_cons;
+    if constexpr(nstate==nstate_baseline_physics) {
+        grad_cons = physics_baseline->convert_grad_prim_to_grad_conservative (cons_sol, prim_grad);
     } else {
         // TO DO, make use of the physics_model object for nstate>nstate_baseline_physics
         std::abort();
