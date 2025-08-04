@@ -446,6 +446,72 @@ public:
         Parameters::AllParameters const* const param);
 };
 
+
+/// Initial Condition Function: Euler Density Wave
+template <int dim, int nstate, typename real>
+class InitialConditionFunction_EulerDensityWave
+        : public InitialConditionFunction<dim,nstate,real>
+{
+protected:
+    using dealii::Function<dim,real>::value; ///< dealii::Function we are templating on
+
+public:
+    /// Constructor for InitialConditionFunction_EulerDensityWave.
+    /** Calls the Function(const unsigned int n_components) constructor in deal.II*/
+    InitialConditionFunction_EulerDensityWave ();
+
+    /// Value of initial condition
+    real value (const dealii::Point<dim,real> &point, const unsigned int istate) const override;
+};
+
+/// Initial Condition Function: Euler Acoustic Wave
+template <int dim, int nstate, typename real>
+class InitialConditionFunction_EulerAcousticWave
+        : public InitialConditionFunction<dim,nstate,real>
+{
+protected:
+    using dealii::Function<dim,real>::value; ///< dealii::Function we are templating on
+
+public:
+    /// Constructor for InitialConditionFunction_EulerAcousticWave.
+    /** Calls the Function(const unsigned int n_components) constructor in deal.II*/
+    InitialConditionFunction_EulerAcousticWave (
+            Parameters::AllParameters const *const param);
+
+    /// Value of initial condition
+    real value (const dealii::Point<dim,real> &point, const unsigned int istate) const override;
+
+protected:
+
+    // Euler physics pointer. Used to convert primitive to conservative.
+    std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_physics;
+
+};
+
+/// Initial Condition Function: Euler Vorticity Wave
+template <int dim, int nstate, typename real>
+class InitialConditionFunction_EulerVorticityWave
+        : public InitialConditionFunction<dim,nstate,real>
+{
+protected:
+    using dealii::Function<dim,real>::value; ///< dealii::Function we are templating on
+
+public:
+    /// Constructor for InitialConditionFunction_EulerVorticityWave.
+    /** Calls the Function(const unsigned int n_components) constructor in deal.II*/
+    InitialConditionFunction_EulerVorticityWave (
+        Parameters::AllParameters const* const param);
+    
+
+    /// Value of initial condition
+    real value (const dealii::Point<dim,real> &point, const unsigned int istate) const override;
+
+protected:
+
+    // Euler physics pointer. Used to convert primitive to conservative.
+    std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_physics;
+};
+
 /// Initial Condition Function: 2D Double Mach Reflection Problem
 /** See Xu & Shu, Third order maximum-principle-satisfying 
  *  and positivity-preserving Lax-Wendroff discontinuous Galerkin 
@@ -523,6 +589,7 @@ public:
     explicit InitialConditionFunction_SVSW(
         Parameters::AllParameters const* const param);
 };
+
 
 
 /// Initial condition 0.

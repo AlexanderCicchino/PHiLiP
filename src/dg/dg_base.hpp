@@ -413,6 +413,12 @@ public:
 
     ///The auxiliary equations' solution.
     std::array<dealii::LinearAlgebra::distributed::Vector<double>,dim> auxiliary_solution;
+
+     /// The entropy production per cell.
+    dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_correction_coef;
+    dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_correction_norm;
+    dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_correction_coef_face;
+    dealii::LinearAlgebra::distributed::Vector<double> cell_entropy_correction_norm_face;
 private:
     /// Modal coefficients of the solution used to compute dRdW last
     /// Will be used to avoid recomputing dRdW.
@@ -884,6 +890,12 @@ public:
     /// Asembles the auxiliary equations' residuals and solves.
     virtual void assemble_auxiliary_residual () = 0;
 
+    /// Compute the entropy correction surf integral and norm.
+    virtual void compute_entropy_correction_coef_and_norm() = 0;
+
+    /// Apply cell entropy production correction.
+    virtual void apply_entropy_correction() = 0;
+
     /// Allocate the dual vector for optimization.
     /** Currently only used in weak form.
     */
@@ -905,6 +917,8 @@ private:
         const int iface,
         const dealii::hp::FECollection<dim> fe_collection) const;
 
+public:
+
     /// In the case that two cells have the same coarseness, this function decides if the current cell should perform the work.
     /** In the case the neighbor is a ghost cell, we let the processor with the lower rank do the work on that face.
      *  We cannot use the cell->index() because the index is relative to the distributed triangulation.
@@ -915,6 +929,8 @@ private:
      */
     template<typename DoFCellAccessorType1, typename DoFCellAccessorType2>
     bool current_cell_should_do_the_work (const DoFCellAccessorType1 &current_cell, const DoFCellAccessorType2 &neighbor_cell) const;
+
+private:
 
     /// Used in the delegated constructor
     /** The main reason we use this weird function is because all of the above objects

@@ -38,11 +38,15 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " leblanc_shock_tube | "
                           " shu_osher_problem | "
                           " advection_limiter | "
+                          " euler_density_wave | "
+                          " euler_acoustic_wave | "
+                          " euler_vorticity_wave | "
                           " burgers_limiter | "
                           " double_mach_reflection | "
                           " shock_diffraction | "
                           " astrophysical_jet | "
                           " strong_vortex_shock_wave |"),
+
                           "The type of flow we want to simulate. "
                           "Choices are "
                           " <taylor_green_vortex | "
@@ -63,11 +67,15 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " leblanc_shock_tube | "
                           " shu_osher_problem | "
                           " advection_limiter | "
+                          " euler_density_wave | "
+                          " euler_acoustic_wave | "
+                          " euler_vorticity_wave | "
                           " burgers_limiter | "
                           " double_mach_reflection | "
                           " shock_diffraction | "
                           " astrophysical_jet | "
                           " strong_vortex_shock_wave >. ");
+
 
         prm.declare_entry("poly_degree", "1",
                           dealii::Patterns::Integer(0, dealii::Patterns::Integer::max_int_value),
@@ -400,6 +408,9 @@ void FlowSolverParam::parse_parameters(dealii::ParameterHandler &prm)
         else if (flow_case_type_string == "shu_osher_problem")          {flow_case_type = shu_osher_problem;}
         else if (flow_case_type_string == "advection_limiter")          {flow_case_type = advection_limiter;}
         else if (flow_case_type_string == "burgers_limiter")            {flow_case_type = burgers_limiter;}
+        else if (flow_case_type_string == "euler_density_wave")         {flow_case_type = euler_density_wave;}
+        else if (flow_case_type_string == "euler_acoustic_wave")         {flow_case_type = euler_acoustic_wave;}
+        else if (flow_case_type_string == "euler_vorticity_wave")         {flow_case_type = euler_vorticity_wave;}
         else if (flow_case_type_string == "double_mach_reflection")     {flow_case_type = double_mach_reflection;}
         else if (flow_case_type_string == "shock_diffraction")          {flow_case_type = shock_diffraction;}
         else if (flow_case_type_string == "astrophysical_jet")          {flow_case_type = astrophysical_jet;}

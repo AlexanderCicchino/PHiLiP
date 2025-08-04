@@ -97,6 +97,28 @@ public:
     /// Flag to use weak or strong form of DG
     bool use_weak_form;
 
+    /// Flag to use Kovasznay mode preserving form.
+    bool use_kmp;
+
+    /// Flag to use entropy conserving vs stable for ent sgs.
+    bool use_ec_entsgs;
+
+    /// Flag to use ent sgs.
+    bool use_entsgs;
+
+//    /// Flag to use aux as gradient of primitive.
+//    bool use_aux_grad_prim;
+
+    /// Auxiliary variable.
+    enum AuxVar { grad_cons, grad_ent, grad_prim};
+    /// Store selected ENTSGS from the input file
+    AuxVar aux_var_type;
+
+    /// Entropy conserving SGS flux.
+    enum EntSGS { AV, Upwind, Smag, AV_NS, AV_GP, AV_GP_Par};
+    /// Store selected ENTSGS from the input file
+    EntSGS ent_sgs_type;
+
     /// Flux nodes type
     enum FluxNodes { GL, GLL };
     /// Store selected FluxNodes from the input file
@@ -109,7 +131,7 @@ public:
     bool use_split_form;
 
     /// Two point numerical flux type for split form
-    enum TwoPointNumericalFlux { KG, IR, CH, Ra };
+    enum TwoPointNumericalFlux { KG, IR, CH, Ra, Sh, CN, CI, CI2 };
     /// Store selected TwoPointNumericalFlux from the input file
     TwoPointNumericalFlux two_point_num_flux_type;
 
@@ -210,6 +232,9 @@ public:
         ROM_error_post_sampling,
         HROM_error_post_sampling,
         hyper_adaptive_sampling_new_error,
+        euler_density_wave,
+        hit_chai_mahesh,
+        euler_acoustic_wave,
         halton_sampling_run,
         low_density
     };

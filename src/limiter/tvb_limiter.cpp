@@ -299,6 +299,21 @@ void TVBLimiter<dim, nstate, real>::limit(
     }
 }
 
+template <int dim, int nstate, typename real>
+void TVBLimiter<dim, nstate, real>::set_cell_min_entropy(
+        dealii::LinearAlgebra::distributed::Vector<double>&     /*solution*/,
+        const dealii::DoFHandler<dim>&                          /*dof_handler*/,
+        const dealii::hp::FECollection<dim>&                    /*fe_collection*/,
+        const dealii::hp::QCollection<dim>&                     /*volume_quadrature_collection*/,
+        const unsigned int                                      /*grid_degree*/,
+        const unsigned int                                      /*max_degree*/,
+        const dealii::hp::FECollection<1>                       /*oneD_fe_collection_1state*/,
+        const dealii::hp::QCollection<1>                        /*oneD_quadrature_collection*/)
+{
+    //do nothing
+}
+
+
 #if PHILIP_DIM==1
 template class TVBLimiter <PHILIP_DIM, 1, double>;
 template class TVBLimiter <PHILIP_DIM, 2, double>;

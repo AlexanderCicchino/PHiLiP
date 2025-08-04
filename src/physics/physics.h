@@ -74,6 +74,12 @@ public:
     virtual std::array<dealii::Tensor<1,dim,real>,nstate> convective_flux (
         const std::array<real,nstate> &solution) const = 0;
 
+    /// Entropy conserving SGS flux.
+    virtual std::array<dealii::Tensor<1,dim,real>,nstate> entropy_correction_sgs_flux (
+        const std::array<real,nstate> &cons_sol,
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad,
+        const real ent_sgs_coef) const = 0 ;
+
     /// Convective Numerical Split Flux for split form
     virtual std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux (
         const std::array<real,nstate> &conservative_soln1,
@@ -83,9 +89,29 @@ public:
     virtual std::array<real,nstate> compute_entropy_variables (
                 const std::array<real,nstate> &conservative_soln) const = 0;
 
+    /// Computes the primitive variables from the conservative variables.
+    virtual std::array<real,nstate> compute_prim_from_cons (
+                const std::array<real,nstate> &conservative_soln) const = 0;
+
     /// Computes the conservative variables from the entropy variables.
     virtual std::array<real,nstate> compute_conservative_variables_from_entropy_variables (
                 const std::array<real,nstate> &entropy_var) const = 0;
+
+    /// Computes the conservative variables from the entropy variables.
+    virtual std::array<real,nstate> convert_cons_to_prim(
+                const std::array<real,nstate> &cons_sol) const = 0;
+
+    /// Given gradient entropy variables
+    /// returns gradient conservative variables.
+    virtual std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_entropy_to_grad_conservative ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const = 0;
+
+    /// Given gradient cons variables
+    /// returns gradient entropy variables.
+    virtual std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_cons_to_grad_entropy ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad) const = 0;
+
+    /// Given gradient prim variables
+    /// returns gradient conservative variables.
+    virtual std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_prim_to_grad_conservative ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &prim_grad) const = 0;
 
     /// Spectral radius of convective term Jacobian.
     /** Used for scalar dissipation

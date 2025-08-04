@@ -52,7 +52,10 @@
 #include "ROM_error_post_sampling.h"
 #include "HROM_error_post_sampling.h"
 #include "hyper_adaptive_sampling_new_error.h"
+#include "euler_density_wave.h"
+#include "hit_chai_mahesh.h"
 #include "halton_sampling_run.h"
+
 
 namespace PHiLiP {
 namespace Tests {
@@ -335,6 +338,10 @@ std::unique_ptr< TestsBase > TestsFactory<dim,nstate,MeshType>
         if constexpr (dim<3 && nstate==dim+2)  return std::make_unique<BoundPreservingLimiterTests<dim, nstate>>(parameters_input, parameter_handler_input);
     } else if(test_type == Test_enum::naca0012_unsteady_check_quick){
         if constexpr (dim==2 && nstate==dim+2)  return std::make_unique<NACA0012UnsteadyCheckQuick<dim, nstate>>(parameters_input, parameter_handler_input);
+    } else if(test_type == Test_enum::euler_density_wave) {
+        if constexpr (nstate==dim+2)  return std::make_unique<EulerDensityWave<dim, nstate>>(parameters_input);
+    } else if(test_type == Test_enum::hit_chai_mahesh) {
+        if constexpr (nstate==dim+2)  return std::make_unique<HITChaiMahesh<dim, nstate>>(parameters_input);
     } else {
         std::cout << "Invalid test. You probably forgot to add it to the list of tests in tests.cpp" << std::endl;
         std::abort();

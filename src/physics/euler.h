@@ -144,6 +144,12 @@ public:
     std::array<dealii::Tensor<1,dim,real>,nstate> convective_flux (
         const std::array<real,nstate> &conservative_soln) const override;
 
+    /// Entropy conserving SGS flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> entropy_correction_sgs_flux (
+        const std::array<real,nstate> &cons_sol,
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad,
+        const real ent_sgs_coef) const override;
+
     /// Convective normal flux: \f$ \mathbf{F}_{conv} \cdot \hat{n} \f$
     std::array<real,nstate> convective_normal_flux (const std::array<real,nstate> &conservative_soln, const dealii::Tensor<1,dim,real> &normal) const;
 
@@ -217,6 +223,27 @@ public:
     ///
     /// Opposite of convert_primitive_to_conservative
     std::array<real,nstate> convert_primitive_to_conservative ( const std::array<real,nstate> &primitive_soln ) const;
+
+    /// Given cons variables [density, [velocities], pressure],
+    /// returns prim variables [density, [momentum], total energy].
+    std::array<real,nstate> compute_prim_from_cons ( const std::array<real,nstate> &conservative_soln ) const;
+
+    /// Computes the conservative variables from the entropy variables.
+    std::array<real,nstate> convert_cons_to_prim(
+                const std::array<real,nstate> &cons_sol) const;
+
+
+    /// Given gradient entropy variables
+    /// returns gradient conservative variables.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_entropy_to_grad_conservative ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &entropy_grad) const;
+
+    /// Given gradient primitive variables
+    /// returns gradient conservative variables.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_prim_to_grad_conservative ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &prim_grad) const;
+
+    /// Given gradient conservative variables
+    /// returns gradient entropy variables.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convert_grad_cons_to_grad_entropy ( const std::array<real,nstate> &cons_sol, const std::array<dealii::Tensor<1,dim,real>,nstate> &cons_grad) const;
 
     /// Evaluate pressure from conservative variables
     template<typename real2>
@@ -308,6 +335,22 @@ public:
     /// from the entropy variables according to Chan 2018, eq. 120
     std::array<real,nstate> compute_conservative_variables_from_entropy_variables (
                 const std::array<real,nstate> &entropy_var) const;
+
+    /** Obtain gradient of primitive variables from gradient of conservative variables */
+    std::array<dealii::Tensor<1,dim,real>,nstate> 
+    convert_conservative_gradient_to_primitive_gradient_euler (
+        const std::array<real,nstate> &conservative_soln,
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &conservative_soln_gradient) const;
+
+    /** Extract gradient of velocities */
+    dealii::Tensor<2,dim,real> 
+    extract_velocities_gradient_from_primitive_solution_gradient_euler (
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &primitive_soln_gradient) const;
+
+    /** Nondimensionalized temperature gradient */
+    dealii::Tensor<1,dim,real> compute_temperature_gradient_euler (
+        const std::array<real,nstate> &primitive_soln,
+        const std::array<dealii::Tensor<1,dim,real>,nstate> &primitive_soln_gradient) const;
 
     /// Computes the kinetic energy variables.
     std::array<real,nstate> compute_kinetic_energy_variables (
@@ -455,12 +498,15 @@ protected:
         const std::array<real,nstate> &conservative_soln1,
         const std::array<real,nstate> &conservative_soln2) const;
 
+public:
     /// Compute Ismail-Roe parameter vector from primitive solution
     std::array<real,nstate> compute_ismail_roe_parameter_vector_from_primitive(
         const std::array<real,nstate> &primitive_soln) const;
 
     /// Compute Ismail-Roe logarithmic mean
     real compute_ismail_roe_logarithmic_mean(const real val1, const real val2) const;
+
+protected:
 
     /** Entropy conserving split form flux of Ismail & Roe.
      *  Refer to Gassner's paper (2016) Eq. 3.17  */
@@ -473,10 +519,33 @@ protected:
         const std::array<real,nstate> &conservative_soln1,
         const std::array<real,nstate> &conservative_soln2) const;
 
+public:
+
     /// Ranocha pressure equilibrium preserving, entropy and energy conserving flux.
     std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_ranocha (
         const std::array<real,nstate> &conservative_soln1,
         const std::array<real,nstate> &conservative_soln2) const;
+
+    /// Central flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_central (
+        const std::array<real,nstate> &conservative_soln1,
+        const std::array<real,nstate> &conservative_soln2) const;
+
+    /// Shima flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_shima (
+        const std::array<real,nstate> &conservative_soln1,
+        const std::array<real,nstate> &conservative_soln2) const;
+
+    /// Cicchino flux.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_cicchino (
+        const std::array<real,nstate> &conservative_soln1,
+        const std::array<real,nstate> &conservative_soln2) const;
+
+    /// Cicchino flux variant 2.
+    std::array<dealii::Tensor<1,dim,real>,nstate> convective_numerical_split_flux_cicchino2 (
+        const std::array<real,nstate> &conservative_soln1,
+        const std::array<real,nstate> &conservative_soln2) const;
+
 };
 
 } // Physics namespace

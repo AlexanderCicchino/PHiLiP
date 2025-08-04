@@ -97,10 +97,23 @@ protected:
         const unsigned int                                      n_shape_fns,
         const std::vector<dealii::types::global_dof_index>&     current_dofs_indices);
 
+    /// Function to cell cell min entropy.
+    void set_cell_min_entropy(
+        dealii::LinearAlgebra::distributed::Vector<double>&     /*solution*/,
+        const dealii::DoFHandler<dim>&                          /*dof_handler*/,
+        const dealii::hp::FECollection<dim>&                    /*fe_collection*/,
+        const dealii::hp::QCollection<dim>&                     /*volume_quadrature_collection*/,
+        const unsigned int                                      /*grid_degree*/,
+        const unsigned int                                      /*max_degree*/,
+        const dealii::hp::FECollection<1>                       /*oneD_fe_collection_1state*/,
+        const dealii::hp::QCollection<1>                        /*oneD_quadrature_collection*/);
+
+
     // Values required to compute solution cell average in 2D/3D
     real dx; ///< Value required to compute solution cell average in 2D/3D, calculated using xmax and xmin parameters
     real dy; ///< Value required to compute solution cell average in 2D/3D, calculated using ymax and ymin parameters
     real dz; ///< Value required to compute solution cell average in 2D/3D, calculated using zmax and zmin parameters
+
 }; // End of PositivityPreservingLimiter Class
 } // PHiLiP namespace
 

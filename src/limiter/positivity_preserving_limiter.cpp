@@ -39,7 +39,7 @@ PositivityPreservingLimiter<dim, nstate, real>::PositivityPreservingLimiter(
     }
     else {
         std::cout << "Error: Positivity-Preserving Limiter can only be applied for pde_type==euler" << std::endl;
-        std::abort();
+//        std::abort();
     }
 
     // Create pointer to TVB Limiter class if use_tvb_limiter==true && dim == 1
@@ -586,5 +586,25 @@ void PositivityPreservingLimiter<dim, nstate, real>::limit(
     }
 }
 
-template class PositivityPreservingLimiter <PHILIP_DIM, PHILIP_DIM + 2, double>;
+
+template <int dim, int nstate, typename real>
+void PositivityPreservingLimiter<dim, nstate, real>::set_cell_min_entropy(
+        dealii::LinearAlgebra::distributed::Vector<double>&     /*solution*/,
+        const dealii::DoFHandler<dim>&                          /*dof_handler*/,
+        const dealii::hp::FECollection<dim>&                    /*fe_collection*/,
+        const dealii::hp::QCollection<dim>&                     /*volume_quadrature_collection*/,
+        const unsigned int                                      /*grid_degree*/,
+        const unsigned int                                      /*max_degree*/,
+        const dealii::hp::FECollection<1>                       /*oneD_fe_collection_1state*/,
+        const dealii::hp::QCollection<1>                        /*oneD_quadrature_collection*/)
+{
+    //do nothing
+}
+template class PositivityPreservingLimiter <PHILIP_DIM, 1, double>;
+template class PositivityPreservingLimiter <PHILIP_DIM, 2, double>;
+template class PositivityPreservingLimiter <PHILIP_DIM, 3, double>;
+template class PositivityPreservingLimiter <PHILIP_DIM, 4, double>;
+template class PositivityPreservingLimiter <PHILIP_DIM, 5, double>;
+template class PositivityPreservingLimiter <PHILIP_DIM, 6, double>;
 } // PHiLiP namespace
+

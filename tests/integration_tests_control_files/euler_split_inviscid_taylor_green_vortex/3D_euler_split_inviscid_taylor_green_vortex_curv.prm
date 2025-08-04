@@ -14,7 +14,7 @@ set overintegration = 2
 
 set use_split_form = true
 
-set two_point_num_flux_type = Ra
+set two_point_num_flux_type = Sh
 
 set use_curvilinear_split_form = true
 

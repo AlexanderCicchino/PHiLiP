@@ -2485,6 +2485,10 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
         std::array<real,nstate> diss_auxi_num_flux_dot_n_at_q;
         // Convective numerical flux. 
         conv_num_flux_dot_n_at_q = this->conv_num_flux_double->evaluate_flux(soln_state_int, soln_state_ext, unit_phys_normal_int);
+      //  if(current_cell_index == 63 && neighbor_cell_index == 64 || current_cell_index == 64 && neighbor_cell_index == 63){
+      //      conv_num_flux_dot_n_at_q[0] += 0.5 * 0.5 * (soln_state_int[0] * soln_state_int[0] + soln_state_ext[0] * soln_state_ext[0])
+      //                                  - 0.5 * 0.5 * abs(soln_state_int[0] + soln_state_ext[0]) * (soln_state_ext[0] - soln_state_int[0]);
+      //  }
         // dissipative numerical flux
         diss_auxi_num_flux_dot_n_at_q = this->diss_num_flux_double->evaluate_auxiliary_flux(
             current_cell_index, neighbor_cell_index,

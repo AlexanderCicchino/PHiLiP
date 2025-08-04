@@ -1246,6 +1246,15 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
         // assembles and solves for auxiliary variable if necessary.
         assemble_auxiliary_residual();
 
+        // set vanishing visc coef to zero
+        this->cell_entropy_correction_coef = 0;
+        this->cell_entropy_correction_norm = 0;
+        this->cell_entropy_correction_coef_face = 0;
+        this->cell_entropy_correction_norm_face = 0;
+        //compute the entropy correction surf integral and norm
+        compute_entropy_correction_coef_and_norm();
+
+
         dealii::Timer timer;
         if(all_parameters->store_residual_cpu_time){
             timer.start();
@@ -1277,6 +1286,8 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
                 right_hand_side,
                 auxiliary_right_hand_side);
         } // end of cell loop
+
+        apply_entropy_correction();
 
         if(all_parameters->store_residual_cpu_time){
             timer.stop();
@@ -1920,6 +1931,12 @@ void DGBase<dim,real,MeshType>::allocate_system (
 
     // Set the assemble resiudla time to 0 for clock_t type
     assemble_residual_time = 0.0;
+
+     //only use idof=0 for it for now (in future should be 1 value per elem)
+    cell_entropy_correction_coef.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
+    cell_entropy_correction_norm.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
+    cell_entropy_correction_coef_face.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
+    cell_entropy_correction_norm_face.reinit(locally_owned_dofs, ghost_dofs, mpi_communicator);
 
     // System matrix allocation
     if (compute_dRdW || compute_dRdX || compute_d2R) {

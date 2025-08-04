@@ -4,6 +4,7 @@
 #include "tvb_limiter.h"
 #include "maximum_principle_limiter.h"
 #include "positivity_preserving_limiter.h"
+#include "min_entropy_principle_limiter.h"
 
 namespace PHiLiP {
 template <int dim, int nstate, typename real>
@@ -55,9 +56,9 @@ std::unique_ptr< BoundPreservingLimiter<dim, real> >
     } else if(curvilinear_grid) {
         std::cout << "Error: Cannot create limiter for curvilinear grid" << std::endl;
         std::abort();
-    } else if (flux_nodes_type != flux_nodes_enum::GLL) {
-        std::cout << "Error: Can only use limiter with GLL flux nodes" << std::endl;
-        std::abort();
+//    } else if (flux_nodes_type != flux_nodes_enum::GLL) {
+//        std::cout << "Error: Can only use limiter with GLL flux nodes" << std::endl;
+//        std::abort();
     } else if (limiter_type == limiter_enum::maximum_principle) {
         return std::make_unique< MaximumPrincipleLimiter<dim, nstate, real> >(parameters_input);
     } else if (limiter_type == limiter_enum::positivity_preservingZhang2010
@@ -70,6 +71,8 @@ std::unique_ptr< BoundPreservingLimiter<dim, real> >
                 std::abort();
             }
         }
+    } else if (limiter_type == limiter_enum::min_entropy_principle) {
+        return std::make_unique< MinEntropyPrincipleLimiter<dim, nstate, real> >(parameters_input);
     }
 
     std::cout << "Error: Cannot create limiter pointer due to an invalid limiter type specified" << std::endl;

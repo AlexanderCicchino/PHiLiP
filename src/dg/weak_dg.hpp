@@ -160,6 +160,16 @@ private:
     /// Assembles the auxiliary equations' residuals and solves for the auxiliary variables.
     void assemble_auxiliary_residual ();
 
+    /// Compute the entropy correction surf integral and norm.
+    void compute_entropy_correction_coef_and_norm() 
+    {//Do nothing
+    };
+
+    /// Apply cell entropy production correction.
+    void apply_entropy_correction() 
+    {//Do nothing
+    };
+
     /// Allocate the dual vector for optimization.
     void allocate_dual_vector ();
 
