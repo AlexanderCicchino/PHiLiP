@@ -46,7 +46,7 @@ end
 
 subsection flow_solver
   set flow_case_type = strong_vortex_shock_wave
-  set poly_degree = 3
+  set poly_degree = 4
   set final_time = 0.7
   #set constant_time_step = 0.0005
   set courant_friedrichs_lewy_number = 0.5
@@ -59,8 +59,8 @@ subsection flow_solver
       set grid_ymin = 0.0
       set grid_ymax = 1.0
 
-      set number_of_grid_elements_x = 50
-      set number_of_grid_elements_y = 25
+      set number_of_grid_elements_x = 35
+      set number_of_grid_elements_y = 15
     end
   end
 end
