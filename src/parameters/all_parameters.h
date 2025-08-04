@@ -235,6 +235,7 @@ public:
         euler_density_wave,
         hit_chai_mahesh,
         euler_acoustic_wave,
+        halton_sampling_run,
         low_density
     };
     /// Store selected TestType from the input file.

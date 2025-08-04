@@ -54,6 +54,8 @@
 #include "hyper_adaptive_sampling_new_error.h"
 #include "euler_density_wave.h"
 #include "hit_chai_mahesh.h"
+#include "halton_sampling_run.h"
+
 
 namespace PHiLiP {
 namespace Tests {
@@ -326,12 +328,14 @@ std::unique_ptr< TestsBase > TestsFactory<dim,nstate,MeshType>
         if constexpr ((dim==2 && nstate==dim+2) || (dim==1 && nstate==1))  return std::make_unique<HROMErrorPostSampling<dim,nstate>>(parameters_input, parameter_handler_input);
     } else if(test_type == Test_enum::hyper_adaptive_sampling_new_error) {
         if constexpr ((dim==2 && nstate==dim+2) || (dim==1 && nstate==1))  return std::make_unique<HyperAdaptiveSamplingNewError<dim,nstate>>(parameters_input, parameter_handler_input);
+    } else if(test_type == Test_enum::halton_sampling_run) {
+        if constexpr ((dim==2 && nstate==dim+2) || (dim==1 && nstate==1))  return std::make_unique<HaltonSamplingRun<dim,nstate>>(parameters_input, parameter_handler_input);
     } else if (test_type == Test_enum::advection_limiter) {
         if constexpr (nstate == 1 && dim < 3) return std::make_unique<BoundPreservingLimiterTests<dim, nstate>>(parameters_input, parameter_handler_input);
     } else if (test_type == Test_enum::burgers_limiter) {
         if constexpr (nstate == dim && dim < 3) return std::make_unique<BoundPreservingLimiterTests<dim, nstate>>(parameters_input, parameter_handler_input);
     } else if(test_type == Test_enum::low_density) {
-        if constexpr (dim==2 && nstate==dim+2)  return std::make_unique<BoundPreservingLimiterTests<dim, nstate>>(parameters_input, parameter_handler_input);
+        if constexpr (dim<3 && nstate==dim+2)  return std::make_unique<BoundPreservingLimiterTests<dim, nstate>>(parameters_input, parameter_handler_input);
     } else if(test_type == Test_enum::naca0012_unsteady_check_quick){
         if constexpr (dim==2 && nstate==dim+2)  return std::make_unique<NACA0012UnsteadyCheckQuick<dim, nstate>>(parameters_input, parameter_handler_input);
     } else if(test_type == Test_enum::euler_density_wave) {
