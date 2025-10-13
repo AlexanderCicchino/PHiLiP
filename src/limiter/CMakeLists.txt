@@ -5,6 +5,7 @@ SET(LIMSOURCE
     positivity_preserving_limiter.cpp
     bound_preserving_limiter_factory.cpp
     min_entropy_principle_limiter.cpp
+    slope_limiter.cpp
     )
 
 foreach(dim RANGE 1 3)

@@ -42,13 +42,16 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operator
     const std::vector<dealii::types::global_dof_index>     &metric_dof_indices,
     const unsigned int                                     poly_degree,
     const unsigned int                                     grid_degree,
-    OPERATOR::basis_functions<dim,2*dim,real>                   &soln_basis,
-    OPERATOR::basis_functions<dim,2*dim,real>                   &flux_basis,
-    OPERATOR::local_basis_stiffness<dim,2*dim,real>             &flux_basis_stiffness,
-    OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper_int,
-    OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<dim,2*dim,real>              &soln_basis,
+    OPERATOR::basis_functions<dim,2*dim,real>              &flux_basis,
+    OPERATOR::local_basis_stiffness<dim,2*dim,real>        &flux_basis_stiffness,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &soln_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<dim,2*dim,real>              &test_basis,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper_ext,
     OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper,
-    OPERATOR::mapping_shape_functions<dim,2*dim,real>           &mapping_basis,
+    OPERATOR::mapping_shape_functions<dim,2*dim,real>      &mapping_basis,
     std::array<std::vector<real>,dim>                      &mapping_support_points,
     dealii::hp::FEValues<dim,dim>                          &/*fe_values_collection_volume*/,
     dealii::hp::FEValues<dim,dim>                          &/*fe_values_collection_volume_lagrange*/,
@@ -70,6 +73,8 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operator
                                                       flux_basis, flux_basis, 
                                                       flux_basis_stiffness, 
                                                       soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
+                                                      test_basis, test_basis,
+                                                      test_basis_projection_oper_int, test_basis_projection_oper_ext,
                                                       mapping_basis);
     }
 
@@ -117,6 +122,8 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operator
             flux_basis,
             flux_basis_stiffness,
             soln_basis_projection_oper_int,
+            test_basis,
+            test_basis_projection_oper_int,
             metric_oper,
             local_rhs_int_cell);
     }
@@ -199,16 +206,20 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
     const unsigned int                                     poly_degree_ext,
     const unsigned int                                     /*grid_degree_int*/,
     const unsigned int                                     grid_degree_ext,
-    OPERATOR::basis_functions<dim,2*dim,real>                   &soln_basis_int,
-    OPERATOR::basis_functions<dim,2*dim,real>                   &soln_basis_ext,
-    OPERATOR::basis_functions<dim,2*dim,real>                   &flux_basis_int,
-    OPERATOR::basis_functions<dim,2*dim,real>                   &flux_basis_ext,
-    OPERATOR::local_basis_stiffness<dim,2*dim,real>             &flux_basis_stiffness,
-    OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper_int,
-    OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<dim,2*dim,real>              &soln_basis_int,
+    OPERATOR::basis_functions<dim,2*dim,real>              &soln_basis_ext,
+    OPERATOR::basis_functions<dim,2*dim,real>              &flux_basis_int,
+    OPERATOR::basis_functions<dim,2*dim,real>              &flux_basis_ext,
+    OPERATOR::local_basis_stiffness<dim,2*dim,real>        &flux_basis_stiffness,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &soln_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<dim,2*dim,real>              &test_basis_int,
+    OPERATOR::basis_functions<dim,2*dim,real>              &test_basis_ext,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper_ext,
     OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper_int,
     OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper_ext,
-    OPERATOR::mapping_shape_functions<dim,2*dim,real>           &mapping_basis,
+    OPERATOR::mapping_shape_functions<dim,2*dim,real>      &mapping_basis,
     std::array<std::vector<real>,dim>                      &mapping_support_points,
     dealii::hp::FEFaceValues<dim,dim>                      &/*fe_values_collection_face_int*/,
     dealii::hp::FEFaceValues<dim,dim>                      &/*fe_values_collection_face_ext*/,
@@ -242,6 +253,8 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
                                                       flux_basis_int, flux_basis_ext, 
                                                       flux_basis_stiffness, 
                                                       soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
+                                                      test_basis_int, test_basis_ext, 
+                                                      test_basis_projection_oper_int, test_basis_projection_oper_ext,
                                                       mapping_basis);
     }
 
@@ -298,6 +311,8 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
             soln_basis_int, soln_basis_ext,
             flux_basis_int, flux_basis_ext,
             soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
+            test_basis_int, test_basis_ext,
+            test_basis_projection_oper_int, test_basis_projection_oper_ext,
             metric_oper_int, metric_oper_ext,
             current_cell_rhs, neighbor_cell_rhs);
         // add local contribution from neighbor cell to global vector
@@ -371,6 +386,10 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_subface_term_and_build_operato
         flux_basis_stiffness,
         soln_basis_projection_oper_int,
         soln_basis_projection_oper_ext,
+        soln_basis_int,//Future bug to deal with
+        soln_basis_ext,//Future bug to deal with
+        soln_basis_projection_oper_int,//Future bug to deal with
+        soln_basis_projection_oper_ext,//Future bug to deal with
         metric_oper_int,
         metric_oper_ext,
         mapping_basis,
@@ -431,6 +450,11 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
         OPERATOR::mapping_shape_functions<dim,2*dim,real> mapping_basis(1, this->max_grid_degree, this->max_grid_degree);
         OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_int(1, this->max_degree, this->max_grid_degree); 
         OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_ext(1, this->max_degree, this->max_grid_degree); 
+
+        OPERATOR::basis_functions<dim,2*dim,real> test_basis_int(1, this->max_degree, this->max_grid_degree, this->all_parameters->use_bern); 
+        OPERATOR::basis_functions<dim,2*dim,real> test_basis_ext(1, this->max_degree, this->max_grid_degree, this->all_parameters->use_bern); 
+        OPERATOR::vol_projection_operator<dim,2*dim,real> test_basis_projection_oper_int(1, this->max_degree, this->max_grid_degree, this->all_parameters->use_bern); 
+        OPERATOR::vol_projection_operator<dim,2*dim,real> test_basis_projection_oper_ext(1, this->max_degree, this->max_grid_degree, this->all_parameters->use_bern); 
          
         this->reinit_operators_for_cell_residual_loop(
             this->max_degree, this->max_degree, this->max_grid_degree, 
@@ -438,6 +462,8 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
             flux_basis_int, flux_basis_ext, 
             flux_basis_stiffness, 
             soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
+            test_basis_int, test_basis_ext, 
+            test_basis_projection_oper_int, test_basis_projection_oper_ext,
             mapping_basis);
 
         //loop over cells solving for auxiliary rhs
@@ -461,6 +487,10 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
                 flux_basis_stiffness,
                 soln_basis_projection_oper_int, 
                 soln_basis_projection_oper_ext,
+                test_basis_int,
+                test_basis_ext,
+                test_basis_projection_oper_int, 
+                test_basis_projection_oper_ext,
                 mapping_basis,
                 true,
                 this->right_hand_side,
@@ -881,10 +911,12 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
     const dealii::types::global_dof_index                  current_cell_index,
     const std::vector<dealii::types::global_dof_index>     &cell_dofs_indices,
     const unsigned int                                     poly_degree,
-    OPERATOR::basis_functions<dim,2*dim,real>                   &soln_basis,
-    OPERATOR::basis_functions<dim,2*dim,real>                   &flux_basis,
-    OPERATOR::local_basis_stiffness<dim,2*dim,real>             &flux_basis_stiffness,
-    OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper,
+    OPERATOR::basis_functions<dim,2*dim,real>              &soln_basis,
+    OPERATOR::basis_functions<dim,2*dim,real>              &flux_basis,
+    OPERATOR::local_basis_stiffness<dim,2*dim,real>        &flux_basis_stiffness,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &/*soln_basis_projection_oper*/,
+    OPERATOR::basis_functions<dim,2*dim,real>              &test_basis,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper,
     OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper,
     dealii::Vector<real>                                   &local_rhs_int_cell)
 {
@@ -995,12 +1027,18 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
         }
         for(int istate=0; istate<nstate; istate++){
             std::vector<real> entropy_var_coeff(n_shape_fns);;
-            soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_at_q[istate],
+           // soln_basis_projection_oper.matrix_vector_mult_1D(entropy_var_at_q[istate],
+           //                                                  entropy_var_coeff,
+           //                                                  soln_basis_projection_oper.oneD_vol_operator);
+           // soln_basis.matrix_vector_mult_1D(entropy_var_coeff,
+           //                                  projected_entropy_var_at_q[istate],
+           //                                  soln_basis.oneD_vol_operator);
+            test_basis_projection_oper.matrix_vector_mult_1D(entropy_var_at_q[istate],
                                                              entropy_var_coeff,
-                                                             soln_basis_projection_oper.oneD_vol_operator);
-            soln_basis.matrix_vector_mult_1D(entropy_var_coeff,
+                                                             test_basis_projection_oper.oneD_vol_operator);
+            test_basis.matrix_vector_mult_1D(entropy_var_coeff,
                                              projected_entropy_var_at_q[istate],
-                                             soln_basis.oneD_vol_operator);
+                                             test_basis.oneD_vol_operator);
         }
     }
 
@@ -1272,10 +1310,12 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_volume_term_strong(
         // Convective
         if (this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
             std::vector<real> ones(n_quad_pts, 1.0);
-            soln_basis.inner_product_1D(conv_flux_divergence, ones, rhs, soln_basis.oneD_vol_operator, false, -1.0);
+           // soln_basis.inner_product_1D(conv_flux_divergence, ones, rhs, soln_basis.oneD_vol_operator, false, -1.0);
+            test_basis.inner_product_1D(conv_flux_divergence, ones, rhs, test_basis.oneD_vol_operator, false, -1.0);
         }
         else {
-            soln_basis.inner_product_1D(conv_flux_divergence, vol_quad_weights, rhs, soln_basis.oneD_vol_operator, false, -1.0);
+           // soln_basis.inner_product_1D(conv_flux_divergence, vol_quad_weights, rhs, soln_basis.oneD_vol_operator, false, -1.0);
+            test_basis.inner_product_1D(conv_flux_divergence, vol_quad_weights, rhs, test_basis.oneD_vol_operator, false, -1.0);
         }
 
         // Diffusive
@@ -1818,8 +1858,12 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
     OPERATOR::basis_functions<dim,2*dim,real>               &soln_basis_ext,
     OPERATOR::basis_functions<dim,2*dim,real>               &flux_basis_int,
     OPERATOR::basis_functions<dim,2*dim,real>               &flux_basis_ext,
-    OPERATOR::vol_projection_operator<dim,2*dim,real>       &soln_basis_projection_oper_int,
-    OPERATOR::vol_projection_operator<dim,2*dim,real>       &soln_basis_projection_oper_ext,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>       &/*soln_basis_projection_oper_int*/,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>       &/*soln_basis_projection_oper_ext*/,
+    OPERATOR::basis_functions<dim,2*dim,real>               &test_basis_int,
+    OPERATOR::basis_functions<dim,2*dim,real>               &test_basis_ext,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>       &test_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>       &test_basis_projection_oper_ext,
     OPERATOR::metric_operators<real,dim,2*dim>         &metric_oper_int,
     OPERATOR::metric_operators<real,dim,2*dim>         &metric_oper_ext,
     dealii::Vector<real>                               &local_rhs_int_cell,
@@ -2199,32 +2243,32 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
 
         //interior
         std::vector<real> entropy_var_coeff_int(n_shape_fns_int);
-        soln_basis_projection_oper_int.matrix_vector_mult_1D(entropy_var_vol_int[istate],
+        test_basis_projection_oper_int.matrix_vector_mult_1D(entropy_var_vol_int[istate],
                                                              entropy_var_coeff_int,
-                                                             soln_basis_projection_oper_int.oneD_vol_operator);
-        soln_basis_int.matrix_vector_mult_1D(entropy_var_coeff_int,
+                                                             test_basis_projection_oper_int.oneD_vol_operator);
+        test_basis_int.matrix_vector_mult_1D(entropy_var_coeff_int,
                                              projected_entropy_var_vol_int[istate],
-                                             soln_basis_int.oneD_vol_operator);
-        soln_basis_int.matrix_vector_mult_surface_1D(iface,
+                                             test_basis_int.oneD_vol_operator);
+        test_basis_int.matrix_vector_mult_surface_1D(iface,
                                                      entropy_var_coeff_int, 
                                                      projected_entropy_var_surf_int[istate],
-                                                     soln_basis_int.oneD_surf_operator,
-                                                     soln_basis_int.oneD_vol_operator);
+                                                     test_basis_int.oneD_surf_operator,
+                                                     test_basis_int.oneD_vol_operator);
 
         //exterior
         std::vector<real> entropy_var_coeff_ext(n_shape_fns_ext);
-        soln_basis_projection_oper_ext.matrix_vector_mult_1D(entropy_var_vol_ext[istate],
+        test_basis_projection_oper_ext.matrix_vector_mult_1D(entropy_var_vol_ext[istate],
                                                              entropy_var_coeff_ext,
-                                                             soln_basis_projection_oper_ext.oneD_vol_operator);
+                                                             test_basis_projection_oper_ext.oneD_vol_operator);
 
-        soln_basis_ext.matrix_vector_mult_1D(entropy_var_coeff_ext,
+        test_basis_ext.matrix_vector_mult_1D(entropy_var_coeff_ext,
                                              projected_entropy_var_vol_ext[istate],
-                                             soln_basis_ext.oneD_vol_operator);
-        soln_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
+                                             test_basis_ext.oneD_vol_operator);
+        test_basis_ext.matrix_vector_mult_surface_1D(neighbor_iface,
                                                      entropy_var_coeff_ext, 
                                                      projected_entropy_var_surf_ext[istate],
-                                                     soln_basis_ext.oneD_surf_operator,
-                                                     soln_basis_ext.oneD_vol_operator);
+                                                     test_basis_ext.oneD_surf_operator,
+                                                     test_basis_ext.oneD_vol_operator);
     }
 
     //get the surface-volume sparsity pattern for a "sum-factorized" Hadamard product only computing terms needed for the operation.
@@ -2524,25 +2568,25 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
         // convective flux
         if(this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
             std::vector<real> ones_surf(n_face_quad_pts, 1.0);
-            soln_basis_int.inner_product_surface_1D(iface, 
+            test_basis_int.inner_product_surface_1D(iface, 
                                                     surf_vol_ref_2pt_flux_interp_surf_int[istate], 
                                                     ones_surf, rhs_int, 
-                                                    soln_basis_int.oneD_surf_operator, 
-                                                    soln_basis_int.oneD_vol_operator,
+                                                    test_basis_int.oneD_surf_operator, 
+                                                    test_basis_int.oneD_vol_operator,
                                                     false, -1.0);
             std::vector<real> ones_vol(n_quad_pts_vol_int, 1.0);
-            soln_basis_int.inner_product_1D(surf_vol_ref_2pt_flux_interp_vol_int[istate], 
+            test_basis_int.inner_product_1D(surf_vol_ref_2pt_flux_interp_vol_int[istate], 
                                             ones_vol, rhs_int, 
-                                            soln_basis_int.oneD_vol_operator, 
+                                            test_basis_int.oneD_vol_operator, 
                                             true, -1.0);
         }
         else 
         {
-            soln_basis_int.inner_product_surface_1D(iface, 
+            test_basis_int.inner_product_surface_1D(iface, 
                                                     conv_int_vol_ref_flux_interp_to_face_dot_ref_normal[istate], 
                                                     surf_quad_weights, rhs_int, 
-                                                    soln_basis_int.oneD_surf_operator, 
-                                                    soln_basis_int.oneD_vol_operator,
+                                                    test_basis_int.oneD_surf_operator, 
+                                                    test_basis_int.oneD_vol_operator,
                                                     false, 1.0);
         }
         // dissipative flux
@@ -2553,16 +2597,16 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                                                 soln_basis_int.oneD_vol_operator,
                                                 true, 1.0);//adding=true, subtract the negative so add it
         // convective numerical flux
-        soln_basis_int.inner_product_surface_1D(iface, conv_num_flux_dot_n[istate], 
+        test_basis_int.inner_product_surface_1D(iface, conv_num_flux_dot_n[istate], 
                                                 surf_quad_weights, rhs_int, 
-                                                soln_basis_int.oneD_surf_operator, 
-                                                soln_basis_int.oneD_vol_operator,
+                                                test_basis_int.oneD_surf_operator, 
+                                                test_basis_int.oneD_vol_operator,
                                                 true, -1.0);//adding=true, scaled by factor=-1.0 bc subtract it
         // dissipative numerical flux
-        soln_basis_int.inner_product_surface_1D(iface, diss_auxi_num_flux_dot_n[istate], 
+        test_basis_int.inner_product_surface_1D(iface, diss_auxi_num_flux_dot_n[istate], 
                                                 surf_quad_weights, rhs_int, 
-                                                soln_basis_int.oneD_surf_operator, 
-                                                soln_basis_int.oneD_vol_operator,
+                                                test_basis_int.oneD_surf_operator, 
+                                                test_basis_int.oneD_vol_operator,
                                                 true, -1.0);//adding=true, scaled by factor=-1.0 bc subtract it
 
 
@@ -2576,26 +2620,26 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
         // convective flux
         if(this->all_parameters->use_split_form || this->all_parameters->use_curvilinear_split_form){
             std::vector<real> ones_surf(n_face_quad_pts, 1.0);
-            soln_basis_ext.inner_product_surface_1D(neighbor_iface, 
+            test_basis_ext.inner_product_surface_1D(neighbor_iface, 
                                                     surf_vol_ref_2pt_flux_interp_surf_ext[istate], 
                                                     ones_surf, rhs_ext, 
-                                                    soln_basis_ext.oneD_surf_operator, 
-                                                    soln_basis_ext.oneD_vol_operator,
+                                                    test_basis_ext.oneD_surf_operator, 
+                                                    test_basis_ext.oneD_vol_operator,
                                                     false, -1.0);//the negative sign is bc the surface Hadamard function computes it on the otherside.
                                                     //to satisfy the unit test that checks consistency with Jesse Chan's formulation.
             std::vector<real> ones_vol(n_quad_pts_vol_ext, 1.0);
-            soln_basis_ext.inner_product_1D(surf_vol_ref_2pt_flux_interp_vol_ext[istate], 
+            test_basis_ext.inner_product_1D(surf_vol_ref_2pt_flux_interp_vol_ext[istate], 
                                             ones_vol, rhs_ext, 
-                                            soln_basis_ext.oneD_vol_operator, 
+                                            test_basis_ext.oneD_vol_operator, 
                                             true, -1.0);
         }
         else 
         {
-            soln_basis_ext.inner_product_surface_1D(neighbor_iface, 
+            test_basis_ext.inner_product_surface_1D(neighbor_iface, 
                                                     conv_ext_vol_ref_flux_interp_to_face_dot_ref_normal[istate], 
                                                     surf_quad_weights, rhs_ext, 
-                                                    soln_basis_ext.oneD_surf_operator, 
-                                                    soln_basis_ext.oneD_vol_operator,
+                                                    test_basis_ext.oneD_surf_operator, 
+                                                    test_basis_ext.oneD_vol_operator,
                                                     false, 1.0);//adding false
         }
         // dissipative flux
@@ -2606,16 +2650,16 @@ void DGStrong<dim,nstate,real,MeshType>::assemble_face_term_strong(
                                                 soln_basis_ext.oneD_vol_operator,
                                                 true, 1.0);//adding=true
         // convective numerical flux
-        soln_basis_ext.inner_product_surface_1D(neighbor_iface, conv_num_flux_dot_n[istate], 
+        test_basis_ext.inner_product_surface_1D(neighbor_iface, conv_num_flux_dot_n[istate], 
                                                 surf_quad_weights, rhs_ext, 
-                                                soln_basis_ext.oneD_surf_operator, 
-                                                soln_basis_ext.oneD_vol_operator,
+                                                test_basis_ext.oneD_surf_operator, 
+                                                test_basis_ext.oneD_vol_operator,
                                                 true, 1.0);//adding=true, scaled by factor=1.0 because negative numerical flux and subtract it
         // dissipative numerical flux
-        soln_basis_ext.inner_product_surface_1D(neighbor_iface, diss_auxi_num_flux_dot_n[istate], 
+        test_basis_ext.inner_product_surface_1D(neighbor_iface, diss_auxi_num_flux_dot_n[istate], 
                                                 surf_quad_weights, rhs_ext, 
-                                                soln_basis_ext.oneD_surf_operator, 
-                                                soln_basis_ext.oneD_vol_operator,
+                                                test_basis_ext.oneD_surf_operator, 
+                                                test_basis_ext.oneD_vol_operator,
                                                 true, 1.0);//adding=true, scaled by factor=1.0 because negative numerical flux and subtract it
 
 

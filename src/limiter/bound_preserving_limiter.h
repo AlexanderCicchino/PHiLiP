@@ -46,7 +46,9 @@ public:
         const unsigned int                                      grid_degree,
         const unsigned int                                      max_degree,
         const dealii::hp::FECollection<1>                       oneD_fe_collection_1state,
-        const dealii::hp::QCollection<1>                        oneD_quadrature_collection) = 0;
+        const dealii::hp::FECollection<1>                       oneD_fe_collection_leg,
+        const dealii::hp::QCollection<1>                        oneD_quadrature_collection,
+        double dt = 0) = 0;
 
 
     /// Function to cell cell min entropy.
@@ -86,6 +88,7 @@ public:
         const unsigned int                                      grid_degree,
         const unsigned int                                      max_degree,
         const dealii::hp::FECollection<1>                       oneD_fe_collection_1state,
+        const dealii::hp::FECollection<1>                       oneD_fe_collection_leg,
         const dealii::hp::QCollection<1>                        oneD_quadrature_collection,
         double                                                  dt) = 0;
 

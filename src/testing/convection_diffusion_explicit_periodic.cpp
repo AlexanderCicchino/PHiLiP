@@ -74,7 +74,7 @@ double ConvectionDiffusionPeriodic<dim, nstate>::compute_conservation(std::share
     std::vector<double> ones_hat(n_dofs_cell);
     // We have to project the vector of ones because the mass matrix has an interpolation from solution nodes built into it.
     OPERATOR::vol_projection_operator<dim,2*dim,double> vol_projection(dg->nstate, poly_degree, dg->max_grid_degree);
-    vol_projection.build_1D_volume_operator(dg->oneD_fe_collection[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
+    vol_projection.build_1D_volume_operator(dg->oneD_fe_collection[poly_degree], dg->oneD_fe_collection[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
     vol_projection.matrix_vector_mult_1D(ones, ones_hat, vol_projection.oneD_vol_operator);
 
     dealii::LinearAlgebra::distributed::Vector<double> ones_hat_global(dg->right_hand_side);

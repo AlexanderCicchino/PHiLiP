@@ -1071,8 +1071,10 @@ template <int dim, int n_faces, typename real>
 basis_functions<dim,n_faces,real>::basis_functions(
     const int nstate_input,
     const unsigned int max_degree_input,
-    const unsigned int grid_degree_input)
+    const unsigned int grid_degree_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree = max_degree_input;
@@ -1087,13 +1089,21 @@ void basis_functions<dim,n_faces,real>::build_1D_volume_operator(
     const unsigned int n_dofs     = finite_element.dofs_per_cell;
     //allocate the basis at volume cubature
     this->oneD_vol_operator.reinit(n_quad_pts, n_dofs);
+    //for index renumbering if based on an feq element
+    const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<1>(current_degree);
     //loop and store
     for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
         const dealii::Point<1> qpoint  = quadrature.point(iquad);
         for(unsigned int idof=0; idof<n_dofs; idof++){
             const int istate = finite_element.system_to_component_index(idof).first;
             //Basis function idof of poly degree idegree evaluated at cubature node qpoint.
-            this->oneD_vol_operator[iquad][idof] = finite_element.shape_value_component(idof,qpoint,istate);
+            if(feq_order){
+                const unsigned int index = index_renumbering[idof];
+                this->oneD_vol_operator[iquad][index] = finite_element.shape_value_component(idof,qpoint,istate);
+            }
+            else{
+                this->oneD_vol_operator[iquad][idof] = finite_element.shape_value_component(idof,qpoint,istate);
+            }
         }
     }
 }
@@ -1107,13 +1117,21 @@ void basis_functions<dim,n_faces,real>::build_1D_gradient_operator(
     const unsigned int n_dofs     = finite_element.dofs_per_cell;
     //allocate the basis at volume cubature
     this->oneD_grad_operator.reinit(n_quad_pts, n_dofs);
+    //for index renumbering if based on an feq element
+    const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<1>(current_degree);
     //loop and store
     for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
         const dealii::Point<1> qpoint  = quadrature.point(iquad);
         for(unsigned int idof=0; idof<n_dofs; idof++){
             const int istate = finite_element.system_to_component_index(idof).first;
             //Basis function idof of poly degree idegree evaluated at cubature node qpoint.
-            this->oneD_grad_operator[iquad][idof] = finite_element.shape_grad_component(idof,qpoint,istate)[0];
+            if(feq_order){
+                const unsigned int index = index_renumbering[idof];
+                this->oneD_grad_operator[iquad][index] = finite_element.shape_grad_component(idof,qpoint,istate)[0];
+            }
+            else{
+                this->oneD_grad_operator[iquad][idof] = finite_element.shape_grad_component(idof,qpoint,istate)[0];
+            }
         }
     }
 }
@@ -1126,6 +1144,8 @@ void basis_functions<dim,n_faces,real>::build_1D_surface_operator(
     const unsigned int n_face_quad_pts = face_quadrature.size();
     const unsigned int n_dofs          = finite_element.dofs_per_cell;
     const unsigned int n_faces_1D      = n_faces / dim;
+    //for index renumbering if based on an feq element
+    const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<1>(current_degree);
     //loop and store
     for(unsigned int iface=0; iface<n_faces_1D; iface++){ 
         //allocate the facet operator
@@ -1139,7 +1159,13 @@ void basis_functions<dim,n_faces,real>::build_1D_surface_operator(
             for(unsigned int idof=0; idof<n_dofs; idof++){
                 const int istate = finite_element.system_to_component_index(idof).first;
                 //Basis function idof of poly degree idegree evaluated at cubature node qpoint.
-                this->oneD_surf_operator[iface][iquad][idof] = finite_element.shape_value_component(idof,qpoint,istate);
+                if(feq_order){
+                    const unsigned int index = index_renumbering[idof];
+                    this->oneD_surf_operator[iface][iquad][index] = finite_element.shape_value_component(idof,qpoint,istate);
+                }
+                else{
+                    this->oneD_surf_operator[iface][iquad][idof] = finite_element.shape_value_component(idof,qpoint,istate);
+                }
             }
         }
     }
@@ -1153,6 +1179,8 @@ void basis_functions<dim,n_faces,real>::build_1D_surface_gradient_operator(
     const unsigned int n_face_quad_pts = face_quadrature.size();
     const unsigned int n_dofs          = finite_element.dofs_per_cell;
     const unsigned int n_faces_1D      = n_faces / dim;
+    //for index renumbering if based on an feq element
+    const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<1>(current_degree);
     //loop and store
     for(unsigned int iface=0; iface<n_faces_1D; iface++){ 
         //allocate the facet operator
@@ -1166,7 +1194,13 @@ void basis_functions<dim,n_faces,real>::build_1D_surface_gradient_operator(
             for(unsigned int idof=0; idof<n_dofs; idof++){
                 const int istate = finite_element.system_to_component_index(idof).first;
                 //Basis function idof of poly degree idegree evaluated at cubature node qpoint.
-                this->oneD_surf_grad_operator[iface][iquad][idof] = finite_element.shape_grad_component(idof,qpoint,istate)[0];
+                if(feq_order){
+                    const unsigned int index = index_renumbering[idof];
+                    this->oneD_surf_grad_operator[iface][iquad][index] = finite_element.shape_grad_component(idof,qpoint,istate)[0];
+                }
+                else{
+                    this->oneD_surf_grad_operator[iface][iquad][idof] = finite_element.shape_grad_component(idof,qpoint,istate)[0];
+                }
             }
         }
     }
@@ -1176,8 +1210,10 @@ template <int dim, int n_faces, typename real>
 vol_integral_basis<dim,n_faces,real>::vol_integral_basis(
     const int nstate_input,
     const unsigned int max_degree_input,
-    const unsigned int grid_degree_input)
+    const unsigned int grid_degree_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1192,14 +1228,22 @@ void vol_integral_basis<dim,n_faces,real>::build_1D_volume_operator(
     const unsigned int n_dofs     = finite_element.dofs_per_cell;
     //allocate
     this->oneD_vol_operator.reinit(n_quad_pts, n_dofs);
+    //for index renumbering if based on an feq element
+    const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<1>(current_degree);
     //loop and store
     const std::vector<double> &quad_weights = quadrature.get_weights ();
     for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
         const dealii::Point<1> qpoint  = quadrature.point(iquad);
         for(unsigned int idof=0; idof<n_dofs; idof++){
             const int istate = finite_element.system_to_component_index(idof).first;
-            //Basis function idof of poly degree idegree evaluated at cubature node qpoint multiplied by quad weight.
-            this->oneD_vol_operator[iquad][idof] = quad_weights[iquad] * finite_element.shape_value_component(idof,qpoint,istate);
+            if(feq_order){
+                const unsigned int index = index_renumbering[idof];
+                this->oneD_vol_operator[iquad][index] = quad_weights[iquad] * finite_element.shape_value_component(idof,qpoint,istate);
+            }
+            else{
+                //Basis function idof of poly degree idegree evaluated at cubature node qpoint multiplied by quad weight.
+                this->oneD_vol_operator[iquad][idof] = quad_weights[iquad] * finite_element.shape_value_component(idof,qpoint,istate);
+            }
         }
     }
 }
@@ -1208,8 +1252,10 @@ template <int dim, int n_faces, typename real>
 local_mass<dim,n_faces,real>::local_mass(
     const int nstate_input,
     const unsigned int max_degree_input,
-    const unsigned int grid_degree_input)
+    const unsigned int grid_degree_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1217,34 +1263,44 @@ local_mass<dim,n_faces,real>::local_mass(
 
 template <int dim, int n_faces, typename real>  
 void local_mass<dim,n_faces,real>::build_1D_volume_operator(
-    const dealii::FESystem<1,1> &finite_element,
-    const dealii::Quadrature<1> &quadrature)
+    const dealii::FESystem<1,1> &finite_element_trial,
+    const dealii::FESystem<1,1> &finite_element_test,
+    const dealii::Quadrature<1> &quadrature,
+    const bool dif_test_trial)
 {
     const unsigned int n_quad_pts = quadrature.size();
-    const unsigned int n_dofs     = finite_element.dofs_per_cell;
+    const unsigned int n_dofs_trial     = finite_element_trial.dofs_per_cell;
+    const unsigned int n_dofs_test     = finite_element_test.dofs_per_cell;
     const std::vector<double> &quad_weights = quadrature.get_weights ();
     //allocate
-    this->oneD_vol_operator.reinit(n_dofs,n_dofs);
+    this->oneD_vol_operator.reinit(n_dofs_trial,n_dofs_trial);
+    //for index renumbering if based on an feq element
+    const std::vector<unsigned int > &index_renumbering = dealii::FETools::hierarchic_to_lexicographic_numbering<1>(current_degree);
     //loop and store
-    for (unsigned int itest=0; itest<n_dofs; ++itest) {
-        const int istate_test = finite_element.system_to_component_index(itest).first;
-        for (unsigned int itrial=itest; itrial<n_dofs; ++itrial) {
-            const int istate_trial = finite_element.system_to_component_index(itrial).first;
+    for (unsigned int itest=0; itest<n_dofs_test; ++itest) {
+        const int istate_test = finite_element_test.system_to_component_index(itest).first;
+       // for (unsigned int itrial=itest; itrial<n_dofs_trial; ++itrial) {
+        for (unsigned int itrial=0; itrial<n_dofs_trial; ++itrial) {
+            const int istate_trial = finite_element_trial.system_to_component_index(itrial).first;
             double value = 0.0;
             for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
                 const dealii::Point<1> qpoint  = quadrature.point(iquad);
                 value +=
-                         finite_element.shape_value_component(itest,qpoint,istate_test)
-                       * finite_element.shape_value_component(itrial,qpoint,istate_trial)
-                       * quad_weights[iquad];                            
+                        finite_element_test.shape_value_component(itest,qpoint,istate_test)
+                        * finite_element_trial.shape_value_component(itrial,qpoint,istate_trial)
+                        * quad_weights[iquad];                            
             }
+            const unsigned int index_test = (feq_order) ? index_renumbering[itest] : itest;//only renumber for test fn
+            const unsigned int index_trial = (!feq_order) ? itrial : ((dif_test_trial) ? itrial : index_renumbering[itrial]);
+            this->oneD_vol_operator[index_test][index_trial] = value;
 
-            this->oneD_vol_operator[itrial][itest] = 0.0;
-            this->oneD_vol_operator[itest][itrial] = 0.0;
-            if(istate_test==istate_trial) {
-                this->oneD_vol_operator[itrial][itest] = value;
-                this->oneD_vol_operator[itest][itrial] = value;
-            }
+            //Petrov-Galerkin mass matrix in general not symmetric
+    //        this->oneD_vol_operator[itrial][itest] = 0.0;
+    //        this->oneD_vol_operator[itest][itrial] = 0.0;
+    //        if(istate_test==istate_trial) {
+    //            this->oneD_vol_operator[itrial][itest] = value;
+    //            this->oneD_vol_operator[itest][itrial] = value;
+    //        }
         }
     }
 }
@@ -1359,7 +1415,7 @@ void modal_basis_differential_operator<dim,n_faces,real>::build_1D_volume_operat
 {
     const unsigned int n_dofs     = finite_element.dofs_per_cell;
     local_mass<dim,n_faces,real> mass_matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    mass_matrix.build_1D_volume_operator(finite_element, quadrature);
+    mass_matrix.build_1D_volume_operator(finite_element, finite_element, quadrature);
     local_basis_stiffness<dim,n_faces,real> stiffness(this->nstate, this->max_degree, this->max_grid_degree);
     stiffness.build_1D_volume_operator(finite_element, quadrature);
     //allocate
@@ -1409,9 +1465,11 @@ local_Flux_Reconstruction_operator<dim,n_faces,real>::local_Flux_Reconstruction_
     const int nstate_input,
     const unsigned int max_degree_input,
     const unsigned int grid_degree_input,
-    const Parameters::AllParameters::Flux_Reconstruction FR_param_input)
+    const Parameters::AllParameters::Flux_Reconstruction FR_param_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
     , FR_param_type(FR_param_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1547,7 +1605,7 @@ void local_Flux_Reconstruction_operator<dim,n_faces,real>::build_1D_volume_opera
     pth_derivative.build_1D_volume_operator(finite_element, quadrature);
 
     local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element, finite_element, quadrature);
     //solves
     build_local_Flux_Reconstruction_operator(local_Mass_Matrix.oneD_vol_operator, pth_derivative.oneD_vol_operator, n_dofs, FR_param, this->oneD_vol_operator);
 }
@@ -1654,9 +1712,11 @@ local_Flux_Reconstruction_operator_aux<dim,n_faces,real>::local_Flux_Reconstruct
     const int nstate_input,
     const unsigned int max_degree_input,
     const unsigned int grid_degree_input,
-    const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_aux_input)
+    const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_aux_input,
+    const bool use_feq_order)
     : local_Flux_Reconstruction_operator<dim,n_faces,real>::local_Flux_Reconstruction_operator(nstate_input, max_degree_input, grid_degree_input, Parameters::AllParameters::Flux_Reconstruction::cDG)
     , FR_param_aux_type(FR_param_aux_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1702,7 +1762,7 @@ void local_Flux_Reconstruction_operator_aux<dim,n_faces,real>::build_1D_volume_o
     derivative_p<dim,n_faces,real> pth_derivative(this->nstate, this->max_degree, this->max_grid_degree);
     pth_derivative.build_1D_volume_operator(finite_element, quadrature);
     local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element, finite_element, quadrature);
     //allocate the volume operator
     this->oneD_vol_operator.reinit(n_dofs, n_dofs);
     //solves
@@ -1713,8 +1773,10 @@ template <int dim, int n_faces, typename real>
 vol_projection_operator<dim,n_faces,real>::vol_projection_operator(
     const int nstate_input,
     const unsigned int max_degree_input,
-    const unsigned int grid_degree_input)
+    const unsigned int grid_degree_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1730,15 +1792,16 @@ void vol_projection_operator<dim,n_faces,real>::compute_local_vol_projection_ope
 }
 template <int dim, int n_faces, typename real>  
 void vol_projection_operator<dim,n_faces,real>::build_1D_volume_operator(
-    const dealii::FESystem<1,1> &finite_element,
+    const dealii::FESystem<1,1> &finite_element_trial,
+    const dealii::FESystem<1,1> &finite_element_test,
     const dealii::Quadrature<1> &quadrature)
 {
-    const unsigned int n_dofs     = finite_element.dofs_per_cell;
+    const unsigned int n_dofs     = finite_element_trial.dofs_per_cell;
     const unsigned int n_quad_pts = quadrature.size();
-    vol_integral_basis<dim,n_faces,real> integral_vol_basis(this->nstate, this->max_degree, this->max_grid_degree);
-    integral_vol_basis.build_1D_volume_operator(finite_element, quadrature);
-    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
+    vol_integral_basis<dim,n_faces,real> integral_vol_basis(this->nstate, this->max_degree, this->max_grid_degree, this->feq_order);
+    integral_vol_basis.build_1D_volume_operator(finite_element_test, quadrature);
+    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree, this->feq_order);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element_trial, finite_element_test, quadrature);
     dealii::FullMatrix<double> mass_inv(n_dofs);
     mass_inv.invert(local_Mass_Matrix.oneD_vol_operator);
     //allocate the volume operator
@@ -1753,10 +1816,12 @@ vol_projection_operator_FR<dim,n_faces,real>::vol_projection_operator_FR(
     const unsigned int max_degree_input,
     const unsigned int grid_degree_input,
     const Parameters::AllParameters::Flux_Reconstruction FR_param_input,
-    const bool store_transpose_input)
+    const bool store_transpose_input,
+    const bool use_feq_order)
     : vol_projection_operator<dim,n_faces,real>::vol_projection_operator(nstate_input, max_degree_input, grid_degree_input)
     , store_transpose(store_transpose_input)
     , FR_param_type(FR_param_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1764,15 +1829,16 @@ vol_projection_operator_FR<dim,n_faces,real>::vol_projection_operator_FR(
 
 template <int dim, int n_faces, typename real>  
 void vol_projection_operator_FR<dim,n_faces,real>::build_1D_volume_operator(
-    const dealii::FESystem<1,1> &finite_element,
+    const dealii::FESystem<1,1> &finite_element_trial,
+    const dealii::FESystem<1,1> &finite_element_test,
     const dealii::Quadrature<1> &quadrature)
 {
-    const unsigned int n_dofs     = finite_element.dofs_per_cell;
+    const unsigned int n_dofs     = finite_element_trial.dofs_per_cell;
     const unsigned int n_quad_pts = quadrature.size();
-    vol_integral_basis<dim,n_faces,real> integral_vol_basis(this->nstate, this->max_degree, this->max_grid_degree);
-    integral_vol_basis.build_1D_volume_operator(finite_element, quadrature);
-    FR_mass_inv<dim,n_faces,real> local_FR_Mass_Matrix_inv(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type);
-    local_FR_Mass_Matrix_inv.build_1D_volume_operator(finite_element, quadrature);
+    vol_integral_basis<dim,n_faces,real> integral_vol_basis(this->nstate, this->max_degree, this->max_grid_degree, this->feq_order);
+    integral_vol_basis.build_1D_volume_operator(finite_element_test, quadrature);
+    FR_mass_inv<dim,n_faces,real> local_FR_Mass_Matrix_inv(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type, this->feq_order);
+    local_FR_Mass_Matrix_inv.build_1D_volume_operator(finite_element_trial, finite_element_test, quadrature);
     //allocate the volume operator
     this->oneD_vol_operator.reinit(n_dofs, n_quad_pts);
     //solves
@@ -1793,10 +1859,12 @@ vol_projection_operator_FR_aux<dim,n_faces,real>::vol_projection_operator_FR_aux
     const unsigned int max_degree_input,
     const unsigned int grid_degree_input,
     const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input,
-    const bool store_transpose_input)
+    const bool store_transpose_input,
+    const bool use_feq_order)
     : vol_projection_operator<dim,n_faces,real>::vol_projection_operator(nstate_input, max_degree_input, grid_degree_input)
     , store_transpose(store_transpose_input)
     , FR_param_type(FR_param_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1809,10 +1877,10 @@ void vol_projection_operator_FR_aux<dim,n_faces,real>::build_1D_volume_operator(
 {
     const unsigned int n_dofs     = finite_element.dofs_per_cell;
     const unsigned int n_quad_pts = quadrature.size();
-    vol_integral_basis<dim,n_faces,real> integral_vol_basis(this->nstate, this->max_degree, this->max_grid_degree);
+    vol_integral_basis<dim,n_faces,real> integral_vol_basis(this->nstate, this->max_degree, this->max_grid_degree, this->feq_order);
     integral_vol_basis.build_1D_volume_operator(finite_element, quadrature);
-    FR_mass_inv_aux<dim,n_faces,real> local_FR_Mass_Matrix_inv(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type);
-    local_FR_Mass_Matrix_inv.build_1D_volume_operator(finite_element, quadrature);
+    FR_mass_inv_aux<dim,n_faces,real> local_FR_Mass_Matrix_inv(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type, this->feq_order);
+    local_FR_Mass_Matrix_inv.build_1D_volume_operator(finite_element, finite_element, quadrature);
     //allocate the volume operator
     this->oneD_vol_operator.reinit(n_dofs, n_quad_pts);
     //solves
@@ -1833,9 +1901,11 @@ FR_mass_inv<dim,n_faces,real>::FR_mass_inv(
     const int nstate_input,
     const unsigned int max_degree_input,
     const unsigned int grid_degree_input,
-    const Parameters::AllParameters::Flux_Reconstruction FR_param_input)
+    const Parameters::AllParameters::Flux_Reconstruction FR_param_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
     , FR_param_type(FR_param_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1843,14 +1913,16 @@ FR_mass_inv<dim,n_faces,real>::FR_mass_inv(
 
 template <int dim, int n_faces, typename real>  
 void FR_mass_inv<dim,n_faces,real>::build_1D_volume_operator(
-    const dealii::FESystem<1,1> &finite_element,
-    const dealii::Quadrature<1> &quadrature)
+    const dealii::FESystem<1,1> &finite_element_trial,
+    const dealii::FESystem<1,1> &finite_element_test,
+    const dealii::Quadrature<1> &quadrature, 
+    const bool dif_test_trial)
 {
-    const unsigned int n_dofs     = finite_element.dofs_per_cell;
-    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
-    local_Flux_Reconstruction_operator<dim,n_faces,real> local_FR_oper(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type);
-    local_FR_oper.build_1D_volume_operator(finite_element, quadrature);
+    const unsigned int n_dofs     = finite_element_trial.dofs_per_cell;
+    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree, this->feq_order);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element_trial, finite_element_test, quadrature, dif_test_trial);
+    local_Flux_Reconstruction_operator<dim,n_faces,real> local_FR_oper(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type, this->feq_order);
+    local_FR_oper.build_1D_volume_operator(finite_element_trial, quadrature);
     dealii::FullMatrix<double> FR_mass_matrix(n_dofs);
     FR_mass_matrix.add(1.0, local_Mass_Matrix.oneD_vol_operator, 1.0, local_FR_oper.oneD_vol_operator);
     //allocate the volume operator
@@ -1864,9 +1936,11 @@ FR_mass_inv_aux<dim,n_faces,real>::FR_mass_inv_aux(
     const int nstate_input,
     const unsigned int max_degree_input,
     const unsigned int grid_degree_input,
-    const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input)
+    const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
     , FR_param_type(FR_param_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1874,14 +1948,15 @@ FR_mass_inv_aux<dim,n_faces,real>::FR_mass_inv_aux(
 
 template <int dim, int n_faces, typename real>  
 void FR_mass_inv_aux<dim,n_faces,real>::build_1D_volume_operator(
-    const dealii::FESystem<1,1> &finite_element,
+    const dealii::FESystem<1,1> &finite_element_trial,
+    const dealii::FESystem<1,1> &finite_element_test,
     const dealii::Quadrature<1> &quadrature)
 {
-    const unsigned int n_dofs     = finite_element.dofs_per_cell;
-    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
-    local_Flux_Reconstruction_operator_aux<dim,n_faces,real> local_FR_oper(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type);
-    local_FR_oper.build_1D_volume_operator(finite_element, quadrature);
+    const unsigned int n_dofs     = finite_element_trial.dofs_per_cell;
+    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree, this->feq_order);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element_trial, finite_element_test, quadrature);
+    local_Flux_Reconstruction_operator_aux<dim,n_faces,real> local_FR_oper(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type, this->feq_order);
+    local_FR_oper.build_1D_volume_operator(finite_element_trial, quadrature);
     dealii::FullMatrix<double> FR_mass_matrix(n_dofs);
     FR_mass_matrix.add(1.0, local_Mass_Matrix.oneD_vol_operator, 1.0, local_FR_oper.oneD_vol_operator);
     //allocate the volume operator
@@ -1894,9 +1969,11 @@ FR_mass<dim,n_faces,real>::FR_mass(
     const int nstate_input,
     const unsigned int max_degree_input,
     const unsigned int grid_degree_input,
-    const Parameters::AllParameters::Flux_Reconstruction FR_param_input)
+    const Parameters::AllParameters::Flux_Reconstruction FR_param_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
     , FR_param_type(FR_param_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1908,9 +1985,9 @@ void FR_mass<dim,n_faces,real>::build_1D_volume_operator(
     const dealii::Quadrature<1> &quadrature)
 {
     const unsigned int n_dofs     = finite_element.dofs_per_cell;
-    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
-    local_Flux_Reconstruction_operator<dim,n_faces,real> local_FR_oper(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type);
+    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree, this->feq_order);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element, finite_element, quadrature);
+    local_Flux_Reconstruction_operator<dim,n_faces,real> local_FR_oper(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type, this->feq_order);
     local_FR_oper.build_1D_volume_operator(finite_element, quadrature);
     dealii::FullMatrix<double> FR_mass_matrix(n_dofs);
     FR_mass_matrix.add(1.0, local_Mass_Matrix.oneD_vol_operator, 1.0, local_FR_oper.oneD_vol_operator);
@@ -1924,9 +2001,11 @@ FR_mass_aux<dim,n_faces,real>::FR_mass_aux(
     const int nstate_input,
     const unsigned int max_degree_input,
     const unsigned int grid_degree_input,
-    const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input)
+    const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input,
+    const bool use_feq_order)
     : SumFactorizedOperators<dim,n_faces,real>::SumFactorizedOperators(nstate_input, max_degree_input, grid_degree_input)
     , FR_param_type(FR_param_input)
+    , feq_order(use_feq_order)
 {
     //Initialize to the max degrees
     current_degree      = max_degree_input;
@@ -1938,9 +2017,9 @@ void FR_mass_aux<dim,n_faces,real>::build_1D_volume_operator(
     const dealii::Quadrature<1> &quadrature)
 {
     const unsigned int n_dofs     = finite_element.dofs_per_cell;
-    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
-    local_Flux_Reconstruction_operator_aux<dim,n_faces,real> local_FR_oper(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type);
+    local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree, this->feq_order);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element, finite_element, quadrature);
+    local_Flux_Reconstruction_operator_aux<dim,n_faces,real> local_FR_oper(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type, this->feq_order);
     local_FR_oper.build_1D_volume_operator(finite_element, quadrature);
     dealii::FullMatrix<double> FR_mass_matrix(n_dofs);
     FR_mass_matrix.add(1.0, local_Mass_Matrix.oneD_vol_operator, 1.0, local_FR_oper.oneD_vol_operator);
@@ -2046,7 +2125,7 @@ void lifting_operator<dim,n_faces,real>::build_1D_volume_operator(
 {
     const unsigned int n_dofs = finite_element.dofs_per_cell;
     local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element, finite_element, quadrature);
     //allocate the volume operator
     this->oneD_vol_operator.reinit(n_dofs, n_dofs);
     //solves
@@ -2102,7 +2181,7 @@ void lifting_operator_FR<dim,n_faces,real>::build_1D_volume_operator(
 {
     const unsigned int n_dofs = finite_element.dofs_per_cell;
     local_mass<dim,n_faces,real> local_Mass_Matrix(this->nstate, this->max_degree, this->max_grid_degree);
-    local_Mass_Matrix.build_1D_volume_operator(finite_element, quadrature);
+    local_Mass_Matrix.build_1D_volume_operator(finite_element, finite_element, quadrature);
     local_Flux_Reconstruction_operator<dim,n_faces,real> local_FR(this->nstate, this->max_degree, this->max_grid_degree, FR_param_type);
     local_FR.build_1D_volume_operator(finite_element, quadrature);
     //allocate the volume operator

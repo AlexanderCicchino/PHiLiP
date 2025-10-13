@@ -179,6 +179,7 @@ void TVBLimiter<dim, nstate, real>::limit(
     const unsigned int                                      grid_degree,
     const unsigned int                                      max_degree,
     const dealii::hp::FECollection<1>                       oneD_fe_collection_1state,
+    const dealii::hp::FECollection<1>                       /*oneD_fe_collection_leg*/,
     dealii::hp::QCollection<1>                              oneD_quadrature_collection,
     double                                                  /*dt*/)
 {
@@ -200,7 +201,7 @@ void TVBLimiter<dim, nstate, real>::limit(
 
     //build the oneD operator to perform interpolation/projection
     soln_basis.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
-    soln_basis_projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+    soln_basis_projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
 
     for (auto soln_cell : dof_handler.active_cell_iterators()) {
         if (!soln_cell->is_locally_owned()) continue;

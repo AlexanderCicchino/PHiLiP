@@ -81,6 +81,10 @@ void AllParameters::declare_parameters (dealii::ParameterHandler &prm)
                       dealii::Patterns::Bool(),
                       "If true, use the ent sgs.");
 
+    prm.declare_entry("use_bern", "false",
+                      dealii::Patterns::Bool(),
+                      "If true, use the Bernstein poly.");
+
 //    prm.declare_entry("use_aux_grad_prim", "false",
 //                      dealii::Patterns::Bool(),
 //                      "If true, use the gradient of the primitive var for the auxiliary variable.");
@@ -488,6 +492,8 @@ const std::string test_string = prm.get("test_type");
     use_ec_entsgs = prm.get_bool("use_ec_entsgs");
 
     use_entsgs = prm.get_bool("use_entsgs");
+
+    use_bern = prm.get_bool("use_bern");
 
  //   use_aux_grad_prim = prm.get_bool("use_aux_grad_prim");
 

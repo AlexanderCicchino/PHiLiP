@@ -48,6 +48,9 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operators(
     OPERATOR::local_basis_stiffness<dim,2*dim,real>             &flux_basis_stiffness,
     OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper_int,
     OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<dim,2*dim,real>                   &/*test_basis*/,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>           &/*test_basis_projection_oper_int*/,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>           &/*test_basis_projection_oper_ext*/,
     OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper,
     OPERATOR::mapping_shape_functions<dim,2*dim,real>           &mapping_basis,
     std::array<std::vector<real>,dim>                      &mapping_support_points,
@@ -70,6 +73,8 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_volume_term_and_build_operators(
                                                       soln_basis, soln_basis, 
                                                       flux_basis, flux_basis, 
                                                       flux_basis_stiffness, 
+                                                      soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
+                                                      soln_basis, soln_basis, 
                                                       soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
                                                       mapping_basis);
     }
@@ -208,6 +213,10 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
     OPERATOR::local_basis_stiffness<dim,2*dim,real>             &flux_basis_stiffness,
     OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper_int,
     OPERATOR::vol_projection_operator<dim,2*dim,real>           &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<dim,2*dim,real>                   &/*test_basis_int*/,
+    OPERATOR::basis_functions<dim,2*dim,real>                   &/*test_basis_ext*/,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>           &/*test_basis_projection_oper_int*/,
+    OPERATOR::vol_projection_operator<dim,2*dim,real>           &/*test_basis_projection_oper_ext*/,
     OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper_int,
     OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper_ext,
     OPERATOR::mapping_shape_functions<dim,2*dim,real>           &mapping_basis,
@@ -243,6 +252,8 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_face_term_and_build_operators(
                                                       soln_basis_int, soln_basis_ext, 
                                                       flux_basis_int, flux_basis_ext, 
                                                       flux_basis_stiffness, 
+                                                      soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
+                                                      soln_basis_int, soln_basis_ext, 
                                                       soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
                                                       mapping_basis);
     }
@@ -374,6 +385,10 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_subface_term_and_build_operators
         flux_basis_stiffness,
         soln_basis_projection_oper_int,
         soln_basis_projection_oper_ext,
+        soln_basis_int,//future bug to deal with
+        soln_basis_ext,//future bug to deal with
+        soln_basis_projection_oper_int,//future bug to deal with
+        soln_basis_projection_oper_ext,//future bug to deal with
         metric_oper_int,
         metric_oper_ext,
         mapping_basis,
@@ -423,6 +438,8 @@ void DG_KMP<dim,nstate,real,MeshType>::compute_entropy_correction_coef_and_norm(
         soln_basis, soln_basis_ext,
         flux_basis, flux_basis_ext,
         flux_basis_stiffness,
+        soln_basis_projection_oper, soln_basis_projection_oper_ext,
+        soln_basis, soln_basis_ext,
         soln_basis_projection_oper, soln_basis_projection_oper_ext,
         mapping_basis);
 
@@ -952,6 +969,8 @@ void DG_KMP<dim,nstate,real,MeshType>::apply_entropy_correction()
         soln_basis, soln_basis_ext,
         flux_basis, flux_basis_ext,
         flux_basis_stiffness,
+        soln_basis_projection_oper, soln_basis_projection_oper_ext,
+        soln_basis, soln_basis_ext,
         soln_basis_projection_oper, soln_basis_projection_oper_ext,
         mapping_basis);
 
@@ -1743,6 +1762,11 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
         OPERATOR::mapping_shape_functions<dim,2*dim,real> mapping_basis(1, this->max_grid_degree, this->max_grid_degree);
         OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_int(1, this->max_degree, this->max_grid_degree); 
         OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_ext(1, this->max_degree, this->max_grid_degree); 
+
+        OPERATOR::basis_functions<dim,2*dim,real> test_basis_int(1, this->max_degree, this->max_grid_degree, this->all_parameters->use_bern); 
+        OPERATOR::basis_functions<dim,2*dim,real> test_basis_ext(1, this->max_degree, this->max_grid_degree, this->all_parameters->use_bern); 
+        OPERATOR::vol_projection_operator<dim,2*dim,real> test_basis_projection_oper_int(1, this->max_degree, this->max_grid_degree, this->all_parameters->use_bern); 
+        OPERATOR::vol_projection_operator<dim,2*dim,real> test_basis_projection_oper_ext(1, this->max_degree, this->max_grid_degree, this->all_parameters->use_bern); 
          
         this->reinit_operators_for_cell_residual_loop(
             this->max_degree, this->max_degree, this->max_grid_degree, 
@@ -1750,6 +1774,8 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
             flux_basis_int, flux_basis_ext, 
             flux_basis_stiffness, 
             soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
+            test_basis_int, test_basis_ext, 
+            test_basis_projection_oper_int, test_basis_projection_oper_ext,
             mapping_basis);
 
         //loop over cells solving for auxiliary rhs
@@ -1773,6 +1799,10 @@ void DG_KMP<dim,nstate,real,MeshType>::assemble_auxiliary_residual()
                 flux_basis_stiffness,
                 soln_basis_projection_oper_int, 
                 soln_basis_projection_oper_ext,
+                test_basis_int,
+                test_basis_ext,
+                test_basis_projection_oper_int, 
+                test_basis_projection_oper_ext,
                 mapping_basis,
                 true,
                 this->right_hand_side,

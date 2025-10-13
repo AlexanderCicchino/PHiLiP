@@ -20,14 +20,16 @@ void LimiterParam::declare_parameters (dealii::ParameterHandler &prm)
                            "maximum_principle | "
                            "positivity_preservingZhang2010 | "
                            "positivity_preservingWang2012 | "
-                           "min_entropy_principle "),
+                           "min_entropy_principle | "
+                           "slope_lim "),
                            "The type of limiter we want to apply to the solution. "
                            "Choices are "
                            " <none | "
                            " maximum_principle | "
                            " positivity_preservingZhang2010 | "
                            " positivity_preservingWang2012 | "
-                           " min_entropy_principle>.");
+                           " min_entropy_principle | "
+                           " slope_lim>.");
 
         prm.declare_entry("min_density", "1e-13",
                           dealii::Patterns::Double(1e-20, 1e200),
@@ -61,6 +63,7 @@ void LimiterParam::parse_parameters (dealii::ParameterHandler &prm)
         if (bound_preserving_limiter_string == "positivity_preservingZhang2010")     bound_preserving_limiter = LimiterType::positivity_preservingZhang2010;
         if (bound_preserving_limiter_string == "positivity_preservingWang2012")      bound_preserving_limiter = LimiterType::positivity_preservingWang2012;
         if (bound_preserving_limiter_string == "min_entropy_principle")      bound_preserving_limiter = LimiterType::min_entropy_principle;
+        if (bound_preserving_limiter_string == "slope_lim")      bound_preserving_limiter = LimiterType::slope_lim;
 
         min_density = prm.get_double("min_density");
 

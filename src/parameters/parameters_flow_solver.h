@@ -36,7 +36,7 @@ public:
         euler_density_wave,
         euler_acoustic_wave,
         euler_vorticity_wave,
-        burgers_limiter
+        burgers_limiter,
         double_mach_reflection,
         shock_diffraction,
         astrophysical_jet,

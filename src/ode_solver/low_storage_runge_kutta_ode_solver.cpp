@@ -56,6 +56,7 @@ void LowStorageRungeKuttaODESolver<dim,real,n_rk_stages, MeshType>::step_in_time
                 this->dg->high_order_grid->fe_system.tensor_degree(),
                 this->dg->max_degree,
                 this->dg->oneD_fe_collection_1state,
+                this->dg->oneD_fe_collection_leg,
                 this->dg->oneD_quadrature_collection,
                 dt);
         }
@@ -92,6 +93,7 @@ void LowStorageRungeKuttaODESolver<dim,real,n_rk_stages, MeshType>::step_in_time
                 this->dg->high_order_grid->fe_system.tensor_degree(),
                 this->dg->max_degree,
                 this->dg->oneD_fe_collection_1state,
+                this->dg->oneD_fe_collection_leg,
                 this->dg->oneD_quadrature_collection,
                 dt);
         }
@@ -111,6 +113,7 @@ void LowStorageRungeKuttaODESolver<dim,real,n_rk_stages, MeshType>::step_in_time
             this->dg->high_order_grid->fe_system.tensor_degree(),
             this->dg->max_degree,
             this->dg->oneD_fe_collection_1state,
+            this->dg->oneD_fe_collection_leg,
             this->dg->oneD_quadrature_collection,
             dt);
     }

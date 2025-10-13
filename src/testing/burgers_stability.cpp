@@ -67,7 +67,7 @@ double BurgersEnergyStability<dim, nstate>::compute_conservation(std::shared_ptr
     std::vector<double> ones_hat(n_dofs_cell);
     //We have to project the vector of ones because the mass matrix has an interpolation from solution nodes built into it.
     OPERATOR::vol_projection_operator<dim,2*dim,double> vol_projection(dg->nstate, poly_degree, dg->max_grid_degree);
-    vol_projection.build_1D_volume_operator(dg->oneD_fe_collection[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
+    vol_projection.build_1D_volume_operator(dg->oneD_fe_collection[poly_degree], dg->oneD_fe_collection[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
     vol_projection.matrix_vector_mult_1D(ones, ones_hat,
                                                vol_projection.oneD_vol_operator);
 
@@ -164,6 +164,7 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
    // ode_solver->limiter->set_cell_min_entropy(dg->solution,dg->dof_handler,dg->fe_collection,dg->volume_quadrature_collection,1,poly_degree,dg->oneD_fe_collection_1state, dg->oneD_quadrature_collection);
 
         double finalTime = 3.0;
+        finalTime = 1.5;
 
         if (all_parameters_new.use_energy == true){//for split form get energy
 
@@ -238,6 +239,8 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
             const unsigned int n_quad_pts = fe_values_extra.n_quadrature_points;
             std::array<double,nstate> soln_at_q;
             std::vector<dealii::types::global_dof_index> dofs_indices (fe_values_extra.dofs_per_cell);
+            OPERATOR::basis_functions<dim,2*dim,double> soln_basis(1, poly_degree, 1, this->all_parameters->use_bern); 
+            soln_basis.build_1D_volume_operator( dg->oneD_fe_collection_bern[poly_degree], dg->oneD_quadrature_collection[poly_degree]);
             
             for (auto cell = dg->dof_handler.begin_active(); cell!=dg->dof_handler.end(); ++cell) {
                 if (!cell->is_locally_owned()) continue;
@@ -248,8 +251,9 @@ int BurgersEnergyStability<dim, nstate>::run_test() const
                 for (unsigned int iquad=0; iquad<n_quad_pts; ++iquad) {
                     std::fill(soln_at_q.begin(), soln_at_q.end(), 0.0);
                     for (unsigned int idof=0; idof<fe_values_extra.dofs_per_cell; ++idof) {
-                        const unsigned int istate = fe_values_extra.get_fe().system_to_component_index(idof).first;
-                        soln_at_q[istate] += dg->solution[dofs_indices[idof]] * fe_values_extra.shape_value_component(idof, iquad, istate);
+                //        const unsigned int istate = fe_values_extra.get_fe().system_to_component_index(idof).first;
+                       // soln_at_q[istate] += dg->solution[dofs_indices[idof]] * fe_values_extra.shape_value_component(idof, iquad, istate);
+                        soln_at_q[0] += dg->solution[dofs_indices[idof]] * soln_basis.oneD_vol_operator[iquad][idof];
                     }
                     const dealii::Point<dim> qpoint = (fe_values_extra.quadrature_point(iquad));
 

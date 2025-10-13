@@ -83,7 +83,7 @@ int main (int argc, char * argv[])
         const dealii::FE_DGQArbitraryNodes<1> fe_dg(quad1D);
         const dealii::FESystem<1,1> fe_system(fe_dg, 1);
         basis.build_1D_surface_operator(fe_system,quad1D_surf);
-        mass.build_1D_volume_operator(fe_system,quad1D);
+        mass.build_1D_volume_operator(fe_system,fe_system, quad1D);
         basis.build_1D_volume_operator(fe_system,quad1D);
         basis.build_1D_gradient_operator(fe_system,quad1D);
         const std::vector<real> &weights = quad1D.get_weights();

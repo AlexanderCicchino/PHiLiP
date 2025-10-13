@@ -18,7 +18,8 @@ public:
         maximum_principle,
         positivity_preservingZhang2010,
         positivity_preservingWang2012,
-        min_entropy_principle
+        min_entropy_principle,
+        slope_lim
     };
     /// Variable to store specified limiter type
     LimiterType bound_preserving_limiter;

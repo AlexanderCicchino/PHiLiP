@@ -23,6 +23,7 @@
 #include <deal.II/lac/sparse_matrix.h>
 
 #include <deal.II/fe/fe_dgq.h>
+#include <deal.II/fe/fe_bernstein.h>
 
 //#include <deal.II/fe/mapping_q1.h> // Might need mapping_q
 #include <deal.II/fe/mapping_q.h> // Might need mapping_q
@@ -89,7 +90,9 @@ DGBase<dim,real,MeshType>::DGBase(
     , oneD_fe_collection(std::get<4>(collection_tuple))
     , oneD_fe_collection_1state(std::get<5>(collection_tuple))
     , oneD_fe_collection_flux(std::get<6>(collection_tuple))
-    , oneD_quadrature_collection(std::get<7>(collection_tuple))
+    , oneD_fe_collection_bern(std::get<7>(collection_tuple))
+    , oneD_fe_collection_leg(std::get<8>(collection_tuple))
+    , oneD_quadrature_collection(std::get<9>(collection_tuple))
     , oneD_face_quadrature(max_degree)
     , dof_handler(*triangulation, true)
     , high_order_grid(std::make_shared<HighOrderGrid<dim,real,MeshType>>(grid_degree_input, triangulation, all_parameters->check_valid_metric_Jacobian, all_parameters->do_renumber_dofs, all_parameters->output_high_order_grid))
@@ -138,6 +141,8 @@ std::tuple<
         dealii::hp::FECollection<1>, // Solution FE 1D
         dealii::hp::FECollection<1>, // Solution FE 1D for a single state
         dealii::hp::FECollection<1>,  // Collocated flux basis 1D for Strong
+        dealii::hp::FECollection<1>,  // bern
+        dealii::hp::FECollection<1>,  // Legendre
         dealii::hp::QCollection<1> >// 1D quadrature for strong form
 DGBase<dim,real,MeshType>::create_collection_tuple(
     const unsigned int max_degree, 
@@ -153,6 +158,9 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
 
     dealii::hp::FECollection<dim>      fe_coll_lagr;
     dealii::hp::FECollection<1>        fe_coll_lagr_1D;
+
+    dealii::hp::FECollection<1>        fe_coll_bern;
+    dealii::hp::FECollection<1>        fe_coll_leg;
 
     const unsigned int overintegration = parameters_input->overintegration;
     using FluxNodes = Parameters::AllParameters::FluxNodes;
@@ -173,6 +181,21 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
         fe_coll_1D.push_back (fe_system_1D);
         const dealii::FESystem<1,1> fe_system_1D_1state(fe_dg_1D, 1);
         fe_coll_1D_1state.push_back (fe_system_1D_1state);
+
+
+        const dealii::FE_Bernstein<1> fe_bern(degree);
+       // const dealii::FE_DGQLegendre<1> fe_bern(degree);
+        const dealii::FESystem<1,1> fe_system_bern(fe_bern, 1);
+        fe_coll_bern.push_back (fe_system_bern);
+//        if(parameters_input->use_bern){
+//            fe_coll_1D_1state.push_back (fe_system_bern);
+//        }
+//        else{
+//            fe_coll_1D_1state.push_back (fe_system_1D_1state);
+//        }
+        const dealii::FE_DGQLegendre<1> fe_leg(degree);
+        const dealii::FESystem<1,1> fe_system_leg(fe_leg, 1);
+        fe_coll_leg.push_back (fe_system_leg);
 
         dealii::Quadrature<1>     oneD_quad(integration_strength);
         dealii::Quadrature<dim>   volume_quad(integration_strength);
@@ -216,6 +239,22 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
         const dealii::FESystem<1,1> fe_system_1D_1state(fe_dg_1D, 1);
         fe_coll_1D_1state.push_back (fe_system_1D_1state);
 
+        unsigned int deg_bern = degree;
+        if(degree == 0) deg_bern = 1;
+        const dealii::FE_Bernstein<1> fe_bern(deg_bern);
+       // const dealii::FE_DGQLegendre<1> fe_bern(deg_bern);
+        const dealii::FESystem<1,1> fe_system_bern(fe_bern, 1);
+        fe_coll_bern.push_back (fe_system_bern);
+//        if(parameters_input->use_bern){
+//            fe_coll_1D_1state.push_back (fe_system_bern);
+//        }
+//        else{
+//            fe_coll_1D_1state.push_back (fe_system_1D_1state);
+//        }
+        const dealii::FE_DGQLegendre<1> fe_leg(deg_bern);
+        const dealii::FESystem<1,1> fe_system_leg(fe_leg, 1);
+        fe_coll_leg.push_back (fe_system_leg);
+
         const unsigned int integration_strength = degree+1+overintegration;
 
         dealii::Quadrature<1>     oneD_quad(integration_strength);
@@ -257,7 +296,7 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
         dealii::FE_DGQArbitraryNodes<1,1> lagrange_poly_1d(oneD_quad);
         fe_coll_lagr_1D.push_back (lagrange_poly_1d);
     }
-    return std::make_tuple(fe_coll, volume_quad_coll, face_quad_coll, fe_coll_lagr, fe_coll_1D, fe_coll_1D_1state, fe_coll_lagr_1D, oneD_quad_coll);
+    return std::make_tuple(fe_coll, volume_quad_coll, face_quad_coll, fe_coll_lagr, fe_coll_1D, fe_coll_1D_1state, fe_coll_lagr_1D, fe_coll_bern, fe_coll_bern, oneD_quad_coll);
 }
 
 
@@ -467,6 +506,10 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
     OPERATOR::local_basis_stiffness<dim,2*dim,real>   &flux_basis_stiffness,
     OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper_int,
     OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<dim,2*dim,real>         &test_basis_int,
+    OPERATOR::basis_functions<dim,2*dim,real>         &test_basis_ext,
+    OPERATOR::vol_projection_operator<dim,2*dim,real> &test_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<dim,2*dim,real> &test_basis_projection_oper_ext,
     OPERATOR::mapping_shape_functions<dim,2*dim,real> &mapping_basis,
     const bool compute_auxiliary_right_hand_side,
     dealii::LinearAlgebra::distributed::Vector<double> &rhs,
@@ -532,6 +575,9 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
         flux_basis_stiffness,
         soln_basis_projection_oper_int,
         soln_basis_projection_oper_ext,
+        test_basis_int,
+        test_basis_projection_oper_int,
+        test_basis_projection_oper_ext,
         metric_oper_int,
         mapping_basis,
         mapping_support_points,
@@ -645,6 +691,10 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                     flux_basis_stiffness,
                     soln_basis_projection_oper_int,
                     soln_basis_projection_oper_ext,
+                    test_basis_int,
+                    test_basis_ext,
+                    test_basis_projection_oper_int,
+                    test_basis_projection_oper_ext,
                     metric_oper_int,
                     metric_oper_ext,
                     mapping_basis,
@@ -815,6 +865,10 @@ void DGBase<dim,real,MeshType>::assemble_cell_residual (
                 flux_basis_stiffness,
                 soln_basis_projection_oper_int,
                 soln_basis_projection_oper_ext,
+                test_basis_int,
+                test_basis_ext,
+                test_basis_projection_oper_int,
+                test_basis_projection_oper_ext,
                 metric_oper_int,
                 metric_oper_ext,
                 mapping_basis,
@@ -1053,18 +1107,12 @@ void DGBase<dim,real,MeshType>::reinit_operators_for_cell_residual_loop(
     OPERATOR::local_basis_stiffness<dim,2*dim,real> &flux_basis_stiffness,
     OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper_int,
     OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<dim,2*dim,real> &test_basis_int,
+    OPERATOR::basis_functions<dim,2*dim,real> &test_basis_ext,
+    OPERATOR::vol_projection_operator<dim,2*dim,real> &test_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<dim,2*dim,real> &test_basis_projection_oper_ext,
     OPERATOR::mapping_shape_functions<dim,2*dim,real> &mapping_basis)
 {
-    soln_basis_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
-    soln_basis_int.build_1D_gradient_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
-    soln_basis_int.build_1D_surface_operator(oneD_fe_collection_1state[poly_degree_int], oneD_face_quadrature);
-    soln_basis_int.build_1D_surface_gradient_operator(oneD_fe_collection_1state[poly_degree_int], oneD_face_quadrature);
-
-    soln_basis_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
-    soln_basis_ext.build_1D_gradient_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
-    soln_basis_ext.build_1D_surface_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_face_quadrature);
-    soln_basis_ext.build_1D_surface_gradient_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_face_quadrature);
-
     flux_basis_int.build_1D_volume_operator(oneD_fe_collection_flux[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
     flux_basis_int.build_1D_gradient_operator(oneD_fe_collection_flux[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
     flux_basis_int.build_1D_surface_operator(oneD_fe_collection_flux[poly_degree_int], oneD_face_quadrature);
@@ -1079,12 +1127,52 @@ void DGBase<dim,real,MeshType>::reinit_operators_for_cell_residual_loop(
     flux_basis_stiffness.build_1D_volume_operator(oneD_fe_collection_flux[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
 
     //basis functions projection operator
-    soln_basis_projection_oper_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
-    soln_basis_projection_oper_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+    soln_basis_projection_oper_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+    soln_basis_projection_oper_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_fe_collection_1state[poly_degree_ext], oneD_quadrature_collection[poly_degree_int]);
 
     //We only need to compute the most recent mapping basis since we compute interior before looping faces
     mapping_basis.build_1D_shape_functions_at_grid_nodes(high_order_grid->oneD_fe_system, high_order_grid->oneD_grid_nodes);
     mapping_basis.build_1D_shape_functions_at_flux_nodes(high_order_grid->oneD_fe_system, oneD_quadrature_collection[poly_degree_ext], oneD_face_quadrature);
+
+    //for testbasis
+    if(this->all_parameters->use_bern){
+        soln_basis_int.build_1D_volume_operator(  oneD_fe_collection_bern[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+        soln_basis_int.build_1D_gradient_operator(oneD_fe_collection_bern[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+        soln_basis_int.build_1D_surface_operator( oneD_fe_collection_bern[poly_degree_int], oneD_face_quadrature);
+        soln_basis_int.build_1D_surface_gradient_operator(oneD_fe_collection_bern[poly_degree_int], oneD_face_quadrature);
+         
+        soln_basis_ext.build_1D_volume_operator(  oneD_fe_collection_bern[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+        soln_basis_ext.build_1D_gradient_operator(oneD_fe_collection_bern[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+        soln_basis_ext.build_1D_surface_operator( oneD_fe_collection_bern[poly_degree_ext], oneD_face_quadrature);
+        soln_basis_ext.build_1D_surface_gradient_operator(oneD_fe_collection_bern[poly_degree_ext], oneD_face_quadrature);
+
+        test_basis_int.build_1D_volume_operator(oneD_fe_collection_bern[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+        test_basis_int.build_1D_surface_operator(oneD_fe_collection_bern[poly_degree_int], oneD_face_quadrature);
+        test_basis_ext.build_1D_volume_operator(oneD_fe_collection_bern[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+        test_basis_ext.build_1D_surface_operator(oneD_fe_collection_bern[poly_degree_ext], oneD_face_quadrature);
+       // test_basis_projection_oper_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_fe_collection_bern[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+       // test_basis_projection_oper_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_fe_collection_bern[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+        test_basis_projection_oper_int.build_1D_volume_operator(oneD_fe_collection_bern[poly_degree_int], oneD_fe_collection_bern[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+        test_basis_projection_oper_ext.build_1D_volume_operator(oneD_fe_collection_bern[poly_degree_ext], oneD_fe_collection_bern[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+    }
+    else{
+        soln_basis_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+        soln_basis_int.build_1D_gradient_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+        soln_basis_int.build_1D_surface_operator(oneD_fe_collection_1state[poly_degree_int], oneD_face_quadrature);
+        soln_basis_int.build_1D_surface_gradient_operator(oneD_fe_collection_1state[poly_degree_int], oneD_face_quadrature);
+         
+        soln_basis_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+        soln_basis_ext.build_1D_gradient_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+        soln_basis_ext.build_1D_surface_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_face_quadrature);
+        soln_basis_ext.build_1D_surface_gradient_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_face_quadrature);
+
+        test_basis_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+        test_basis_int.build_1D_surface_operator(oneD_fe_collection_1state[poly_degree_int], oneD_face_quadrature);
+        test_basis_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+        test_basis_ext.build_1D_surface_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_face_quadrature);
+        test_basis_projection_oper_int.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_int], oneD_fe_collection_1state[poly_degree_int], oneD_quadrature_collection[poly_degree_int]);
+        test_basis_projection_oper_ext.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree_ext], oneD_fe_collection_1state[poly_degree_ext], oneD_quadrature_collection[poly_degree_ext]);
+    }
 }
 
 template <int dim, typename real, typename MeshType>
@@ -1214,14 +1302,29 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
     dealii::hp::FEValues<dim,dim>        fe_values_collection_volume_lagrange (mapping_collection, fe_collection_lagrange, volume_quadrature_collection, this->volume_update_flags);
 
     const unsigned int init_grid_degree = high_order_grid->fe_system.tensor_degree();
-    OPERATOR::basis_functions<dim,2*dim,real> soln_basis_int(1, max_degree, init_grid_degree); 
-    OPERATOR::basis_functions<dim,2*dim,real> soln_basis_ext(1, max_degree, init_grid_degree); 
+    OPERATOR::basis_functions<dim,2*dim,real> soln_basis_int(1, max_degree, init_grid_degree, this->all_parameters->use_bern); 
+    OPERATOR::basis_functions<dim,2*dim,real> soln_basis_ext(1, max_degree, init_grid_degree, this->all_parameters->use_bern); 
+   // OPERATOR::basis_functions<dim,2*dim,real> soln_basis_int(1, max_degree, init_grid_degree); 
+   // OPERATOR::basis_functions<dim,2*dim,real> soln_basis_ext(1, max_degree, init_grid_degree); 
     OPERATOR::basis_functions<dim,2*dim,real> flux_basis_int(1, max_degree, init_grid_degree); 
     OPERATOR::basis_functions<dim,2*dim,real> flux_basis_ext(1, max_degree, init_grid_degree); 
     OPERATOR::local_basis_stiffness<dim,2*dim,real> flux_basis_stiffness(1, max_degree, init_grid_degree, true); 
+   // OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_int(1, max_degree, init_grid_degree, this->all_parameters->use_bern); 
+   // OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_ext(1, max_degree, init_grid_degree, this->all_parameters->use_bern); 
     OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_int(1, max_degree, init_grid_degree); 
     OPERATOR::vol_projection_operator<dim,2*dim,real> soln_basis_projection_oper_ext(1, max_degree, init_grid_degree); 
     OPERATOR::mapping_shape_functions<dim,2*dim,real> mapping_basis(1, init_grid_degree, init_grid_degree);
+
+    //for DPG
+    OPERATOR::basis_functions<dim,2*dim,real> test_basis_int(1, max_degree, init_grid_degree, this->all_parameters->use_bern); 
+    OPERATOR::basis_functions<dim,2*dim,real> test_basis_ext(1, max_degree, init_grid_degree, this->all_parameters->use_bern); 
+    OPERATOR::vol_projection_operator<dim,2*dim,real> test_basis_projection_oper_int(1, max_degree, init_grid_degree, this->all_parameters->use_bern); 
+    OPERATOR::vol_projection_operator<dim,2*dim,real> test_basis_projection_oper_ext(1, max_degree, init_grid_degree, this->all_parameters->use_bern); 
+   // OPERATOR::basis_functions<dim,2*dim,real> test_basis_int(1, max_degree, init_grid_degree); 
+   // OPERATOR::basis_functions<dim,2*dim,real> test_basis_ext(1, max_degree, init_grid_degree); 
+   // OPERATOR::vol_projection_operator<dim,2*dim,real> test_basis_projection_oper_int(1, max_degree, init_grid_degree); 
+   // OPERATOR::vol_projection_operator<dim,2*dim,real> test_basis_projection_oper_ext(1, max_degree, init_grid_degree); 
+
 
     reinit_operators_for_cell_residual_loop(
         max_degree, max_degree, init_grid_degree, 
@@ -1229,6 +1332,8 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
         flux_basis_int, flux_basis_ext, 
         flux_basis_stiffness, 
         soln_basis_projection_oper_int, soln_basis_projection_oper_ext,
+        test_basis_int, test_basis_ext,
+        test_basis_projection_oper_int, test_basis_projection_oper_ext,
         mapping_basis);
 
     solution.update_ghost_values();
@@ -1281,6 +1386,10 @@ void DGBase<dim,real,MeshType>::assemble_residual (const bool compute_dRdW, cons
                 flux_basis_stiffness,
                 soln_basis_projection_oper_int,
                 soln_basis_projection_oper_ext,
+                test_basis_int,
+                test_basis_ext,
+                test_basis_projection_oper_int,
+                test_basis_projection_oper_ext,
                 mapping_basis,
                 false,
                 right_hand_side,
@@ -2060,7 +2169,12 @@ void DGBase<dim,real,MeshType>::reinit_operators_for_mass_matrix(
     mapping_basis.build_1D_shape_functions_at_volume_flux_nodes(high_order_grid->oneD_fe_system, oneD_quadrature_collection[poly_degree]);
 
     if(Cartesian_element || this->all_parameters->use_weight_adjusted_mass){//then we can factor out det of Jac and rapidly simplify
-        reference_mass_matrix.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+        if(this->all_parameters->use_bern){
+            reference_mass_matrix.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_bern[poly_degree], oneD_quadrature_collection[poly_degree]);
+        }
+        else{
+            reference_mass_matrix.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+        }
     }
     if(grid_degree > 1 || !Cartesian_element){//then we need to construct dim matrices on the fly
         basis.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]); 
@@ -2479,11 +2593,16 @@ void DGBase<dim,real,MeshType>::apply_inverse_global_mass_matrix(
     const unsigned int init_grid_degree = high_order_grid->fe_system.tensor_degree();
     OPERATOR::mapping_shape_functions<dim,2*dim,real> mapping_basis(1, init_grid_degree, init_grid_degree);
      
-    OPERATOR::FR_mass_inv<dim,2*dim,real> mass_inv(1, max_degree, init_grid_degree, FR_Type);
-    OPERATOR::FR_mass_inv_aux<dim,2*dim,real> mass_inv_aux(1, max_degree, init_grid_degree, FR_Type_Aux);
+    OPERATOR::FR_mass_inv<dim,2*dim,real> mass_inv(1, max_degree, init_grid_degree, FR_Type, this->all_parameters->use_bern);
+    OPERATOR::FR_mass_inv_aux<dim,2*dim,real> mass_inv_aux(1, max_degree, init_grid_degree, FR_Type_Aux, this->all_parameters->use_bern);
      
-    OPERATOR::vol_projection_operator_FR<dim,2*dim,real> projection_oper(1, max_degree, init_grid_degree, FR_Type, true);
-    OPERATOR::vol_projection_operator_FR_aux<dim,2*dim,real> projection_oper_aux(1, max_degree, init_grid_degree, FR_Type_Aux, true);
+    OPERATOR::vol_projection_operator_FR<dim,2*dim,real> projection_oper(1, max_degree, init_grid_degree, FR_Type, true, this->all_parameters->use_bern);
+    OPERATOR::vol_projection_operator_FR_aux<dim,2*dim,real> projection_oper_aux(1, max_degree, init_grid_degree, FR_Type_Aux, true, this->all_parameters->use_bern);
+  //  OPERATOR::FR_mass_inv<dim,2*dim,real> mass_inv(1, max_degree, init_grid_degree, FR_Type);
+  //  OPERATOR::FR_mass_inv_aux<dim,2*dim,real> mass_inv_aux(1, max_degree, init_grid_degree, FR_Type_Aux);
+  //   
+  //  OPERATOR::vol_projection_operator_FR<dim,2*dim,real> projection_oper(1, max_degree, init_grid_degree, FR_Type, true);
+  //  OPERATOR::vol_projection_operator_FR_aux<dim,2*dim,real> projection_oper_aux(1, max_degree, init_grid_degree, FR_Type_Aux, true);
      
     mapping_basis.build_1D_shape_functions_at_volume_flux_nodes(high_order_grid->oneD_fe_system, oneD_quadrature_collection[max_degree]);
      
@@ -2497,10 +2616,26 @@ void DGBase<dim,real,MeshType>::apply_inverse_global_mass_matrix(
 
     if(Cartesian_first_element){//then we can factor out det of Jac and rapidly simplify
         if(use_auxiliary_eq){
-            mass_inv_aux.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+            if(this->all_parameters->use_bern){
+                //basis lag test bern
+               // mass_inv_aux.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_bern[max_degree], oneD_quadrature_collection[max_degree]);
+               //basis and test both bern
+                mass_inv_aux.build_1D_volume_operator(oneD_fe_collection_bern[max_degree], oneD_fe_collection_bern[max_degree], oneD_quadrature_collection[max_degree]);
+            }
+            else{
+                mass_inv_aux.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+            }
         }
         else{
-            mass_inv.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+            if(this->all_parameters->use_bern){
+                //basis lag test bern
+               // mass_inv.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_bern[max_degree], oneD_quadrature_collection[max_degree], true);
+               //basis and test both bern
+                mass_inv.build_1D_volume_operator(oneD_fe_collection_bern[max_degree], oneD_fe_collection_bern[max_degree], oneD_quadrature_collection[max_degree], false);
+            }
+            else{
+                mass_inv.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+            }
         }
     }
     else{//we always use weight-adjusted for curvilinear based off the projection operator
@@ -2508,7 +2643,15 @@ void DGBase<dim,real,MeshType>::apply_inverse_global_mass_matrix(
             projection_oper_aux.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
         }
         else{
-            projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+            if(this->all_parameters->use_bern){
+                //basis lag test bern
+               // projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_bern[max_degree], oneD_quadrature_collection[max_degree]);
+               //basis and test both bern
+                projection_oper.build_1D_volume_operator(oneD_fe_collection_bern[max_degree], oneD_fe_collection_bern[max_degree], oneD_quadrature_collection[max_degree]);
+            }
+            else{
+                projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+            }
         }
     }
 
@@ -2534,13 +2677,23 @@ void DGBase<dim,real,MeshType>::apply_inverse_global_mass_matrix(
         {
             mapping_basis.build_1D_shape_functions_at_volume_flux_nodes(high_order_grid->oneD_fe_system, oneD_quadrature_collection[poly_degree]);
             if(Cartesian_element){//then we can factor out det of Jac and rapidly simplify
-                mass_inv.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+                if(this->all_parameters->use_bern){
+                    mass_inv.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_bern[poly_degree], oneD_quadrature_collection[poly_degree], true);
+                }
+                else{
+                    mass_inv.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+                }
                 if(use_auxiliary_eq){
-                    mass_inv_aux.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+                    if(this->all_parameters->use_bern){
+                        mass_inv_aux.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_bern[poly_degree], oneD_quadrature_collection[poly_degree]);
+                    }
+                    else{
+                        mass_inv_aux.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+                    }
                 }
             }
             else{//we always use weight-adjusted for curvilinear based off the projection operator
-                projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+                projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[poly_degree]);
                 if(use_auxiliary_eq){
                     projection_oper_aux.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
                 }
@@ -2656,10 +2809,14 @@ void DGBase<dim,real,MeshType>::apply_global_mass_matrix(
     const unsigned int init_grid_degree = high_order_grid->fe_system.tensor_degree();
     OPERATOR::mapping_shape_functions<dim,2*dim,real> mapping_basis(1, max_degree, init_grid_degree);
      
-    OPERATOR::FR_mass<dim,2*dim,real> mass(1, max_degree, init_grid_degree, FR_Type);
-    OPERATOR::FR_mass_aux<dim,2*dim,real> mass_aux(1, max_degree, init_grid_degree, FR_Type_Aux);
+    OPERATOR::FR_mass<dim,2*dim,real> mass(1, max_degree, init_grid_degree, FR_Type, this->all_parameters->use_bern);
+    OPERATOR::FR_mass_aux<dim,2*dim,real> mass_aux(1, max_degree, init_grid_degree, FR_Type_Aux, this->all_parameters->use_bern);
      
-    OPERATOR::vol_projection_operator<dim,2*dim,real> projection_oper(1, max_degree, init_grid_degree);
+    OPERATOR::vol_projection_operator<dim,2*dim,real> projection_oper(1, max_degree, init_grid_degree, this->all_parameters->use_bern);
+   // OPERATOR::FR_mass<dim,2*dim,real> mass(1, max_degree, init_grid_degree, FR_Type);
+   // OPERATOR::FR_mass_aux<dim,2*dim,real> mass_aux(1, max_degree, init_grid_degree, FR_Type_Aux);
+   //  
+   // OPERATOR::vol_projection_operator<dim,2*dim,real> projection_oper(1, max_degree, init_grid_degree);
      
     mapping_basis.build_1D_shape_functions_at_volume_flux_nodes(high_order_grid->oneD_fe_system, oneD_quadrature_collection[max_degree]);
      
@@ -2674,13 +2831,21 @@ void DGBase<dim,real,MeshType>::apply_global_mass_matrix(
     if(use_auxiliary_eq){
         mass_aux.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
         if(grid_degree>1 || !Cartesian_first_element){
-            projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+            projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
         }
     }
     else{
+        if(this->all_parameters->use_bern){
+        mass.build_1D_volume_operator(oneD_fe_collection_bern[max_degree], oneD_quadrature_collection[max_degree]);
+        if(grid_degree>1 || !Cartesian_first_element){
+            projection_oper.build_1D_volume_operator(oneD_fe_collection_bern[max_degree], oneD_fe_collection_bern[max_degree], oneD_quadrature_collection[max_degree]);
+        }
+        }
+        else{
         mass.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
         if(grid_degree>1 || !Cartesian_first_element){
-            projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+            projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[max_degree], oneD_fe_collection_1state[max_degree], oneD_quadrature_collection[max_degree]);
+        }
         }
     }
 
@@ -2702,13 +2867,13 @@ void DGBase<dim,real,MeshType>::apply_global_mass_matrix(
                 if(use_auxiliary_eq){
                     mass_aux.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
                     if(grid_degree>1 || !Cartesian_element){
-                        projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+                        projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
                     }
                 }
                 else{
                     mass.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
                     if(grid_degree>1 || !Cartesian_element){
-                        projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
+                        projection_oper.build_1D_volume_operator(oneD_fe_collection_1state[poly_degree], oneD_fe_collection_1state[poly_degree], oneD_quadrature_collection[poly_degree]);
                     }
                 }
         }
@@ -3084,6 +3249,10 @@ DGBase<PHILIP_DIM,double,dealii::Triangulation<PHILIP_DIM>>::assemble_cell_resid
     OPERATOR::local_basis_stiffness<PHILIP_DIM,2*PHILIP_DIM,double> &flux_basis_stiffness,
     OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &soln_basis_projection_oper_int,
     OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_int,
+    OPERATOR::basis_functions<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_ext,
+    OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_projection_oper_ext,
     OPERATOR::mapping_shape_functions<PHILIP_DIM,2*PHILIP_DIM,double> &mapping_basis,
     const bool compute_auxiliary_right_hand_side,
     dealii::LinearAlgebra::distributed::Vector<double> &rhs,
@@ -3106,6 +3275,10 @@ DGBase<PHILIP_DIM,double,dealii::parallel::distributed::Triangulation<PHILIP_DIM
     OPERATOR::local_basis_stiffness<PHILIP_DIM,2*PHILIP_DIM,double> &flux_basis_stiffness,
     OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &soln_basis_projection_oper_int,
     OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_int,
+    OPERATOR::basis_functions<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_ext,
+    OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_projection_oper_ext,
     OPERATOR::mapping_shape_functions<PHILIP_DIM,2*PHILIP_DIM,double> &mapping_basis,
     const bool compute_auxiliary_right_hand_side,
     dealii::LinearAlgebra::distributed::Vector<double> &rhs,
@@ -3128,6 +3301,10 @@ DGBase<PHILIP_DIM,double,dealii::parallel::shared::Triangulation<PHILIP_DIM>>::a
     OPERATOR::local_basis_stiffness<PHILIP_DIM,2*PHILIP_DIM,double> &flux_basis_stiffness,
     OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &soln_basis_projection_oper_int,
     OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &soln_basis_projection_oper_ext,
+    OPERATOR::basis_functions<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_int,
+    OPERATOR::basis_functions<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_ext,
+    OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_projection_oper_int,
+    OPERATOR::vol_projection_operator<PHILIP_DIM,2*PHILIP_DIM,double> &test_basis_projection_oper_ext,
     OPERATOR::mapping_shape_functions<PHILIP_DIM,2*PHILIP_DIM,double> &mapping_basis,
     const bool compute_auxiliary_right_hand_side,
     dealii::LinearAlgebra::distributed::Vector<double> &rhs,

@@ -241,6 +241,7 @@ real RootFindingRRKODESolver<dim,real,MeshType>::compute_integrated_numerical_en
 
     OPERATOR::vol_projection_operator<dim,2*dim,double> vol_projection(1, poly_degree, dg->max_grid_degree);
     vol_projection.build_1D_volume_operator(dg->oneD_fe_collection_1state[poly_degree], 
+                                            dg->oneD_fe_collection_1state[poly_degree],
                                             dg->oneD_quadrature_collection[poly_degree]);
 
     // Construct the basis functions and mapping shape functions.

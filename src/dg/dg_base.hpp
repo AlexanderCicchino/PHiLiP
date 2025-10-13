@@ -142,6 +142,8 @@ public:
         dealii::hp::FECollection<1>,  // Solution FE 1D
         dealii::hp::FECollection<1>,  // Solution FE 1D for a single state
         dealii::hp::FECollection<1>,   // Collocated flux basis 1D for strong form
+        dealii::hp::FECollection<1>,   //  bern
+        dealii::hp::FECollection<1>,   //  Legendre
         dealii::hp::QCollection<1> >; // 1D quadrature for strong form
 
     /// Delegated constructor that initializes collections.
@@ -227,6 +229,10 @@ public:
         OPERATOR::local_basis_stiffness<dim,2*dim,real>   &flux_basis_stiffness,
         OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper_int,
         OPERATOR::vol_projection_operator<dim,2*dim,real> &soln_basis_projection_oper_ext,
+        OPERATOR::basis_functions<dim,2*dim,real>         &test_basis_int,
+        OPERATOR::basis_functions<dim,2*dim,real>         &test_basis_ext,
+        OPERATOR::vol_projection_operator<dim,2*dim,real> &test_basis_projection_oper_int,
+        OPERATOR::vol_projection_operator<dim,2*dim,real> &test_basis_projection_oper_ext,
         OPERATOR::mapping_shape_functions<dim,2*dim,real> &mapping_basis);
 
     /// Builds needed operators to compute mass matrices/inverses efficiently.
@@ -593,6 +599,10 @@ public:
         OPERATOR::local_basis_stiffness<dim,2*dim,real>                    &flux_basis_stiffness,
         OPERATOR::vol_projection_operator<dim,2*dim,real>                  &soln_basis_projection_oper_int,
         OPERATOR::vol_projection_operator<dim,2*dim,real>                  &soln_basis_projection_oper_ext,
+        OPERATOR::basis_functions<dim,2*dim,real>                          &test_basis_int,
+        OPERATOR::basis_functions<dim,2*dim,real>                          &test_basis_ext,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>                  &test_basis_projection_oper_int,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>                  &test_basis_projection_oper_ext,
         OPERATOR::mapping_shape_functions<dim,2*dim,real>                  &mapping_basis,
         const bool                                                         compute_auxiliary_right_hand_side,//flag on whether computing the Auxiliary variable's equations' residuals
         dealii::LinearAlgebra::distributed::Vector<double>                 &rhs,
@@ -634,6 +644,13 @@ public:
     /// 1D collocated flux basis used in strong form
     /** This is a collection of collocated Lagrange bases for 1D.*/
     const dealii::hp::FECollection<1>  oneD_fe_collection_flux;
+
+    /// Bernstein fe for dpg.
+    const dealii::hp::FECollection<1>    oneD_fe_collection_bern;
+
+    /// Legendre fe for limiting.
+    const dealii::hp::FECollection<1>    oneD_fe_collection_leg;
+
     /// 1D quadrature to generate Lagrange polynomials for the sake of flux interpolation.
     dealii::hp::QCollection<1>       oneD_quadrature_collection;
     /// 1D surface quadrature is always one single point for all poly degrees.
@@ -691,6 +708,9 @@ protected:
         OPERATOR::local_basis_stiffness<dim,2*dim,real>        &flux_basis_stiffness,
         OPERATOR::vol_projection_operator<dim,2*dim,real>      &soln_basis_projection_oper_int,
         OPERATOR::vol_projection_operator<dim,2*dim,real>      &soln_basis_projection_oper_ext,
+        OPERATOR::basis_functions<dim,2*dim,real>              &test_basis,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper_int,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper_ext,
         OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper,
         OPERATOR::mapping_shape_functions<dim,2*dim,real>      &mapping_basis,
         std::array<std::vector<real>,dim>                      &mapping_support_points,
@@ -752,6 +772,10 @@ protected:
         OPERATOR::local_basis_stiffness<dim,2*dim,real>        &flux_basis_stiffness,
         OPERATOR::vol_projection_operator<dim,2*dim,real>      &soln_basis_projection_oper_int,
         OPERATOR::vol_projection_operator<dim,2*dim,real>      &soln_basis_projection_oper_ext,
+        OPERATOR::basis_functions<dim,2*dim,real>              &test_basis_int,
+        OPERATOR::basis_functions<dim,2*dim,real>              &test_basis_ext,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper_int,
+        OPERATOR::vol_projection_operator<dim,2*dim,real>      &test_basis_projection_oper_ext,
         OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper_int,
         OPERATOR::metric_operators<real,dim,2*dim>             &metric_oper_ext,
         OPERATOR::mapping_shape_functions<dim,2*dim,real>      &mapping_basis,

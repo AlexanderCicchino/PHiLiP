@@ -5,6 +5,7 @@
 #include "maximum_principle_limiter.h"
 #include "positivity_preserving_limiter.h"
 #include "min_entropy_principle_limiter.h"
+#include "slope_limiter.h"
 
 namespace PHiLiP {
 template <int dim, int nstate, typename real>
@@ -73,6 +74,8 @@ std::unique_ptr< BoundPreservingLimiter<dim, real> >
         }
     } else if (limiter_type == limiter_enum::min_entropy_principle) {
         return std::make_unique< MinEntropyPrincipleLimiter<dim, nstate, real> >(parameters_input);
+    } else if (limiter_type == limiter_enum::slope_lim) {
+        return std::make_unique< SlopeLimiter<dim, nstate, real> >(parameters_input);
     }
 
     std::cout << "Error: Cannot create limiter pointer due to an invalid limiter type specified" << std::endl;

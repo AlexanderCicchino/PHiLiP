@@ -385,7 +385,11 @@ public:
     basis_functions (
         const int nstate_input,
         const unsigned int max_degree_input,
-        const unsigned int grid_degree_input);
+        const unsigned int grid_degree_input,
+        const bool use_feq_order = false);
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
@@ -420,7 +424,11 @@ public:
     vol_integral_basis (
         const int nstate_input,
         const unsigned int max_degree_input,
-        const unsigned int grid_degree_input);
+        const unsigned int grid_degree_input,
+        const bool use_feq_order = false);
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     /// Stores the degree of the current poly degree.
     unsigned int current_degree;
@@ -440,15 +448,21 @@ public:
     local_mass (
         const int nstate_input,
         const unsigned int max_degree_input,
-        const unsigned int grid_degree_input);
+        const unsigned int grid_degree_input,
+        const bool use_feq_order = false);
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     /// Stores the degree of the current poly degree.
     unsigned int current_degree;
 
     /// Assembles the one dimensional operator.
     void build_1D_volume_operator(
-            const dealii::FESystem<1,1> &finite_element,
-            const dealii::Quadrature<1> &quadrature); //override;
+            const dealii::FESystem<1,1> &finite_element_trial,
+            const dealii::FESystem<1,1> &finite_element_test,
+            const dealii::Quadrature<1> &quadrature,
+            const bool dif_test_trial = false); //override;
 
     /// Assemble the dim mass matrix on the fly with metric Jacobian dependence.
     /** Note: n_shape_functions is not the same as n_dofs, but the number of 
@@ -544,13 +558,17 @@ public:
         const int nstate_input,
         const unsigned int max_degree_input,
         const unsigned int grid_degree_input,
-        const Parameters::AllParameters::Flux_Reconstruction FR_param_input);
+        const Parameters::AllParameters::Flux_Reconstruction FR_param_input,
+        const bool use_feq_order = false);
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
 
     ///Flux reconstruction parameter type.
     const Parameters::AllParameters::Flux_Reconstruction FR_param_type;
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     ///Flux reconstruction paramater value.
     double FR_param;
@@ -660,13 +678,17 @@ public:
         const int nstate_input,
         const unsigned int max_degree_input,
         const unsigned int grid_degree_input,
-        const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_aux_input);
+        const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_aux_input,
+        const bool use_feq_order = false);
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
 
     ///Flux reconstruction parameter type.
     const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_aux_type;
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     ///Flux reconstruction paramater value.
     double FR_param_aux;
@@ -698,7 +720,11 @@ public:
     vol_projection_operator (
         const int nstate_input,
         const unsigned int max_degree_input,
-        const unsigned int grid_degree_input);
+        const unsigned int grid_degree_input,
+        const bool use_feq_order = false);
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
@@ -711,7 +737,8 @@ public:
 
     ///Assembles the one dimensional operator.
     void build_1D_volume_operator(
-            const dealii::FESystem<1,1> &finite_element,
+            const dealii::FESystem<1,1> &finite_element_trial,
+            const dealii::FESystem<1,1> &finite_element_test,
             const dealii::Quadrature<1> &quadrature);
 };
 
@@ -726,7 +753,8 @@ public:
         const unsigned int max_degree_input,
         const unsigned int grid_degree_input,
         const Parameters::AllParameters::Flux_Reconstruction FR_param_input,
-        const bool store_transpose_input = false);
+        const bool store_transpose_input = false,
+        const bool use_feq_order = false);
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
@@ -737,9 +765,13 @@ public:
     ///Flux reconstruction parameter type.
     const Parameters::AllParameters::Flux_Reconstruction FR_param_type;
 
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
+
     ///Assembles the one dimensional operator.
     void build_1D_volume_operator(
-            const dealii::FESystem<1,1> &finite_element,
+            const dealii::FESystem<1,1> &finite_element_trial,
+            const dealii::FESystem<1,1> &finite_element_test,
             const dealii::Quadrature<1> &quadrature);
 
     ///Stores the transpose of the operator for fast weight-adjusted solves.
@@ -757,7 +789,8 @@ public:
         const unsigned int max_degree_input,
         const unsigned int grid_degree_input,
         const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input,
-        const bool store_transpose_input = false);
+        const bool store_transpose_input = false,
+        const bool use_feq_order = false);
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
@@ -767,6 +800,9 @@ public:
 
     ///Flux reconstruction parameter type.
     const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_type;
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     ///Assembles the one dimensional operator.
     void build_1D_volume_operator(
@@ -787,7 +823,8 @@ public:
         const int nstate_input,
         const unsigned int max_degree_input,
         const unsigned int grid_degree_input,
-        const Parameters::AllParameters::Flux_Reconstruction FR_param_input);
+        const Parameters::AllParameters::Flux_Reconstruction FR_param_input,
+        const bool use_feq_order = false);
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
@@ -795,10 +832,15 @@ public:
     ///Flux reconstruction parameter type.
     const Parameters::AllParameters::Flux_Reconstruction FR_param_type;
 
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
+
     ///Assembles the one dimensional operator.
     void build_1D_volume_operator(
-            const dealii::FESystem<1,1> &finite_element,
-            const dealii::Quadrature<1> &quadrature);
+            const dealii::FESystem<1,1> &finite_element_trial,//trial fn
+            const dealii::FESystem<1,1> &finite_element_test,//test fn
+            const dealii::Quadrature<1> &quadrature,
+            const bool dif_test_trial = false);
 };
 ///The metric independent inverse of the FR mass matrix for auxiliary equation \f$(M+K)^{-1}\f$.
 template<int dim, int n_faces, typename real>
@@ -810,7 +852,8 @@ public:
         const int nstate_input,
         const unsigned int max_degree_input,
         const unsigned int grid_degree_input,
-        const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input);
+        const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input,
+        const bool use_feq_order = false);
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
@@ -818,9 +861,13 @@ public:
     ///Flux reconstruction parameter type.
     const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_type;
 
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
+
     ///Assembles the one dimensional operator.
     void build_1D_volume_operator(
-            const dealii::FESystem<1,1> &finite_element,
+            const dealii::FESystem<1,1> &finite_element_trial,//trial fn
+            const dealii::FESystem<1,1> &finite_element_test,//test fn
             const dealii::Quadrature<1> &quadrature);
 };
 ///The metric independent FR mass matrix \f$(M+K)\f$.
@@ -833,13 +880,17 @@ public:
         const int nstate_input,
         const unsigned int max_degree_input,
         const unsigned int grid_degree_input,
-        const Parameters::AllParameters::Flux_Reconstruction FR_param_input);
+        const Parameters::AllParameters::Flux_Reconstruction FR_param_input,
+        const bool use_feq_order = false);
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
 
     ///Flux reconstruction parameter type.
     const Parameters::AllParameters::Flux_Reconstruction FR_param_type;
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     ///Assembles the one dimensional operator.
     void build_1D_volume_operator(
@@ -857,13 +908,17 @@ public:
         const int nstate_input,
         const unsigned int max_degree_input,
         const unsigned int grid_degree_input,
-        const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input);
+        const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_input,
+        const bool use_feq_order = false);
 
     ///Stores the degree of the current poly degree.
     unsigned int current_degree;
 
     ///Flux reconstruction parameter type.
     const Parameters::AllParameters::Flux_Reconstruction_Aux FR_param_type;
+
+    ///Bool for using feq order or tensor product);
+    const bool feq_order;
 
     ///Assembles the one dimensional operator.
     void build_1D_volume_operator(

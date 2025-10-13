@@ -106,6 +106,9 @@ public:
     /// Flag to use ent sgs.
     bool use_entsgs;
 
+    /// Flag to use Bernstein poly.
+    bool use_bern;
+
 //    /// Flag to use aux as gradient of primitive.
 //    bool use_aux_grad_prim;
 

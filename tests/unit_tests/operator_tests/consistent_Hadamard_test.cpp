@@ -74,7 +74,7 @@ int main (int argc, char * argv[])
         const dealii::FE_DGQArbitraryNodes<1> fe_dg(quad1D);
         const dealii::FESystem<1,1> fe_system(fe_dg, 1);
         stiffness.build_1D_volume_operator(fe_system,quad1D);
-        mass.build_1D_volume_operator(fe_system,quad1D);
+        mass.build_1D_volume_operator(fe_system,fe_system,quad1D);
         const std::vector<real> &quad_weights_1D = quad1D.get_weights();
 
         const unsigned int n_dofs = pow(poly_degree+1,dim);

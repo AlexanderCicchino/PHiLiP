@@ -1,5 +1,5 @@
-#ifndef __MIN_ENTROPY_PRINCIPLE_LIMITER__
-#define __MIN_ENTROPY_PRINCIPLE_LIMITER__
+#ifndef __SLOPE_LIMITER__
+#define __SLOPE_LIMITER__
 
 #include "bound_preserving_limiter.h"
 #include "physics/burgers.h"
@@ -7,15 +7,15 @@
 namespace PHiLiP {
 /// Class for implementation of min entropy principle limiter.
 template<int dim, int nstate, typename real>
-class MinEntropyPrincipleLimiter : public BoundPreservingLimiterState <dim, nstate, real>
+class SlopeLimiter : public BoundPreservingLimiterState <dim, nstate, real>
 {
 public:
     /// Constructor
-    explicit MinEntropyPrincipleLimiter(
+    explicit SlopeLimiter(
         const Parameters::AllParameters* const parameters_input);
 
     /// Destructor
-    ~MinEntropyPrincipleLimiter() = default;
+    ~SlopeLimiter() = default;
 
     /// Pointer to TVB limiter class (TVB limiter can be applied in conjunction with this limiter)
     std::shared_ptr<BoundPreservingLimiterState<dim, nstate, real>> tvbLimiter;
