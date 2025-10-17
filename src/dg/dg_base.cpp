@@ -89,7 +89,8 @@ DGBase<dim,real,MeshType>::DGBase(
     , oneD_fe_collection(std::get<4>(collection_tuple))
     , oneD_fe_collection_1state(std::get<5>(collection_tuple))
     , oneD_fe_collection_flux(std::get<6>(collection_tuple))
-    , oneD_quadrature_collection(std::get<7>(collection_tuple))
+    , oneD_fe_collection_leg(std::get<7>(collection_tuple))
+    , oneD_quadrature_collection(std::get<8>(collection_tuple))
     , oneD_face_quadrature(max_degree)
     , dof_handler(*triangulation, true)
     , high_order_grid(std::make_shared<HighOrderGrid<dim,real,MeshType>>(grid_degree_input, triangulation, all_parameters->check_valid_metric_Jacobian, all_parameters->do_renumber_dofs, all_parameters->output_high_order_grid))
@@ -138,6 +139,7 @@ std::tuple<
         dealii::hp::FECollection<1>, // Solution FE 1D
         dealii::hp::FECollection<1>, // Solution FE 1D for a single state
         dealii::hp::FECollection<1>,  // Collocated flux basis 1D for Strong
+        dealii::hp::FECollection<1>,  // Legendre basis
         dealii::hp::QCollection<1> >// 1D quadrature for strong form
 DGBase<dim,real,MeshType>::create_collection_tuple(
     const unsigned int max_degree, 
@@ -153,6 +155,8 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
 
     dealii::hp::FECollection<dim>      fe_coll_lagr;
     dealii::hp::FECollection<1>        fe_coll_lagr_1D;
+
+    dealii::hp::FECollection<1>        fe_coll_leg;
 
     const unsigned int overintegration = parameters_input->overintegration;
     using FluxNodes = Parameters::AllParameters::FluxNodes;
@@ -200,6 +204,10 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
 
         dealii::FE_DGQArbitraryNodes<1,1> lagrange_poly_1D(oneD_quad);
         fe_coll_lagr_1D.push_back (lagrange_poly_1D);
+
+        const dealii::FE_DGQLegendre<1> fe_leg(degree);
+        const dealii::FESystem<1,1> fe_system_leg(fe_leg, 1);
+        fe_coll_leg.push_back (fe_system_leg);
     }
 
     int minimum_degree = (flux_nodes_type==FluxNodes::GLL) ?  1 :  0;
@@ -215,6 +223,12 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
         fe_coll_1D.push_back (fe_system_1D);
         const dealii::FESystem<1,1> fe_system_1D_1state(fe_dg_1D, 1);
         fe_coll_1D_1state.push_back (fe_system_1D_1state);
+
+        const unsigned int deg_leg = (degree==0) ? 1 : degree;
+        const dealii::FE_DGQLegendre<1> fe_leg(deg_leg);
+        const dealii::FESystem<1,1> fe_system_leg(fe_leg, 1);
+        fe_coll_leg.push_back (fe_system_leg);
+
 
         const unsigned int integration_strength = degree+1+overintegration;
 
@@ -257,7 +271,7 @@ DGBase<dim,real,MeshType>::create_collection_tuple(
         dealii::FE_DGQArbitraryNodes<1,1> lagrange_poly_1d(oneD_quad);
         fe_coll_lagr_1D.push_back (lagrange_poly_1d);
     }
-    return std::make_tuple(fe_coll, volume_quad_coll, face_quad_coll, fe_coll_lagr, fe_coll_1D, fe_coll_1D_1state, fe_coll_lagr_1D, oneD_quad_coll);
+    return std::make_tuple(fe_coll, volume_quad_coll, face_quad_coll, fe_coll_lagr, fe_coll_1D, fe_coll_1D_1state, fe_coll_lagr_1D, fe_coll_leg, oneD_quad_coll);
 }
 
 

@@ -685,18 +685,31 @@ std::array<real,nstate> Euler<dim, nstate, real>
     std::array<real,nstate> entropy_var;
     const real density = conservative_soln[0];
     const real pressure = compute_pressure<real>(conservative_soln);
-    
+
     const real entropy = compute_entropy<real>(density, pressure);
 
-    const real rho_theta = pressure / gamm1;
-
-    entropy_var[0] = (rho_theta *(gam + 1.0 - entropy) - conservative_soln[nstate-1])/rho_theta;
+    entropy_var[0] = (gam - entropy + 1.0 )/gamm1 - conservative_soln[nstate-1] / pressure;
     for(int idim=0; idim<dim; idim++){
-        entropy_var[idim+1] = conservative_soln[idim+1] / rho_theta;
+        entropy_var[idim+1] = conservative_soln[idim+1] / pressure;
     }
-    entropy_var[nstate-1] = - density / rho_theta;
+    entropy_var[nstate-1] = - density / pressure;
 
     return entropy_var;
+//    std::array<real,nstate> entropy_var;
+//    const real density = conservative_soln[0];
+//    const real pressure = compute_pressure<real>(conservative_soln);
+//    
+//    const real entropy = compute_entropy<real>(density, pressure);
+//
+//    const real rho_theta = pressure / gamm1;
+//
+//    entropy_var[0] = (rho_theta *(gam + 1.0 - entropy) - conservative_soln[nstate-1])/rho_theta;
+//    for(int idim=0; idim<dim; idim++){
+//        entropy_var[idim+1] = conservative_soln[idim+1] / rho_theta;
+//    }
+//    entropy_var[nstate-1] = - density / rho_theta;
+//
+//    return entropy_var;
 }
 
 template <int dim, int nstate, typename real>

@@ -212,6 +212,7 @@ public:
         HROM_error_post_sampling,
         hyper_adaptive_sampling_new_error,
         halton_sampling_run,
+        euler_density_wave,
         low_density
     };
     /// Store selected TestType from the input file.

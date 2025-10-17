@@ -49,6 +49,7 @@ void RungeKuttaBase<dim, real, n_rk_stages, MeshType>::apply_limiter (real dt)
             this->dg->high_order_grid->fe_system.tensor_degree(),
             this->dg->max_degree,
             this->dg->oneD_fe_collection_1state,
+            this->dg->oneD_fe_collection_leg,
             this->dg->oneD_quadrature_collection,
             dt);
     }

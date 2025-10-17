@@ -142,6 +142,7 @@ public:
         dealii::hp::FECollection<1>,  // Solution FE 1D
         dealii::hp::FECollection<1>,  // Solution FE 1D for a single state
         dealii::hp::FECollection<1>,   // Collocated flux basis 1D for strong form
+        dealii::hp::FECollection<1>,   // Legendre
         dealii::hp::QCollection<1> >; // 1D quadrature for strong form
 
     /// Delegated constructor that initializes collections.
@@ -628,6 +629,10 @@ public:
     /// 1D collocated flux basis used in strong form
     /** This is a collection of collocated Lagrange bases for 1D.*/
     const dealii::hp::FECollection<1>  oneD_fe_collection_flux;
+
+    /// Legendre fe for limiting.
+    const dealii::hp::FECollection<1>    oneD_fe_collection_leg;
+
     /// 1D quadrature to generate Lagrange polynomials for the sake of flux interpolation.
     dealii::hp::QCollection<1>       oneD_quadrature_collection;
     /// 1D surface quadrature is always one single point for all poly degrees.
