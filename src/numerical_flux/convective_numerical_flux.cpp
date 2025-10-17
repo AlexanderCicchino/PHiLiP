@@ -333,7 +333,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     const std::array<real, nstate> &soln_ext,
     const dealii::Tensor<1,dim,real> &normal_int) const
 {
-#if 0
+//#if 0
     //ROE SCHEME WITH ENTORPY FIX
     // See Blazek 2015, p.103-105
     // -- Note: Modified calculation of alpha_{3,4} to use 
@@ -591,7 +591,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     #endif
 
     return numerical_flux_dot_n;
-#endif
+//#endif
 
 #if 0
     //ROE - CUSP idea
@@ -1247,7 +1247,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
     return dissipation;
 #endif
 
-//#if 0
+#if 0
 //HLLC dissipation
 // Using HLLC from Appendix B of Yu Lv and Matthias Ihme, 2014, Discontinuous Galerkin method for
     // multicomponent chemically reacting ﬂows and combustion.
@@ -1510,7 +1510,7 @@ std::array<real, nstate> RoeBaseRiemannSolverDissipation<dim,nstate,real>
 
     return numerical_flux_dot_n;
 
-//#endif
+#endif
 
 #if 0
 //entropy diss roe
