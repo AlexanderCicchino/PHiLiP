@@ -109,6 +109,21 @@ real RungeKuttaODESolver<dim,real,n_rk_stages,MeshType>::adjust_time_step (real 
     return dt;
 }
 
+template<int dim, typename real, int n_rk_stages, typename MeshType>
+void RungeKuttaODESolver<dim,real,n_rk_stages,MeshType>::calculate_lim_stage(const int istage, real dt)
+{
+    //get the limited prev rk stage from the limited solution
+    this->temp_rk_stage=0.0;
+    for(int jstage=0; jstage<istage-1; jstage++){
+        this->temp_rk_stage.add(this->butcher_tableau->get_a(istage,jstage), this->rk_stage[jstage]);
+    }
+    this->rk_stage[istage-1] = 0.0;
+    this->rk_stage[istage-1].add(1.0,this->dg->solution);
+    this->rk_stage[istage-1].add(-1.0, this->solution_update);
+    this->rk_stage[istage-1].add(-dt, this->temp_rk_stage);
+    this->rk_stage[istage-1] /= (dt*this->butcher_tableau->get_a(istage,istage-1));
+}
+
 template <int dim, typename real, int n_rk_stages, typename MeshType> 
 void RungeKuttaODESolver<dim,real,n_rk_stages,MeshType>::allocate_runge_kutta_system ()
 {

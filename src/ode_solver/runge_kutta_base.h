@@ -49,6 +49,9 @@ public:
 
     /// Function to adjust time step size
     virtual real adjust_time_step(real dt) = 0;             
+
+    //calc limited stages for slope limiter
+    virtual void calculate_lim_stage(const int istage, real dt) = 0;
 protected:
 
     /// Stores functions related to relaxation Runge-Kutta (RRK).
@@ -63,6 +66,9 @@ protected:
 
     /// Storage for the derivative at each Runge-Kutta stage
     std::vector<dealii::LinearAlgebra::distributed::Vector<double>> rk_stage;
+
+    /// Storage for the derivative at each Runge-Kutta stage
+    dealii::LinearAlgebra::distributed::Vector<double> temp_rk_stage;
     
     /// Indicator for zero diagonal elements; used to toggle implicit solve.
     std::vector<bool> butcher_tableau_aii_is_zero;

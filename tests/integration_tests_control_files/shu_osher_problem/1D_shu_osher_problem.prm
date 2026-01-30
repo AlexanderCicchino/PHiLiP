@@ -5,10 +5,12 @@
 set dimension = 1
 set run_type = flow_simulation
 set pde_type = euler
+#set pde_type = navier_stokes
 
 # DG formulation
 set use_weak_form = false
 set flux_nodes_type = GLL
+set overintegration = 0
 
 # Strong DG - LaxF
 #set use_split_form = false
@@ -18,14 +20,16 @@ set flux_nodes_type = GLL
 set use_split_form = true
 set two_point_num_flux_type = Ra
 set conv_num_flux = two_point_flux_with_roe_dissipation
+#set conv_num_flux = two_point_flux_with_lax_friedrichs_dissipation
 #set conv_num_flux = roe
 set flux_reconstruction = cDG
 #set flux_reconstruction = cPlus
 set use_inverse_mass_on_the_fly = true
 
 subsection limiter
-  set bound_preserving_limiter = positivity_preservingWang2012
-  #set bound_preserving_limiter = slope_lim
+ set bound_preserving_limiter = positivity_preservingWang2012
+ # set bound_preserving_limiter = slope_lim
+ # set bound_preserving_limiter = char_max_princ
   set min_density = 1e-13
 end
 
@@ -34,9 +38,12 @@ subsection ODE solver
   set ode_output = verbose
   set ode_solver_type = runge_kutta
   set initial_time_step = 0.00000001
-  #set output_solution_every_x_steps = 100
+ # set output_solution_every_x_steps = 1
+ # set output_solution_every_x_steps = 10
   set output_solution_every_dt_time_intervals = 0.1
   set runge_kutta_method = ssprk3_ex
+ # set runge_kutta_method = heun2_ex
+ # set runge_kutta_method = euler_ex
   set print_iteration_modulo = 1
 end
 
@@ -51,8 +58,10 @@ subsection flow_solver
   set poly_degree = 3
   set final_time = 1.8
   #set constant_time_step = 0.0024
-  set courant_friedrichs_lewy_number = 0.5
-  #set courant_friedrichs_lewy_number = 0.3
+ # set courant_friedrichs_lewy_number = 0.5
+  set courant_friedrichs_lewy_number = 0.2
+ # set courant_friedrichs_lewy_number = 0.1
+ # set courant_friedrichs_lewy_number = 0.05
   set adaptive_time_step = true
   set unsteady_data_table_filename = shu_osher_shock_energy
   subsection grid
@@ -60,6 +69,9 @@ subsection flow_solver
     set grid_right_bound = 5.0
     subsection grid_rectangle
       set number_of_grid_elements_x = 100
+    #  set number_of_grid_elements_x = 200
+     # set number_of_grid_elements_x = 400
+     # set number_of_grid_elements_x = 2000
 	end
   end
 end

@@ -46,6 +46,7 @@ set(TESTS_SOURCE
     halton_sampling_run.cpp
     bound_preserving_limiter_tests.cpp
     naca0012_unsteady_check_quick.cpp
+    euler_density_wave.cpp
     )
 
 foreach(dim RANGE 1 3)

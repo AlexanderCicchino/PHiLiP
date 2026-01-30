@@ -956,6 +956,8 @@ template <int dim, int nstate, typename real>
 inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
 ::value(const dealii::Point<dim,real> &point, const unsigned int istate) const
 {
+//Density wave (Entropy wave)
+//#if 0
     real value = 0.0;
     real pi = dealii::numbers::PI;
     real rho = 0.0;
@@ -990,6 +992,74 @@ inline real InitialConditionFunction_EulerDensityWave<dim,nstate,real>
        // value = 20.0/(0.4) + 0.5*rho*(0.1*0.1);
 
     return value;
+//#endif
+
+
+//Acoustic Wave
+#if 0
+    real value = 0.0;
+    const real rho0 = 1.0;       // background density
+    const real p0   = 1.0;       // background pressure
+    const real gamma = 1.4;      // ideal gas
+    const real epsilon = 1e-3;   // amplitude of perturbation
+    const real sigma = 0.1;      // width of Gaussian pulse
+    const real x0 = 0.0;         // pulse center x
+    const real y0 = 0.0;         // pulse center y
+    real x = point[0];
+    real y = point[1];
+    real c0 = std::sqrt(gamma * p0 / rho0); // sound speed
+    real r2 = (x - x0)*(x - x0) + (y - y0)*(y - y0);
+    real dp = epsilon * std::exp(-r2 / (2.0 * sigma*sigma));
+    real p = p0 +dp;
+    real rho = rho0 +dp/(c0*c0);
+    real u = dp / (rho0 * c0);
+    real v = dp / (rho0 * c0);
+    real E = p/0.4 + 0.5*rho*(u*u+v*v);
+    if(istate==0)//rho
+        value = rho;
+    if(istate==1)//u
+        value = u;
+    if(istate==2 && dim > 1)//v
+        value = v;
+    if(istate==2 && dim==1)//E
+        value = E;
+       // value = 1.0/(0.4) + 0.5*rho;//Jesse's
+    if(istate==3 && dim==3)//w
+        value = 0.0;
+    if((istate==3 && dim==2) || istate==4)//E
+        value = E;
+
+    return value;
+#endif
+
+//Vortical Wave
+#if 0
+    real value = 0.0;
+    real pi = dealii::numbers::PI;
+    real rho = 2.0;
+    real k = 2.0*pi/2.0;
+    real k2 = sqrt(2*k*k);
+    real eps = 0.5;
+    real velx = 0.1 + eps * k/k2*sin(k*point[0]+k*point[0]);
+    real vely = 0.2 - eps * k/k2*sin(k*point[0]+k*point[0]);
+    real p = 20.0;
+
+    if(istate==0)//rho
+        value = rho;
+    if(istate==1)//u
+        value = velx;
+    if(istate==2 && dim > 1)//v
+        value = vely;
+    if(istate==2 && dim==1)//E
+        value = p/(0.4) + 0.5*rho*(velx*velx);
+       // value = 1.0/(0.4) + 0.5*rho;//Jesse's
+    if(istate==3 && dim==3)//w
+        value = 0.0;
+    if((istate==3 && dim==2) || istate==4)//E
+        value = p/(0.4) + 0.5*rho*(velx*velx + vely*vely);
+
+    return value;
+#endif
 }
 
 // ========================================================
@@ -1089,6 +1159,8 @@ InitialConditionFactory<dim,nstate, real>::create_InitialConditionFunction(
         if constexpr (dim < 3 && nstate == 1)  return std::make_shared<InitialConditionFunction_Advection<dim, nstate, real> >();
     } else if (flow_type == FlowCaseEnum::burgers_limiter) {
         if constexpr (nstate==dim && dim<3) return std::make_shared<InitialConditionFunction_BurgersInviscid<dim, nstate, real> >();
+    } else if (flow_type == FlowCaseEnum::euler_density_wave){
+        if constexpr (nstate == dim+2) return std::make_unique<InitialConditionFunction_EulerDensityWave<dim, nstate, real>>();
     }else {
         std::cout << "Invalid Flow Case Type. You probably forgot to add it to the list of flow cases in initial_condition_function.cpp" << std::endl;
         std::abort();

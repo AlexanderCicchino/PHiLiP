@@ -37,6 +37,9 @@ public:
     /// Function to adjust time step size
     real adjust_time_step (real dt) override;
 
+    //calc limited stages for slope limiter
+    void calculate_lim_stage(const int istage, real dt) override;
+
 protected:
     /// Stores Butcher tableau a and b, which specify the RK method
     std::shared_ptr<RKTableauButcherBase<dim,real,MeshType>> butcher_tableau;

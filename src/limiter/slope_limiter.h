@@ -2,7 +2,8 @@
 #define __SLOPE_LIMITER__
 
 #include "bound_preserving_limiter.h"
-#include "physics/burgers.h"
+//#include "physics/burgers.h"
+//#include "physics/euler.h"
 
 namespace PHiLiP {
 /// Class for implementation of min entropy principle limiter.
@@ -20,14 +21,14 @@ public:
     /// Pointer to TVB limiter class (TVB limiter can be applied in conjunction with this limiter)
     std::shared_ptr<BoundPreservingLimiterState<dim, nstate, real>> tvbLimiter;
 
-//    /// Pointer to positivity preserving limiter class
-//    std::shared_ptr<PositivityPreservingLimiter<dim, nstate, real>> posdensity_limiter;
+    /// Pointer to positivity preserving limiter class
+    std::shared_ptr<PositivityPreservingLimiter<dim, nstate, real>> posdensity_limiter;
 
-    /// Euler physics pointer. Used to compute pressure.
-    std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_physics;
-    
-    /// Burgers physics pointer. Used to compute pressure.
-    std::shared_ptr < Physics::Burgers<1, 1, double > > burgers_physics;
+//    /// Euler physics pointer. Used to compute pressure.
+//    std::shared_ptr < Physics::Euler<dim, nstate, double > > euler_physics;
+//    
+//    /// Burgers physics pointer. Used to compute pressure.
+//    std::shared_ptr < Physics::Burgers<1, 1, double > > burgers_physics;
 
     /// PDE type.
     Parameters::AllParameters::PartialDifferentialEquation pde_type;
@@ -35,10 +36,10 @@ public:
     /// Function to obtain the solution cell average
     using BoundPreservingLimiterState<dim, nstate, real>::get_soln_cell_avg;
 
-    /// Min entropy in each cell.
-    /* size number of local cells.
-    */
-    dealii::LinearAlgebra::distributed::Vector<double> local_min_entropy;
+//    /// Min entropy in each cell.
+//    /* size number of local cells.
+//    */
+//    dealii::LinearAlgebra::distributed::Vector<double> local_min_entropy;
 
     /// Applies positivity-preserving limiter to the solution.
     /// Using Zhang,Shu November 2010 Eq 3.14-3.19 or Wang, Shu 2012 Eq 3.7
@@ -55,6 +56,8 @@ public:
         const dealii::hp::QCollection<1>                        oneD_quadrature_collection,
         double dt =0);
 protected:
+    /// Solution update given by the ODE solver
+    dealii::LinearAlgebra::distributed::Vector<double> solution_update;
     /// Obtain the theta value used to scale all the states using 3.16-3.18 in Zhang, Shu 2010
     std::vector<real> get_theta2_Zhang2010(
         const std::vector< real >&                      p_lim,
@@ -96,6 +99,41 @@ protected:
         const unsigned int                                      max_degree,
         const dealii::hp::FECollection<1>                       oneD_fe_collection_1state,
         const dealii::hp::QCollection<1>                        oneD_quadrature_collection);
+
+    /// minmod funtcion
+    void minmod(
+    const real &a,
+    const real &b,
+    real &val);
+
+    /// transform to characteristic variables
+    void transform_cons_to_char_var(
+        const std::array<real,nstate> &soln,
+        std::array<real,nstate> &char_var);
+    /// transform characteristic to cons variables
+    void transform_char_to_cons_var(
+        const std::array<real,nstate> &char_var,
+        const std::array<real,nstate> &soln_prev,
+        std::array<real,nstate> &soln);
+    /// eiegnevctor matrix transform to characteristic variables
+    void eigenvect_cons_to_char_var(
+        const std::array<real,nstate> &soln,
+        const std::array<std::array<std::array<real,nstate>,nstate>,dim> &right_eig,
+        std::array<std::array<std::array<real,nstate>,nstate>,dim> &eigenvect);
+    /// eiegnevctor matrix transform characteristic to cons variables
+    void eigenvect_char_to_cons_var(
+        const std::array<real,nstate> &soln,
+        std::array<std::array<std::array<real,nstate>,nstate>,dim> &eigenvect);
+    /// eiegnevctor matrix transform to characteristic variables
+    void eigenvect_cons_to_char_var_roeavg(
+        const std::array<real,nstate> &soln_L,
+        const std::array<real,nstate> &soln_R,
+        std::array<std::array<real,nstate>,nstate> &eigenvect);
+    /// eiegnevctor matrix transform characteristic to cons variables
+    void eigenvect_char_to_cons_var_roeavg(
+        const std::array<real,nstate> &soln_L,
+        const std::array<real,nstate> &soln_R,
+        std::array<std::array<real,nstate>,nstate> &eigenvect);
 
 }; // End of PositivityPreservingLimiter Class
 } // PHiLiP namespace

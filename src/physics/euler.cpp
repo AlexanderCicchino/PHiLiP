@@ -449,6 +449,8 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim, nstate, real>
         conv_num_split_flux = convective_numerical_split_flux_chandrashekar(conservative_soln1, conservative_soln2);
     } else if(two_point_num_flux_type == two_point_num_flux_enum::Ra) {
         conv_num_split_flux = convective_numerical_split_flux_ranocha(conservative_soln1, conservative_soln2);
+    } else if(two_point_num_flux_type == two_point_num_flux_enum::SH) {
+        conv_num_split_flux = convective_numerical_split_flux_shima(conservative_soln1, conservative_soln2);
     }
 
     return conv_num_split_flux;
@@ -678,38 +680,100 @@ std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim, nstate, real>
 }
 
 template <int dim, int nstate, typename real>
+std::array<dealii::Tensor<1,dim,real>,nstate> Euler<dim, nstate, real>
+::convective_numerical_split_flux_shima(const std::array<real,nstate> &conservative_soln1,
+                                                const std::array<real,nstate> &conservative_soln2) const
+{
+    std::array<dealii::Tensor<1,dim,real>,nstate> conv_num_split_flux;
+    const real mean_density = compute_mean_density(conservative_soln1, conservative_soln2);
+   // const real mean_density = 2.0 * conservative_soln1[0] * conservative_soln2[0] / (conservative_soln1[0] + conservative_soln2[0]);
+    const real mean_pressure = compute_mean_pressure(conservative_soln1, conservative_soln2);
+    const dealii::Tensor<1,dim,real> mean_velocities = compute_mean_velocities(conservative_soln1,conservative_soln2);
+    const dealii::Tensor<1,dim,real> vel_L = compute_velocities(conservative_soln1);
+    const dealii::Tensor<1,dim,real> vel_R = compute_velocities(conservative_soln2);
+    const real p_L = compute_pressure(conservative_soln1);
+    const real p_R = compute_pressure(conservative_soln2);
+    real vel_vel_avg_dif = 0.0;
+    dealii::Tensor<1,dim,real> p_vel_avg_dif;
+    for(int idim=0; idim<dim; idim++){
+        vel_vel_avg_dif += 2.0 * mean_velocities[idim] * mean_velocities[idim] - 0.5 * (vel_L[idim]*vel_R[idim] + vel_L[idim]*vel_R[idim]);
+       //kuwai
+  //      vel_vel_avg_dif += mean_velocities[idim] * mean_velocities[idim];
+        p_vel_avg_dif[idim] = 2.0 * mean_pressure * mean_velocities[idim] - 0.5 * (p_L*vel_L[idim] + p_R*vel_R[idim]);
+    }
+
+    //play around
+   // const real h_L = (conservative_soln1[nstate-1] + p_L)/conservative_soln1[0];
+   // const real h_R = (conservative_soln2[nstate-1] + p_R)/conservative_soln2[0];
+   // const real h_avg = 0.5*(h_L+h_R);
+
+    for (int flux_dim = 0; flux_dim < dim; ++flux_dim)
+    {
+        // Density equation
+        conv_num_split_flux[0][flux_dim] = mean_density * mean_velocities[flux_dim];
+        // Momentum equation
+        for (int velocity_dim=0; velocity_dim<dim; ++velocity_dim){
+            conv_num_split_flux[1+velocity_dim][flux_dim] = mean_density*mean_velocities[flux_dim]*mean_velocities[velocity_dim];
+        }
+        conv_num_split_flux[1+flux_dim][flux_dim] += mean_pressure; // Add diagonal of pressure
+        // Energy equation
+        conv_num_split_flux[nstate-1][flux_dim] = 0.5 * mean_density*mean_velocities[flux_dim]*vel_vel_avg_dif
+                                                + 1.0/this->gamm1 * mean_pressure * mean_velocities[flux_dim]
+                                                + p_vel_avg_dif[flux_dim];
+     //kuwai
+//        conv_num_split_flux[nstate-1][flux_dim] = mean_density*mean_velocities[flux_dim]*vel_vel_avg_dif
+//                                                + 1.0/this->gamm1 * mean_density * 0.5*(p_L/conservative_soln1[0] + p_R/conservative_soln2[0]) * mean_velocities[flux_dim]
+//                                                + p_vel_avg_dif[flux_dim];
+       // conv_num_split_flux[nstate-1][flux_dim] = mean_density*h_avg*mean_velocities[flux_dim];
+    }
+
+
+//    //playing around
+//    const real s_L = log(p_L) - this->gam * log(conservative_soln1[0]);
+//    const real s_R = log(p_R) - this->gam * log(conservative_soln2[0]);
+//    const std::array<real,nstate> prim_var_L = convert_conservative_to_primitive(conservative_soln1);
+//    const std::array<real,nstate> prim_var_R = convert_conservative_to_primitive(conservative_soln2);
+//   // const real t_L = compute_temperature(prim_var_L);
+//   // const real t_R = compute_temperature(prim_var_L);
+//    this->pcout<<" T dels "<< (s_R - s_L)*(0.5*(p_L+p_R)/(0.4)) <<" versus "<<((p_R/(0.4*prim_var_R[0])) - (p_L/(0.4*prim_var_L[0]))) - (prim_var_R[0] - prim_var_L[0])*0.5*((p_R/(prim_var_R[0]*prim_var_R[0])) + (p_L/(prim_var_L[0]*prim_var_L[0])))*(1.4/0.4)<< std::setprecision(16)<<std::endl;
+
+    return conv_num_split_flux;
+}
+
+
+template <int dim, int nstate, typename real>
 std::array<real,nstate> Euler<dim, nstate, real>
 ::compute_entropy_variables (
     const std::array<real,nstate> &conservative_soln) const
 {
-    std::array<real,nstate> entropy_var;
-    const real density = conservative_soln[0];
-    const real pressure = compute_pressure<real>(conservative_soln);
-
-    const real entropy = compute_entropy<real>(density, pressure);
-
-    entropy_var[0] = (gam - entropy + 1.0 )/gamm1 - conservative_soln[nstate-1] / pressure;
-    for(int idim=0; idim<dim; idim++){
-        entropy_var[idim+1] = conservative_soln[idim+1] / pressure;
-    }
-    entropy_var[nstate-1] = - density / pressure;
-
-    return entropy_var;
 //    std::array<real,nstate> entropy_var;
 //    const real density = conservative_soln[0];
 //    const real pressure = compute_pressure<real>(conservative_soln);
-//    
+//
 //    const real entropy = compute_entropy<real>(density, pressure);
 //
-//    const real rho_theta = pressure / gamm1;
-//
-//    entropy_var[0] = (rho_theta *(gam + 1.0 - entropy) - conservative_soln[nstate-1])/rho_theta;
+//    entropy_var[0] = (gam - entropy + 1.0 )/gamm1 - conservative_soln[nstate-1] / pressure;
 //    for(int idim=0; idim<dim; idim++){
-//        entropy_var[idim+1] = conservative_soln[idim+1] / rho_theta;
+//        entropy_var[idim+1] = conservative_soln[idim+1] / pressure;
 //    }
-//    entropy_var[nstate-1] = - density / rho_theta;
+//    entropy_var[nstate-1] = - density / pressure;
 //
 //    return entropy_var;
+    std::array<real,nstate> entropy_var;
+    const real density = conservative_soln[0];
+    const real pressure = compute_pressure<real>(conservative_soln);
+    
+    const real entropy = compute_entropy<real>(density, pressure);
+
+    const real rho_theta = pressure / gamm1;
+
+    entropy_var[0] = (rho_theta *(gam + 1.0 - entropy) - conservative_soln[nstate-1])/rho_theta;
+    for(int idim=0; idim<dim; idim++){
+        entropy_var[idim+1] = conservative_soln[idim+1] / rho_theta;
+    }
+    entropy_var[nstate-1] = - density / rho_theta;
+
+    return entropy_var;
 }
 
 template <int dim, int nstate, typename real>

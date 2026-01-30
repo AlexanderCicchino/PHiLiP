@@ -60,6 +60,11 @@ public:
 
     /// Function to prepare the LSRK for a step in time
     void prep_for_step_in_time();
+
+    /// Function to calculate stage
+    void calculate_lim_stage(const int /*istage*/, real /*dt*/) override
+    {//do nothing
+    };
 protected:
     /// Stores Butcher tableau a and b, which specify the RK method
     std::shared_ptr<LowStorageRKTableauBase<dim,real,MeshType>> butcher_tableau;

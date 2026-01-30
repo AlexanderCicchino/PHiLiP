@@ -1,5 +1,5 @@
-#ifndef __MAXIMUM_PRINCIPLE_LIMITER__
-#define __MAXIMUM_PRINCIPLE_LIMITER__
+#ifndef __CHARACTERISTIC_MAXIMUM_PRINCIPLE_LIMITER__
+#define __CHARACTERISTIC_MAXIMUM_PRINCIPLE_LIMITER__
 
 #include "bound_preserving_limiter.h"
 
@@ -11,15 +11,15 @@ namespace PHiLiP {
 * Journal of Computational Physics 229.9 (2010): 3091-3120.
 **********************************/
 template<int dim, int nstate, typename real>
-class MaximumPrincipleLimiter : public BoundPreservingLimiterState <dim, nstate, real>
+class CharacteristicMaxPrinciple: public BoundPreservingLimiterState <dim, nstate, real>
 {
 public:
     /// Constructor
-    explicit MaximumPrincipleLimiter(
+    explicit CharacteristicMaxPrinciple(
         const Parameters::AllParameters* const parameters_input);
 
     /// Destructor
-    ~MaximumPrincipleLimiter() = default;
+    ~CharacteristicMaxPrinciple() = default;
 
     /// Maximum of initial solution for each state in domain.
     std::vector<real> global_max;
@@ -63,7 +63,16 @@ public:
         const dealii::hp::QCollection<1>                        oneD_quadrature_collection,
         double                                                  dt) override;
 
-}; // End of MaximumPrincipleLimiter Class
+    /// eiegnevctor matrix transform to characteristic variables
+    void eigenvect_cons_to_char_var(
+        const std::array<real,nstate> &soln,
+        std::array<std::array<real,nstate>,nstate> &eigenvect);
+    /// eiegnevctor matrix transform characteristic to cons variables
+    void eigenvect_char_to_cons_var(
+        const std::array<real,nstate> &soln,
+        std::array<std::array<real,nstate>,nstate> &eigenvect);
+
+}; // End of CharacteristicMaxPrinciple Class
 } // PHiLiP namespace
 
 #endif

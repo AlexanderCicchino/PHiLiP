@@ -42,6 +42,7 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " double_mach_reflection | "
                           " shock_diffraction | "
                           " astrophysical_jet | "
+                          " euler_density_wave | "
                           " strong_vortex_shock_wave |"),
                           "The type of flow we want to simulate. "
                           "Choices are "
@@ -67,6 +68,7 @@ void FlowSolverParam::declare_parameters(dealii::ParameterHandler &prm)
                           " double_mach_reflection | "
                           " shock_diffraction | "
                           " astrophysical_jet | "
+                          " euler_density_wave | "
                           " strong_vortex_shock_wave >. ");
 
         prm.declare_entry("poly_degree", "1",
@@ -396,6 +398,7 @@ void FlowSolverParam::parse_parameters(dealii::ParameterHandler &prm)
         else if (flow_case_type_string == "shock_diffraction")          {flow_case_type = shock_diffraction;}
         else if (flow_case_type_string == "astrophysical_jet")          {flow_case_type = astrophysical_jet;}
         else if (flow_case_type_string == "strong_vortex_shock_wave")   {flow_case_type = strong_vortex_shock_wave;}
+        else if (flow_case_type_string == "euler_density_wave")         {flow_case_type = euler_density_wave;}
         
         poly_degree = prm.get_integer("poly_degree");
         

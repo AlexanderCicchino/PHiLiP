@@ -25,6 +25,12 @@ void RungeKuttaBase<dim, real, n_rk_stages, MeshType>::step_in_time(real dt, con
     for (int istage = 0; istage < n_rk_stages; ++istage){
         this->calculate_stage_solution(istage, dt, pseudotime); // u_n + dt * sum(a_ij * k_j) <explicit> + dt * a_ii * u^(istage) <implicit>
         this->apply_limiter(dt);
+
+        this->apply_limiter(dt);
+        this->apply_limiter(dt);
+       // if((this->all_parameters->limiter_param.bound_preserving_limiter == Parameters::LimiterParam::LimiterType::slope_lim || this->all_parameters->limiter_param.bound_preserving_limiter == Parameters::LimiterParam::LimiterType::char_max_princ) && istage > 0){
+       //     this->calculate_lim_stage(istage, dt);
+       // }
         this->calculate_stage_derivative(istage, dt); //rk_stage[istage] = IMM*RHS = F(u_n + dt*sum(a_ij*k_j))
     }
     dt = this->adjust_time_step(dt);
@@ -32,6 +38,9 @@ void RungeKuttaBase<dim, real, n_rk_stages, MeshType>::step_in_time(real dt, con
     this->dg->solution = this->solution_update; 
      // Calculate numerical entropy with FR correction. Does nothing if use has not selected param.
     this->FR_entropy_contribution_RRK_solver = relaxation_runge_kutta->compute_FR_entropy_contribution(dt, this->dg, this->rk_stage, true);
+    this->apply_limiter(dt);
+
+    this->apply_limiter(dt);
     this->apply_limiter(dt);
     ++(this->current_iteration);
     this->current_time += dt;
@@ -67,6 +76,8 @@ void RungeKuttaBase<dim, real, n_rk_stages, MeshType>::allocate_ode_system()
     for (int istage=0; istage<n_rk_stages; ++istage) {
         this->rk_stage[istage].reinit(this->dg->solution);
     }
+
+    this->temp_rk_stage.reinit(this->dg->solution);
 
     this->allocate_runge_kutta_system();
 }

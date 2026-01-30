@@ -20,6 +20,7 @@ void LimiterParam::declare_parameters (dealii::ParameterHandler &prm)
                            "maximum_principle | "
                            "positivity_preservingZhang2010 | "
                            "slope_lim | "
+                           "char_max_princ | "
                            "positivity_preservingWang2012 "),
                            "The type of limiter we want to apply to the solution. "
                            "Choices are "
@@ -27,6 +28,7 @@ void LimiterParam::declare_parameters (dealii::ParameterHandler &prm)
                            " maximum_principle | "
                            " positivity_preservingZhang2010 | "
                            " slope_lim | "
+                           " char_max_princ | "
                            " positivity_preservingWang2012>.");
 
         prm.declare_entry("min_density", "1e-13",
@@ -61,6 +63,7 @@ void LimiterParam::parse_parameters (dealii::ParameterHandler &prm)
         if (bound_preserving_limiter_string == "positivity_preservingZhang2010")     bound_preserving_limiter = LimiterType::positivity_preservingZhang2010;
         if (bound_preserving_limiter_string == "positivity_preservingWang2012")      bound_preserving_limiter = LimiterType::positivity_preservingWang2012;
         if (bound_preserving_limiter_string == "slope_lim")      bound_preserving_limiter = LimiterType::slope_lim;
+        if (bound_preserving_limiter_string == "char_max_princ")      bound_preserving_limiter = LimiterType::char_max_princ;
 
         min_density = prm.get_double("min_density");
 

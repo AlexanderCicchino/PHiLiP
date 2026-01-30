@@ -23,8 +23,9 @@ set use_inverse_mass_on_the_fly = true
 
 #limiter flags
 subsection limiter
-  set bound_preserving_limiter = positivity_preservingWang2012
+ # set bound_preserving_limiter = positivity_preservingWang2012
   set min_density = 1e-13
+  set bound_preserving_limiter = slope_lim
   #set use_tvb_limiter = true
   #set max_delta_x = 0.0
   #set tuning_parameter_for_each_state = 0,0,0,0

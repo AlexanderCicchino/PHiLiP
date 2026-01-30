@@ -23,6 +23,7 @@ set use_inverse_mass_on_the_fly = true
 
 subsection limiter
   set bound_preserving_limiter = positivity_preservingWang2012
+ # set bound_preserving_limiter = slope_lim
   set min_density = 1e-13
 end
 

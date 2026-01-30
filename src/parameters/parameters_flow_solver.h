@@ -37,6 +37,7 @@ public:
         double_mach_reflection,
         shock_diffraction,
         astrophysical_jet,
+        euler_density_wave,
         strong_vortex_shock_wave
         };
     FlowCaseType flow_case_type; ///< Selected FlowCaseType from the input file

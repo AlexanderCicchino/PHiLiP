@@ -1,4 +1,4 @@
-#include "maximum_principle_limiter.h"
+#include "characteristic_max_princ_lim.h"
 #include "tvb_limiter.h"
 
 namespace PHiLiP {
@@ -9,7 +9,7 @@ namespace PHiLiP {
 **********************************/
 // Constructor
 template <int dim, int nstate, typename real>
-MaximumPrincipleLimiter<dim, nstate, real>::MaximumPrincipleLimiter(
+CharacteristicMaxPrinciple<dim, nstate, real>::CharacteristicMaxPrinciple(
     const Parameters::AllParameters* const parameters_input)
     : BoundPreservingLimiterState<dim,nstate, real>::BoundPreservingLimiterState(parameters_input) 
 {
@@ -26,10 +26,10 @@ MaximumPrincipleLimiter<dim, nstate, real>::MaximumPrincipleLimiter(
 }
 
 template <int dim, int nstate, typename real>
-void MaximumPrincipleLimiter<dim, nstate, real>::get_global_max_and_min_of_solution(
+void CharacteristicMaxPrinciple<dim, nstate, real>::get_global_max_and_min_of_solution(
     const dealii::LinearAlgebra::distributed::Vector<double>&   solution,
     const dealii::DoFHandler<dim>&                              dof_handler,
-    const dealii::hp::QCollection<dim>&                     /*volume_quadrature_collection*/,
+    const dealii::hp::QCollection<dim>&                     volume_quadrature_collection,
     const dealii::hp::FECollection<dim>&                        fe_collection)
 {
     for (auto soln_cell : dof_handler.active_cell_iterators()) {
@@ -64,23 +64,48 @@ void MaximumPrincipleLimiter<dim, nstate, real>::get_global_max_and_min_of_solut
                 soln_coeff[istate].resize(n_shape_fns);
             }
             soln_coeff[istate][ishape] = solution[current_dofs_indices[idof]]; //
-            if (soln_coeff[istate][ishape] > global_max[istate])
-                global_max[istate] = soln_coeff[istate][ishape];
-            if (soln_coeff[istate][ishape] < global_min[istate])
-                global_min[istate] = soln_coeff[istate][ishape];
+        }
+        // Obtain solution cell average
+        const unsigned int n_quad_pts = volume_quadrature_collection[poly_degree].size();
+        const std::vector<real>& quad_weights = volume_quadrature_collection[poly_degree].get_weights();
+        std::array<real, nstate> soln_cell_avg = get_soln_cell_avg(soln_coeff, n_quad_pts, quad_weights);//coeff bc only GLL for now
+        //get characteristic transformation matrices about the cell average
+        std::array<std::array<real,nstate>,nstate> eigenvect_cons_to_char{};
+        std::array<std::array<real,nstate>,nstate> eigenvect_char_to_cons{};
+        eigenvect_cons_to_char_var(soln_cell_avg, eigenvect_cons_to_char);
+        eigenvect_char_to_cons_var(soln_cell_avg, eigenvect_char_to_cons);
+
+        //transform the solution at quad points to characteristic values
+        std::array<std::vector<real>, nstate> char_at_q;
+        for(int istate=0; istate<nstate; istate++){
+            char_at_q[istate].resize(n_quad_pts);
+            for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+                char_at_q[istate][iquad] = 0.0;
+                for(int jstate=0; jstate<nstate; jstate++){
+                    char_at_q[istate][iquad] += eigenvect_cons_to_char[istate][jstate]
+                                               * soln_coeff[jstate][iquad];//doing coeffs for now
+                }
+                //set global max and min for the characteristic variables
+                if (char_at_q[istate][iquad] > global_max[istate])
+                    global_max[istate] = char_at_q[istate][iquad];
+                if (char_at_q[istate][iquad] < global_min[istate])
+                    global_min[istate] = char_at_q[istate][iquad];
+            }
         }
     }
 
+#if 0
     // Print the obtained values for verification
     for (unsigned int istate = 0; istate < nstate; ++istate) {
         std::cout << std::fixed;
         std::cout << std::setprecision(14);
         std::cout << "global_max:   " << global_max[istate] << "   global_min:   " << global_min[istate] << std::endl;
     }
+#endif
 }
 
 template <int dim, int nstate, typename real>
-void MaximumPrincipleLimiter<dim, nstate, real>::write_limited_solution(
+void CharacteristicMaxPrinciple<dim, nstate, real>::write_limited_solution(
     dealii::LinearAlgebra::distributed::Vector<double>&      solution,
     const std::array<std::vector<real>, nstate>&             soln_coeff,
     const unsigned int                                       n_shape_fns,
@@ -92,6 +117,7 @@ void MaximumPrincipleLimiter<dim, nstate, real>::write_limited_solution(
             const unsigned int idof = istate * n_shape_fns + ishape;
             solution[current_dofs_indices[idof]] = soln_coeff[istate][ishape];
 
+#if 0
             if (solution[current_dofs_indices[idof]] > global_max[istate] + 1e-13) {
                 std::cout << "Error: Solution exceeds global maximum   -   Aborting... Value:   " << solution[current_dofs_indices[idof]] << std::endl << std::flush;
                 std::abort();
@@ -100,12 +126,70 @@ void MaximumPrincipleLimiter<dim, nstate, real>::write_limited_solution(
                 std::cout << "Error: Solution exceeds global minimum   -   Aborting... Value:   " << solution[current_dofs_indices[idof]] << std::endl << std::flush;
                 std::abort();
             }
+#endif
         }
+    }
+}
+template <int dim, int nstate, typename real>
+void CharacteristicMaxPrinciple<dim, nstate, real>::eigenvect_cons_to_char_var(
+    const std::array<real,nstate> &soln,
+    std::array<std::array<real,nstate>,nstate> &eigenvect)
+{
+    const real density = soln[0];
+    dealii::Tensor<1,dim,real> vel;
+    real vel2 = 0.0;
+    for(int idim=0; idim<dim; idim++){
+        vel[idim] = soln[idim+1]/soln[0];
+        vel2 += vel[idim] * vel[idim];
+    }
+    const real pressure = (0.4) * (soln[nstate-1] - 0.5 * density * vel2);
+   // const real specific_total_enthalpy = soln[nstate-1]/density + pressure/density;
+    const real a = sqrt(pressure*1.4/density);
+    const real a2 = a*a;
+    if constexpr(dim==1){
+        eigenvect[0][0] = (0.4)/4.0*vel[0]*vel[0]/(a2) + vel[0]/(2.0*a);
+        eigenvect[0][1] =  -0.4/2.0*vel[0]/a2 - 1.0/2.0/a;
+        eigenvect[0][2] = 0.4/(2.0*a2);
+        eigenvect[1][0] = 1.0 - 0.4/2.0*vel[0]*vel[0]/a2;
+        eigenvect[1][1] = 0.4*vel[0]/a2;
+        eigenvect[1][2] = -0.4/a2;
+        eigenvect[2][0] = 0.4/4.0*vel[0]*vel[0]/a2 - vel[0]/2.0/a;
+        eigenvect[2][1] = -0.4/2.0*vel[0]/a2 + 1.0/2.0/a;
+        eigenvect[2][2] = 0.4/2.0/a2;
+        
+    }
+}
+template <int dim, int nstate, typename real>
+void CharacteristicMaxPrinciple<dim, nstate, real>::eigenvect_char_to_cons_var(
+    const std::array<real,nstate> &soln,
+    std::array<std::array<real,nstate>,nstate> &eigenvect)
+{
+    const real density = soln[0];
+    dealii::Tensor<1,dim,real> vel;
+    real vel2 = 0.0;
+    for(int idim=0; idim<dim; idim++){
+        vel[idim] = soln[idim+1]/soln[0];
+        vel2 += vel[idim] * vel[idim];
+    }
+    const real pressure = (0.4) * (soln[nstate-1] - 0.5 * density * vel2);
+    const real specific_total_enthalpy = soln[nstate-1]/density + pressure/density;
+    const real speed_sound = sqrt(pressure*1.4/density);
+    if constexpr(dim==1){
+        eigenvect[0][0] = 1.0;
+        eigenvect[0][1] = 1.0;
+        eigenvect[0][2] = 1.0;
+        eigenvect[1][0] = vel[0] - speed_sound;
+        eigenvect[1][1] = vel[0];
+        eigenvect[1][2] = vel[0] + speed_sound;
+        eigenvect[2][0] = specific_total_enthalpy - vel[0] * speed_sound;
+        eigenvect[2][1] = 0.5 * vel2;
+        eigenvect[2][2] = specific_total_enthalpy + vel[0] * speed_sound;
+        
     }
 }
 
 template <int dim, int nstate, typename real>
-void MaximumPrincipleLimiter<dim, nstate, real>::limit(
+void CharacteristicMaxPrinciple<dim, nstate, real>::limit(
         dealii::LinearAlgebra::distributed::Vector<double>&     solution,
         const dealii::DoFHandler<dim>&                          dof_handler,
         const dealii::hp::FECollection<dim>&                    fe_collection,
@@ -168,59 +252,50 @@ void MaximumPrincipleLimiter<dim, nstate, real>::limit(
             const unsigned int istate = fe_collection[poly_degree].system_to_component_index(idof).first;
             const unsigned int ishape = fe_collection[poly_degree].system_to_component_index(idof).second;
             soln_coeff[istate][ishape] = solution[current_dofs_indices[idof]];
-
-            if (soln_coeff[istate][ishape] > local_max[istate])
-                local_max[istate] = soln_coeff[istate][ishape];
-
-            if (soln_coeff[istate][ishape] < local_min[istate])
-                local_min[istate] = soln_coeff[istate][ishape];
         }
-
-
+//        //interp soln coeff to quad points
+//        std::array<std::vector<real>, nstate> soln_at_q;
+//        for(int istate=0; istate<nstate; istate++){
+//            soln_basis.matrix_vector_mult_1D(soln_coeff[istate], soln_at_q[istate],
+//                                             soln_basis.oneD_vol_operator);
+//        }
+        // Obtain solution cell average
         const unsigned int n_quad_pts = volume_quadrature_collection[poly_degree].size();
         const std::vector<real>& quad_weights = volume_quadrature_collection[poly_degree].get_weights();
+        std::array<real, nstate> soln_cell_avg = get_soln_cell_avg(soln_coeff, n_quad_pts, quad_weights);//coeff bc only GLL for now
+        //get characteristic transformation matrices about the cell average
 
-        std::array<std::array<std::vector<real>, nstate>, dim> soln_at_q;
-        std::array<std::vector<real>, nstate> soln_at_q_dim;
-
-        // Interpolate solution dofs to quadrature pts.
-        for(unsigned int idim = 0; idim < dim; idim++) {
-            for (int istate = 0; istate < nstate; istate++) {
-                soln_at_q_dim[istate].resize(n_quad_pts);
-
-                if(idim == 0) {
-                    soln_basis_GLL.matrix_vector_mult(soln_coeff[istate], soln_at_q_dim[istate],
-                        soln_basis_GLL.oneD_vol_operator, soln_basis_GL.oneD_vol_operator, soln_basis_GL.oneD_vol_operator);
-                }
-
-                if(idim == 1) {
-                    soln_basis_GLL.matrix_vector_mult(soln_coeff[istate], soln_at_q_dim[istate],
-                        soln_basis_GL.oneD_vol_operator, soln_basis_GLL.oneD_vol_operator, soln_basis_GL.oneD_vol_operator);
-                }
-
-                if(idim == 2) {
-                    soln_basis_GLL.matrix_vector_mult(soln_coeff[istate], soln_at_q_dim[istate],
-                        soln_basis_GL.oneD_vol_operator, soln_basis_GL.oneD_vol_operator, soln_basis_GLL.oneD_vol_operator);
-                }
-            }
-            soln_at_q[idim] = soln_at_q_dim;
-        }
-
-        for (unsigned int idim = 0; idim < dim; ++idim) {
-             for (unsigned int istate = 0; istate < nstate; ++istate) {
-                for (unsigned int iquad = 0; iquad < n_quad_pts; ++iquad) {
-                    if(soln_at_q[idim][istate][iquad] > local_max[istate]) {
-                        local_max[istate] = soln_at_q[idim][istate][iquad];
-                    }
-                    if(soln_at_q[idim][istate][iquad] < local_min[istate]) {
-                        local_min[istate] = soln_at_q[idim][istate][iquad];
-                    }
-                }
+        std::array<std::array<real,nstate>,nstate> eigenvect_cons_to_char{};
+        std::array<std::array<real,nstate>,nstate> eigenvect_char_to_cons{};
+        eigenvect_cons_to_char_var(soln_cell_avg, eigenvect_cons_to_char);
+        eigenvect_char_to_cons_var(soln_cell_avg, eigenvect_char_to_cons);
+        //get L*soln_avg
+        std::array<real, nstate> char_soln_avg;
+        for(int istate=0; istate<nstate; istate++){
+            char_soln_avg[istate] = 0.0;
+            for(int jstate=0; jstate<nstate; jstate++){
+                char_soln_avg[istate] += eigenvect_cons_to_char[istate][jstate]
+                                       * soln_cell_avg[jstate];
             }
         }
 
-        // Obtain solution cell average
-        std::array<real, nstate> soln_cell_avg = get_soln_cell_avg(soln_coeff, n_quad_pts, quad_weights);
+        //transform the solution at quad points to characteristic values
+        std::array<std::vector<real>, nstate> char_at_q;
+        for(int istate=0; istate<nstate; istate++){
+            char_at_q[istate].resize(n_quad_pts);
+            for(unsigned int iquad=0; iquad<n_quad_pts; iquad++){
+                char_at_q[istate][iquad] = 0.0;
+                for(int jstate=0; jstate<nstate; jstate++){
+                    char_at_q[istate][iquad] += eigenvect_cons_to_char[istate][jstate]
+                                               * soln_coeff[jstate][iquad];//only coeff for now
+                }
+                //set local max and min for the characteristic variables
+                if(char_at_q[istate][iquad] > local_max[istate])
+                    local_max[istate] = char_at_q[istate][iquad];
+                if(char_at_q[istate][iquad] < local_min[istate])
+                    local_min[istate] = char_at_q[istate][iquad];
+            }
+        }
 
         // Obtain theta value
         std::array<real, nstate> theta; // Value used to linearly scale solution 
@@ -228,32 +303,34 @@ void MaximumPrincipleLimiter<dim, nstate, real>::limit(
             real maxscale = 1.0;
             real minscale = 1.0;
 
-            if (local_max[istate] - soln_cell_avg[istate] != 0)
-                maxscale = local_max[istate] - soln_cell_avg[istate];
-            if (local_min[istate] - soln_cell_avg[istate] != 0)
-                minscale = local_min[istate] - soln_cell_avg[istate];
+            if (local_max[istate] - char_soln_avg[istate] != 0)
+                maxscale = local_max[istate] - char_soln_avg[istate];
+            if (local_min[istate] - char_soln_avg[istate] != 0)
+                minscale = local_min[istate] - char_soln_avg[istate];
 
-            theta[istate] = std::min({ abs((global_max[istate] - soln_cell_avg[istate]) / maxscale),
-                                        abs((global_min[istate] - soln_cell_avg[istate]) / minscale), 1.0 });
+            theta[istate] = std::min({ abs((global_max[istate] - char_soln_avg[istate]) / maxscale),
+                                        abs((global_min[istate] - char_soln_avg[istate]) / minscale), 1.0 });
         }
 
         // Apply limiter on solution values at quadrature points
         for (unsigned int istate = 0; istate < nstate; ++istate) {
             for (unsigned int iquad = 0; iquad < n_quad_pts; ++iquad) {
-                soln_coeff[istate][iquad] = theta[istate] * (soln_coeff[istate][iquad] - soln_cell_avg[istate])
-                    + soln_cell_avg[istate];
+                soln_coeff[istate][iquad] = soln_cell_avg[istate];
+                for(int jstate=0; jstate<nstate; jstate++){
+                    soln_coeff[istate][iquad] += eigenvect_char_to_cons[istate][jstate]
+                                               * theta[jstate]
+                                               * (char_at_q[jstate][iquad] - char_soln_avg[jstate]);
+                }
             }
         }
 
         // Write limited solution back and verify that the strict maximum principle is satisfied
         write_limited_solution(solution, soln_coeff, n_shape_fns, current_dofs_indices);
     }
+
+//    //after the step reset the global char max and min
+//    get_global_max_and_min_of_solution(solution, dof_handler, volume_quadrature_collection, fe_collection);
 }
 
-template class MaximumPrincipleLimiter <PHILIP_DIM, 1, double>;
-template class MaximumPrincipleLimiter <PHILIP_DIM, 2, double>;
-template class MaximumPrincipleLimiter <PHILIP_DIM, 3, double>;
-template class MaximumPrincipleLimiter <PHILIP_DIM, 4, double>;
-template class MaximumPrincipleLimiter <PHILIP_DIM, 5, double>;
-template class MaximumPrincipleLimiter <PHILIP_DIM, 6, double>;
+template class CharacteristicMaxPrinciple <PHILIP_DIM, PHILIP_DIM+2, double>;
 } // PHiLiP namespace

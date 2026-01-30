@@ -5,6 +5,7 @@ SET(LIMSOURCE
     positivity_preserving_limiter.cpp
     bound_preserving_limiter_factory.cpp
     slope_limiter.cpp
+    characteristic_max_princ_lim.cpp
     )
 
 foreach(dim RANGE 1 3)

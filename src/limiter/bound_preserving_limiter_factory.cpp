@@ -5,6 +5,7 @@
 #include "maximum_principle_limiter.h"
 #include "positivity_preserving_limiter.h"
 #include "slope_limiter.h"
+#include "characteristic_max_princ_lim.h"
 
 namespace PHiLiP {
 template <int dim, int nstate, typename real>
@@ -56,7 +57,7 @@ std::unique_ptr< BoundPreservingLimiter<dim, real> >
     } else if(curvilinear_grid) {
         std::cout << "Error: Cannot create limiter for curvilinear grid" << std::endl;
         std::abort();
-    } else if (flux_nodes_type != flux_nodes_enum::GLL) {
+    } else if (flux_nodes_type != flux_nodes_enum::GLL && limiter_type != limiter_enum::slope_lim && limiter_type != limiter_enum::char_max_princ) {
         std::cout << "Error: Can only use limiter with GLL flux nodes" << std::endl;
         std::abort();
     } else if (limiter_type == limiter_enum::maximum_principle) {
@@ -72,7 +73,11 @@ std::unique_ptr< BoundPreservingLimiter<dim, real> >
             }
         }
     } else if (limiter_type == limiter_enum::slope_lim) {
-        return std::make_unique< SlopeLimiter<dim, nstate, real> >(parameters_input);
+        if (nstate == dim + 2)
+            return std::make_unique< SlopeLimiter<dim, nstate, real> >(parameters_input);
+    } else if (limiter_type == limiter_enum::char_max_princ) {
+        if (nstate == dim + 2)
+            return std::make_unique< CharacteristicMaxPrinciple<dim, nstate, real> >(parameters_input);
     }
 
 
